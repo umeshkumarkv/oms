@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: order-service
+          uri: http://order-service:8082
+          predicates:
+            - Path=/api/v1/orders/**
+        - id: client-service
+          uri: http://client-service:8083
+          predicates:
+            - Path=/api/v1/clients/**
+        - id: marketdata-service
+          uri: http://marketdata-service:8084
+          predicates:
+            - Path=/api/v1/market/**
+        - id: risk-service
+          uri: http://risk-service:8085
+          predicates:
+            - Path=/api/v1/risk/**
+        - id: execution-service
+          uri: http://execution-service:8086
+          predicates:
+            - Path=/api/v1/executions/**
+        - id: audit-service
+          uri: http://audit-service:8087
+          predicates:
+            - Path=/api/v1/audit/**
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+logging:
+  level:
+    com.brokerdealer: INFO
+    org.springframework.cloud.gateway: WARN
