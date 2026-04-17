@@ -26,7 +26,7 @@
     <module>services/risk-service</module>
     <module>services/execution-service</module>
     <module>services/audit-service</module>
-    <module>api-gateway</module>
+    <module>services/api-gateway</module>
   </modules>
 
   <properties>
