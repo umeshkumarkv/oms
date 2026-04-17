@@ -39,7 +39,8 @@ Methodology: Agentic AI SDLC — Claude Code executes JIRA stories,
 | Migrations     | Flyway                        | Via Boot     |
 | Async          | Apache Kafka + Zookeeper      | Latest       |
 | Cache          | Redis via Spring Data Redis   | Latest       |
-| Gateway        | Spring Cloud Gateway          | Via Boot     |
+| Concurrency    | Java 21 Virtual Threads       | JDK 21       |
+| Gateway        | Spring Cloud Gateway MVC      | Via Boot     |
 | Auth           | JWT via jjwt                  | 0.12.x       |
 | Resilience     | Resilience4j                  | Via Boot     |
 | API Docs       | SpringDoc OpenAPI             | 2.x          |
@@ -264,6 +265,7 @@ Interface contract:
 - NEVER log sensitive client data — log IDs and states only
 - NEVER push directly to develop or main — always via PR
 - NEVER use Spring ApplicationEvent — use Kafka only
+- NEVER use WebFlux or reactive programming (Mono, Flux, Reactor) — use virtual threads
 - NEVER introduce a new dependency without updating this file
 - Market hours: 09:30–16:00 ET Monday–Friday
 - Timezone: always America/New_York — never UTC for market hours
@@ -273,7 +275,44 @@ Interface contract:
 
 ---
 
-## 11. REST API Standards
+## 11. Concurrency Model — Virtual Threads Mandatory
+
+Java 21 virtual threads replace reactive programming for all I/O-bound work.
+This is a project-wide standard. No exceptions.
+
+### Mandatory configuration — every service application.yml
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+
+This single flag makes Spring Boot 3.2 dispatch all request-handling threads,
+@Async tasks, and scheduled tasks on virtual threads automatically.
+
+### Why virtual threads — not WebFlux
+
+| Concern           | WebFlux (Reactor)         | Virtual Threads (Java 21)     |
+|-------------------|---------------------------|-------------------------------|
+| Programming model | Reactive — Mono/Flux      | Blocking — standard Java      |
+| Debugging         | Async stack traces        | Normal stack traces           |
+| Consistency       | Different from MVC        | Same model across all services|
+| I/O throughput    | High                      | Equivalent at this scale      |
+| Complexity        | High — operators, context | None — write blocking code    |
+
+### Rules
+
+- All services set spring.threads.virtual.enabled: true — no exceptions
+- Write blocking code — virtual threads handle the I/O scheduling
+- Do NOT use CompletableFuture chains to avoid blocking — just block
+- @Async methods benefit automatically — no Executor configuration needed
+- Spring Data JPA, RestTemplate, WebClient (if used) all work without changes
+- NEVER introduce Mono, Flux, or any Reactor type — treat as a build error
+- api-gateway uses Spring Cloud Gateway MVC (servlet) — not reactive Gateway
+
+---
+
+## 12. REST API Standards
 
 - Base path: /api/v1/{resource}
 - Resources: plural nouns — /orders, /clients, /executions
@@ -307,7 +346,7 @@ Error response envelope:
 
 ---
 
-## 12. Security
+## 13. Security
 
 - JWT issued by auth-service on login
 - Token payload: userId, role, expiry
@@ -326,7 +365,7 @@ Error response envelope:
 
 ---
 
-## 13. Testing Requirements
+## 14. Testing Requirements
 
 - Unit tests: all business logic, all risk rules, all state transitions
 - Integration tests: all REST endpoints — happy path + error cases
@@ -336,7 +375,7 @@ Error response envelope:
 
 ---
 
-## 14. GitHub Workflow
+## 15. GitHub Workflow
 
 | Branch                        | Created By        | Merges To  | Approvals |
 |-------------------------------|-------------------|------------|-----------|
@@ -358,7 +397,7 @@ Claude Code session opener — use this every session:
 
 ---
 
-## 15. CLAUDE.md Hierarchy
+## 16. CLAUDE.md Hierarchy
 
 This root file covers all services.
 Each service has its own CLAUDE.md at services/{name}/CLAUDE.md.
@@ -371,7 +410,7 @@ Both apply. Neither overrides the other.
 
 ---
 
-## 16. Out of Scope for POC
+## 17. Out of Scope for POC
 
 - Real exchange connectivity
 - Clearing and settlement
@@ -389,7 +428,7 @@ Both apply. Neither overrides the other.
 
 ---
 
-## 17. Document Control
+## 18. Document Control
 
 | Field          | Value                                               |
 |----------------|-----------------------------------------------------|
