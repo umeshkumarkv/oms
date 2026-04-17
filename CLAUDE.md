@@ -349,7 +349,258 @@ Error response envelope:
 
 ---
 
-## 13. Security
+## 13. Coding Conventions — Mandatory for All Services
+
+These apply to every line of code written by any developer or Claude Code session.
+Violations must be caught in code review and not merged.
+
+---
+
+### 13a. Java Type Rules
+
+| Concept              | Correct Type          | NEVER Use                        |
+|----------------------|-----------------------|----------------------------------|
+| Money / price        | `BigDecimal`          | `double`, `float`, `long`, `int` |
+| Order / trade quantity | `Integer`           | `int`, `long`, `double`          |
+| Primary keys         | `UUID`                | `Long`, `Integer`, `String`      |
+| UTC timestamps       | `Instant`             | `Date`, `Calendar`, `long`       |
+| Date only (no time)  | `LocalDate`           | `Date`, `String`                 |
+| Boolean entity fields | `Boolean`            | `boolean` (primitives allow no null in JPA) |
+| Enums in JSON/DB     | stored as `STRING`    | `ORDINAL` — breaks on reorder    |
+
+BigDecimal arithmetic:
+- Always use `BigDecimal.valueOf(string)` or constructor from String — NEVER from double
+- Use `compareTo()` for equality — NEVER `equals()` (scale differs: 1.0 ≠ 1.00)
+- Scale for money: 2 decimal places via `setScale(2, RoundingMode.HALF_UP)`
+
+---
+
+### 13b. Naming Conventions
+
+#### Java
+| Element            | Convention       | Example                          |
+|--------------------|------------------|----------------------------------|
+| Class              | PascalCase       | `OrderService`, `ClientController` |
+| Interface          | PascalCase       | `RiskRule`, `OrderRepository`    |
+| Method             | camelCase        | `submitOrder()`, `getClientById()` |
+| Variable           | camelCase        | `clientId`, `limitPrice`         |
+| Constant / static final | UPPER_SNAKE_CASE | `MAX_ORDER_QUANTITY`, `DEFAULT_EXPIRY_DAYS` |
+| Enum type          | PascalCase       | `OrderStatus`, `OrderSide`       |
+| Enum value         | UPPER_SNAKE_CASE | `RISK_CHECK_PASSED`, `PARTIALLY_FILLED` |
+| Package            | lowercase        | `com.brokerdealer.orderservice`  |
+| Test class         | PascalCase + Test | `OrderServiceTest`              |
+| Test method        | camelCase        | `shouldRejectOrderWhenMarketClosed()` |
+
+#### Database (PostgreSQL)
+| Element       | Convention    | Example                           |
+|---------------|---------------|-----------------------------------|
+| Table         | snake_case    | `order_events`, `risk_rule_config` |
+| Column        | snake_case    | `client_id`, `limit_price`        |
+| Primary key   | `id`          | `id UUID PRIMARY KEY`             |
+| Foreign key   | `{entity}_id` | `client_id`, `order_id`           |
+| Schema        | snake_case    | `order_schema`, `auth_schema`     |
+| Index         | `idx_{table}_{column}` | `idx_orders_client_id`  |
+
+#### Kafka
+| Element        | Convention          | Example                            |
+|----------------|---------------------|------------------------------------|
+| Topic name     | dot.separated.lower | `order.state.changed`              |
+| DLT topic      | topic + `.DLT`      | `order.state.changed.DLT`          |
+| Consumer group | `{service}-{topic}-group` | `order-service-risk.evaluation.result-group` |
+
+#### REST
+| Element         | Convention        | Example                           |
+|-----------------|-------------------|-----------------------------------|
+| Resource path   | kebab-case plural | `/api/v1/orders`, `/api/v1/risk-rules` |
+| Path variable   | camelCase         | `{orderId}`, `{clientId}`         |
+| Query parameter | camelCase         | `?pageSize=10&clientId=uuid`      |
+| JSON field      | camelCase         | `"limitPrice"`, `"expiryDate"`    |
+
+#### Redis keys
+| Convention              | Example                          |
+|-------------------------|----------------------------------|
+| `{domain}:{entity}:{id}` | `order:state:{orderId}`         |
+| `{domain}:{list}:{id}`   | `client:portfolio:{clientId}`   |
+| `{domain}:{type}:{value}` | `auth:blacklist:{token}`       |
+
+---
+
+### 13c. Class Suffix Conventions
+
+Every class name must end with its layer suffix. No exceptions.
+
+| Layer            | Suffix        | Example                          |
+|------------------|---------------|----------------------------------|
+| REST controller  | `Controller`  | `OrderController`                |
+| Business logic   | `Service`     | `OrderService`                   |
+| JPA repository   | `Repository`  | `OrderRepository`                |
+| JPA entity       | (none)        | `Order`, `Client`, `Holding`     |
+| Inbound DTO      | `Request`     | `SubmitOrderRequest`             |
+| Outbound DTO     | `Response`    | `OrderResponse`, `PortfolioResponse` |
+| MapStruct mapper | `Mapper`      | `OrderMapper`                    |
+| Custom exception | `Exception`   | `InsufficientBuyingPowerException` |
+| Kafka producer   | `Producer`    | `OrderEventProducer`             |
+| Kafka consumer   | `Consumer`    | `RiskResultConsumer`             |
+| Spring config    | `Config`      | `KafkaConfig`, `RedisConfig`     |
+| Spring filter    | `Filter`      | `JwtValidationFilter`            |
+
+---
+
+### 13d. Lombok — Mandatory Annotations
+
+Entities:
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "orders", schema = "order_schema")
+public class Order { }
+```
+
+Services / Consumers / Producers:
+```java
+@Service          // or @Component
+@RequiredArgsConstructor
+@Slf4j
+public class OrderService { }
+```
+
+Controllers:
+```java
+@RestController
+@RequestMapping("/api/v1/orders")
+@RequiredArgsConstructor
+public class OrderController { }
+```
+
+DTOs — use `@Value` (immutable) for Responses, `@Data` for Requests:
+```java
+@Value  // immutable response
+@Builder
+public class OrderResponse { }
+
+@Data   // mutable, Bean Validation annotations
+public class SubmitOrderRequest { }
+```
+
+---
+
+### 13e. Dependency Injection
+
+ALWAYS constructor injection via `@RequiredArgsConstructor`.
+NEVER `@Autowired` on fields — it hides dependencies and breaks testability.
+
+```java
+// CORRECT
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+    private final OrderRepository orderRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+}
+
+// WRONG — never do this
+@Service
+public class OrderService {
+    @Autowired
+    private OrderRepository orderRepository;
+}
+```
+
+---
+
+### 13f. Entity Column Conventions
+
+```java
+@Column(nullable = false)               // all required fields
+@Column(nullable = false, unique = true) // unique required fields
+@Enumerated(EnumType.STRING)            // ALL enums — never ORDINAL
+@Column(precision = 19, scale = 4)      // ALL BigDecimal monetary fields
+```
+
+Audit fields on every entity that tracks changes:
+```java
+@Column(nullable = false, updatable = false)
+private Instant createdAt;
+
+@Column(nullable = false)
+private Instant updatedAt;
+```
+
+---
+
+### 13g. Service Layer Return Types
+
+- Return `Optional<T>` when the entity may not exist — NEVER return `null`
+- Return `List<T>` (never null list) — return `Collections.emptyList()` if empty
+- Throw domain exceptions for business failures — NEVER return null to signal error
+- NEVER expose JPA entities from service methods — always map to DTO first
+
+```java
+// CORRECT
+public Optional<OrderResponse> getOrderById(UUID id) {
+    return orderRepository.findById(id).map(orderMapper::toResponse);
+}
+
+// WRONG
+public OrderResponse getOrderById(UUID id) {
+    return null; // caller has no idea what happened
+}
+```
+
+---
+
+### 13h. Logging Conventions
+
+Use `@Slf4j` (Lombok). All log statements must follow these rules:
+
+```java
+// Service entry — DEBUG level, log IDs only, never data
+log.debug("Submitting order: orderId={}, clientId={}, symbol={}", orderId, clientId, symbol);
+
+// State transitions — INFO level
+log.info("Order state transition: orderId={} {} -> {}", orderId, previousState, newState);
+
+// External call failures — WARN level
+log.warn("Circuit breaker open for client-service: clientId={}", clientId);
+
+// Unexpected errors — ERROR level with context
+log.error("Failed to process order: orderId={}, error={}", orderId, e.getMessage(), e);
+```
+
+NEVER log:
+- Passwords, tokens, secrets
+- Full request/response bodies containing client PII
+- BigDecimal monetary values at INFO or above — use IDs and states only
+
+---
+
+### 13i. Exception Handling
+
+Every service must have `GlobalExceptionHandler` annotated `@RestControllerAdvice`.
+
+Custom exceptions must:
+- Extend `RuntimeException`
+- Carry a machine-readable error code (`String errorCode`)
+- Have a human-readable message
+- Map to the standard error envelope in the handler
+
+```java
+// CORRECT
+throw new InsufficientBuyingPowerException("INSUFFICIENT_BUYING_POWER",
+    "Buying power " + buyingPower + " is less than order value " + orderValue);
+
+// WRONG — never throw generic exceptions from business logic
+throw new RuntimeException("not enough money");
+```
+
+NEVER expose stack traces in API responses. Log them server-side only.
+
+---
+
+## 14. Security
 
 - JWT issued by auth-service on login
 - Token payload: userId, role, expiry
@@ -368,7 +619,7 @@ Error response envelope:
 
 ---
 
-## 14. Testing Requirements
+## 15. Testing Requirements
 
 - Unit tests: all business logic, all risk rules, all state transitions
 - Integration tests: all REST endpoints — happy path + error cases
@@ -378,7 +629,7 @@ Error response envelope:
 
 ---
 
-## 15. GitHub Workflow
+## 16. GitHub Workflow
 
 | Branch                        | Created By        | Merges To  | Approvals |
 |-------------------------------|-------------------|------------|-----------|
@@ -400,7 +651,7 @@ Claude Code session opener — use this every session:
 
 ---
 
-## 16. CLAUDE.md Hierarchy
+## 17. CLAUDE.md Hierarchy
 
 This root file covers all services.
 Each service has its own CLAUDE.md at services/{name}/CLAUDE.md.
@@ -413,7 +664,7 @@ Both apply. Neither overrides the other.
 
 ---
 
-## 17. Out of Scope for POC
+## 18. Out of Scope for POC
 
 - Real exchange connectivity
 - Clearing and settlement
@@ -431,7 +682,7 @@ Both apply. Neither overrides the other.
 
 ---
 
-## 18. Document Control
+## 19. Document Control
 
 | Field          | Value                                               |
 |----------------|-----------------------------------------------------|
