@@ -1,0 +1,2 @@
+-- order-service seed data
+-- No seed data required for orders — orders are created via API

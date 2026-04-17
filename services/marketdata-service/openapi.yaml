@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: Market Data Service API
+  description: Mock market prices, instrument data, and market hours for Broker Dealer OMS
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8084
+    description: Local development
+
+paths:
+  /api/v1/market/{symbol}:
+    get:
+      summary: Get instrument data by symbol
+      operationId: getInstrument
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 20
+      responses:
+        '200':
+          description: Instrument data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentResponse'
+        '404':
+          description: Symbol not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SYMBOL_NOT_FOUND
+                  message: Symbol not found
+                  details: []
+
+  /api/v1/market/hours:
+    get:
+      summary: Get current market hours status
+      operationId: getMarketHours
+      responses:
+        '200':
+          description: Market hours status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketHoursResponse'
+
+  /api/v1/market/instruments:
+    get:
+      summary: List all instruments
+      operationId: getInstruments
+      responses:
+        '200':
+          description: List of instruments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentListResponse'
+
+components:
+  schemas:
+    InstrumentDetail:
+      type: object
+      properties:
+        symbol:
+          type: string
+        bidPrice:
+          type: string
+        askPrice:
+          type: string
+        lastPrice:
+          type: string
+        tradable:
+          type: boolean
+        halted:
+          type: boolean
+        minQuantity:
+          type: integer
+        maxQuantity:
+          type: integer
+        dataTimestamp:
+          type: string
+          format: date-time
+
+    InstrumentResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/InstrumentDetail'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    InstrumentSummary:
+      type: object
+      properties:
+        symbol:
+          type: string
+        tradable:
+          type: boolean
+        halted:
+          type: boolean
+
+    InstrumentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstrumentSummary'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    MarketHoursResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            marketOpen:
+              type: boolean
+            openTime:
+              type: string
+              example: "09:30"
+            closeTime:
+              type: string
+              example: "16:00"
+            timezone:
+              type: string
+              example: "America/New_York"
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'

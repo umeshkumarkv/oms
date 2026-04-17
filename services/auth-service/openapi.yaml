@@ -1,0 +1,176 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  description: JWT authentication and authorization for Broker Dealer OMS
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8081
+    description: Local development
+
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: Authenticate user and issue JWT
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: INVALID_CREDENTIALS
+                  message: Username or password is incorrect
+                  details: []
+                meta:
+                  timestamp: "2026-04-16T09:30:00Z"
+                  requestId: "uuid"
+
+  /api/v1/auth/logout:
+    post:
+      summary: Invalidate JWT token
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+
+  /api/v1/auth/me:
+    get:
+      summary: Get current authenticated user details
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: UNAUTHORIZED
+                  message: Token is missing or invalid
+                  details: []
+                meta:
+                  timestamp: "2026-04-16T09:30:00Z"
+                  requestId: "uuid"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: trader.john
+        password:
+          type: string
+          format: password
+          example: Demo@1234
+
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+            role:
+              type: string
+              enum: [TRADER, OPERATIONS, ADMIN]
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    LogoutResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    MeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            userId:
+              type: string
+              format: uuid
+            username:
+              type: string
+            role:
+              type: string
+              enum: [TRADER, OPERATIONS, ADMIN]
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'

@@ -1,0 +1,2 @@
+-- audit-service seed data
+-- No seed data required for audit logs — logs are created by Kafka consumers
