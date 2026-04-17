@@ -18,4 +18,4 @@ FROM amazoncorretto:21-alpine
 WORKDIR /app
 COPY --from=builder /build/services/auth-service/target/*.jar app.jar
 EXPOSE 8081
-ENTRYPOINT ["java", "-XX:+UseVirtualThreads", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
