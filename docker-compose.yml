@@ -86,7 +86,8 @@ services:
     image: umeshkumarkv/api-gateway:latest
     container_name: api-gateway
     build:
-      context: ./services/api-gateway
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -113,7 +114,8 @@ services:
     image: umeshkumarkv/auth-service:latest
     container_name: auth-service
     build:
-      context: ./services/auth-service
+      context: .
+      dockerfile: services/auth-service/Dockerfile
     ports:
       - "8081:8081"
     environment:
@@ -141,7 +143,8 @@ services:
     image: umeshkumarkv/order-service:latest
     container_name: order-service
     build:
-      context: ./services/order-service
+      context: .
+      dockerfile: services/order-service/Dockerfile
     ports:
       - "8082:8082"
     environment:
@@ -169,7 +172,8 @@ services:
     image: umeshkumarkv/client-service:latest
     container_name: client-service
     build:
-      context: ./services/client-service
+      context: .
+      dockerfile: services/client-service/Dockerfile
     ports:
       - "8083:8083"
     environment:
@@ -197,7 +201,8 @@ services:
     image: umeshkumarkv/marketdata-service:latest
     container_name: marketdata-service
     build:
-      context: ./services/marketdata-service
+      context: .
+      dockerfile: services/marketdata-service/Dockerfile
     ports:
       - "8084:8084"
     environment:
@@ -225,7 +230,8 @@ services:
     image: umeshkumarkv/risk-service:latest
     container_name: risk-service
     build:
-      context: ./services/risk-service
+      context: .
+      dockerfile: services/risk-service/Dockerfile
     ports:
       - "8085:8085"
     environment:
@@ -253,7 +259,8 @@ services:
     image: umeshkumarkv/execution-service:latest
     container_name: execution-service
     build:
-      context: ./services/execution-service
+      context: .
+      dockerfile: services/execution-service/Dockerfile
     ports:
       - "8086:8086"
     environment:
@@ -281,7 +288,8 @@ services:
     image: umeshkumarkv/audit-service:latest
     container_name: audit-service
     build:
-      context: ./services/audit-service
+      context: .
+      dockerfile: services/audit-service/Dockerfile
     ports:
       - "8087:8087"
     environment:
