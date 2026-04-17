@@ -309,6 +309,9 @@ This single flag makes Spring Boot 3.2 dispatch all request-handling threads,
 - Spring Data JPA, RestTemplate, WebClient (if used) all work without changes
 - NEVER introduce Mono, Flux, or any Reactor type — treat as a build error
 - api-gateway uses Spring Cloud Gateway MVC (servlet) — not reactive Gateway
+- NEVER use a connection pool for RestTemplate — use SimpleClientHttpRequestFactory
+  with no pool. Pool limits defeat virtual threads. Each virtual thread blocks its
+  own connection without consuming an OS thread.
 
 ---
 
