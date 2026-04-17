@@ -1,19 +1,19 @@
 package com.brokerdealer.apigateway.filter;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
-import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ServerWebExchange;
-import reactor.core.publisher.Mono;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
 
 @Component
 @Slf4j
-public class JwtValidationFilter implements GlobalFilter, Ordered {
+public class JwtValidationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String AUTH_LOGIN_PATH = "/api/v1/auth/login";
@@ -23,30 +23,29 @@ public class JwtValidationFilter implements GlobalFilter, Ordered {
     private String jwtSecret;
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String path = exchange.getRequest().getPath().toString();
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getRequestURI();
 
         // Allow login and actuator endpoints without JWT
         if (path.startsWith(AUTH_LOGIN_PATH) || path.startsWith(ACTUATOR_PATH)) {
-            return chain.filter(exchange);
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             // TODO: implement JWT validation — JIRA story BD-XX
             log.warn("Stub: JWT validation not yet implemented — allowing request through");
             // For now, pass through. Replace with actual validation in feature story.
-            return chain.filter(exchange);
+            filterChain.doFilter(request, response);
+            return;
         }
 
         // TODO: validate token and extract claims — JIRA story BD-XX
         log.debug("Stub: JWT token present, bypassing validation");
-        return chain.filter(exchange);
-    }
-
-    @Override
-    public int getOrder() {
-        return -1;
+        filterChain.doFilter(request, response);
     }
 }

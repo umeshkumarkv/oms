@@ -98,4 +98,6 @@ None — the gateway has no domain entities or database tables.
 - On blacklisted token: return 401 (future — reads auth:blacklist:{token} from Redis)
 - Role enforcement is a future story — currently all valid JWTs are passed through
 - All downstream service URLs use Docker/k8s service names, not localhost
-- Spring Cloud Gateway uses WebFlux (reactive) — do NOT introduce blocking calls
+- Spring Cloud Gateway MVC (servlet stack) with Java 21 virtual threads — do NOT introduce WebFlux/reactive code
+- Virtual threads enabled via spring.threads.virtual.enabled=true — all servlet threads are virtual
+- Filters extend OncePerRequestFilter (servlet) — not GlobalFilter (reactive)
