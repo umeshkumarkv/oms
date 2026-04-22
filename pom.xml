@@ -27,6 +27,7 @@
     <module>services/execution-service</module>
     <module>services/audit-service</module>
     <module>services/api-gateway</module>
+    <module>services/notification-service</module>
   </modules>
 
   <properties>

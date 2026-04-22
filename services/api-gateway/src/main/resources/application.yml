@@ -36,6 +36,12 @@ spring:
           uri: http://audit-service:8087
           predicates:
             - Path=/api/v1/audit/**
+        # WebSocket connections are proxied directly to notification-service.
+        # The service validates JWT on the STOMP CONNECT frame internally.
+        - id: notification-service-ws
+          uri: http://notification-service:8088
+          predicates:
+            - Path=/ws/**
 
 server:
   port: 8080

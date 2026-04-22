@@ -64,6 +64,7 @@ Methodology: Agentic AI SDLC — Claude Code executes JIRA stories,
 | execution-service  | 8086  | Mock fill engine, execution records       | Update portfolio directly               |
 | audit-service      | 8087  | Immutable audit log                       | Be called synchronously                 |
 | api-gateway        | 8080  | JWT validation, routing                   | Contain business logic                  |
+| notification-service | 8088 | WebSocket push, Kafka fan-out to UI      | Persist data, call services directly    |
 
 One service per domain boundary.
 One PostgreSQL schema per service.
@@ -188,11 +189,11 @@ Fail → 422 Unprocessable Entity with specific error code
 
 | Topic                         | Producer          | Consumers                                          |
 |-------------------------------|-------------------|----------------------------------------------------|
-| order.state.changed           | order-service     | audit-service, client-service                      |
-| risk.evaluation.requested     | order-service     | risk-service                                       |
-| risk.evaluation.result        | risk-service      | order-service                                      |
-| order.execution.requested     | order-service     | execution-service                                  |
-| execution.completed           | execution-service | order-service, client-service, audit-service       |
+| order.state.changed           | order-service     | audit-service, client-service, notification-service        |
+| risk.evaluation.requested     | order-service     | risk-service                                               |
+| risk.evaluation.result        | risk-service      | order-service, notification-service                        |
+| order.execution.requested     | order-service     | execution-service                                          |
+| execution.completed           | execution-service | order-service, client-service, audit-service, notification-service |
 
 ### Kafka Rules
 - Use Spring Kafka @KafkaListener for all consumers
