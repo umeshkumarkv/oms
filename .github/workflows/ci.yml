@@ -26,14 +26,8 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
-
-      - name: Run tests
-        run: mvn test
-
-      - name: Check coverage
-        run: mvn jacoco:check
+      - name: Build, test, and verify
+        run: mvn clean verify
 
       - name: Build Docker images
         run: docker compose build

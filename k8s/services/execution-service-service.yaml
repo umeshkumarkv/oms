@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: execution-service-service
+  namespace: broker-dealer-poc
+  labels:
+    app: execution-service
+spec:
+  type: ClusterIP
+  selector:
+    app: execution-service
+  ports:
+    - protocol: TCP
+      port: 8086
+      targetPort: 8086

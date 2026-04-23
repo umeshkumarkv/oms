@@ -1,0 +1,198 @@
+openapi: 3.0.3
+info:
+  title: API Gateway
+  description: |
+    Single entry point for all Broker Dealer OMS services.
+    Validates JWT on every inbound request except /api/v1/auth/login and /actuator/**.
+    Routes requests to the appropriate downstream microservice.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (via gateway)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/auth/**:
+    x-gateway-route:
+      upstream: http://auth-service:8081
+      jwtRequired: false (login only)
+    get:
+      summary: Proxied to auth-service (port 8081)
+      description: See auth-service/openapi.yaml for full contract
+      responses:
+        '200':
+          description: Proxied response from auth-service
+
+  /api/v1/orders/**:
+    x-gateway-route:
+      upstream: http://order-service:8082
+      jwtRequired: true
+    get:
+      summary: Proxied to order-service (port 8082)
+      description: See order-service/openapi.yaml for full contract
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from order-service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/clients/**:
+    x-gateway-route:
+      upstream: http://client-service:8083
+      jwtRequired: true
+    get:
+      summary: Proxied to client-service (port 8083)
+      description: See client-service/openapi.yaml for full contract
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from client-service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/market/**:
+    x-gateway-route:
+      upstream: http://marketdata-service:8084
+      jwtRequired: true
+    get:
+      summary: Proxied to marketdata-service (port 8084)
+      description: See marketdata-service/openapi.yaml for full contract
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from marketdata-service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/risk/**:
+    x-gateway-route:
+      upstream: http://risk-service:8085
+      jwtRequired: true
+    get:
+      summary: Proxied to risk-service (port 8085)
+      description: See risk-service/openapi.yaml for full contract. ADMIN role required for PATCH.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from risk-service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/executions/**:
+    x-gateway-route:
+      upstream: http://execution-service:8086
+      jwtRequired: true
+    get:
+      summary: Proxied to execution-service (port 8086)
+      description: See execution-service/openapi.yaml for full contract
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from execution-service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/audit/**:
+    x-gateway-route:
+      upstream: http://audit-service:8087
+      jwtRequired: true
+    get:
+      summary: Proxied to audit-service (port 8087)
+      description: See audit-service/openapi.yaml for full contract
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from audit-service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /actuator/health:
+    get:
+      summary: Gateway health check
+      security: []
+      responses:
+        '200':
+          description: UP
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT issued by auth-service. Algorithm HS256. Expiry 8 hours.
+        Payload contains: userId (UUID), role (TRADER|OPERATIONS|ADMIN), expiry.
+
+  responses:
+    Unauthorized:
+      description: JWT missing, expired, or blacklisted
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Token is missing or invalid
+              details: []
+            meta:
+              timestamp: "2026-04-16T09:30:00Z"
+              requestId: "uuid"
+
+    Forbidden:
+      description: Authenticated but insufficient role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Insufficient role for this operation
+              details: []
+            meta:
+              timestamp: "2026-04-16T09:30:00Z"
+              requestId: "uuid"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid

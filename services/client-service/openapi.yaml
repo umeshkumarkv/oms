@@ -1,0 +1,216 @@
+openapi: 3.0.3
+info:
+  title: Client Service API
+  description: Client profiles, portfolio management and cash reservations for Broker Dealer OMS
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8083
+    description: Local development
+
+paths:
+  /api/v1/clients/{id}:
+    get:
+      summary: Get client profile by ID
+      operationId: getClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: CLIENT_NOT_FOUND
+                  message: Client not found
+                  details: []
+
+  /api/v1/clients/{id}/portfolio:
+    get:
+      summary: Get client portfolio including cash and holdings
+      operationId: getPortfolio
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client portfolio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/clients/{id}/reserved-cash:
+    patch:
+      summary: Adjust client reserved cash
+      operationId: adjustReservedCash
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservedCashRequest'
+      responses:
+        '200':
+          description: Reserved cash updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservedCashResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ClientResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            clientId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            status:
+              type: string
+              enum: [ACTIVE, BLOCKED]
+            tradingEnabled:
+              type: boolean
+            kycStatus:
+              type: string
+              enum: [VERIFIED, PENDING, EXPIRED]
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    HoldingDetail:
+      type: object
+      properties:
+        symbol:
+          type: string
+        quantity:
+          type: integer
+        avgPrice:
+          type: string
+        currentPrice:
+          type: string
+        marketValue:
+          type: string
+
+    PortfolioResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            cashBalance:
+              type: string
+            reservedCash:
+              type: string
+            buyingPower:
+              type: string
+            holdings:
+              type: array
+              items:
+                $ref: '#/components/schemas/HoldingDetail'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ReservedCashRequest:
+      type: object
+      required: [adjustment, reason]
+      properties:
+        adjustment:
+          type: string
+          description: BigDecimal as string — positive to reserve, negative to release
+        reason:
+          type: string
+
+    ReservedCashResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            clientId:
+              type: string
+              format: uuid
+            reservedCash:
+              type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'

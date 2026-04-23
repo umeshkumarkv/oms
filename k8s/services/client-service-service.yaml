@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-service-service
+  namespace: broker-dealer-poc
+  labels:
+    app: client-service
+spec:
+  type: ClusterIP
+  selector:
+    app: client-service
+  ports:
+    - protocol: TCP
+      port: 8083
+      targetPort: 8083

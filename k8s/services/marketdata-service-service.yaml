@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: marketdata-service-service
+  namespace: broker-dealer-poc
+  labels:
+    app: marketdata-service
+spec:
+  type: ClusterIP
+  selector:
+    app: marketdata-service
+  ports:
+    - protocol: TCP
+      port: 8084
+      targetPort: 8084

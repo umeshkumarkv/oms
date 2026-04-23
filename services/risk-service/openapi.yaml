@@ -1,0 +1,137 @@
+openapi: 3.0.3
+info:
+  title: Risk Service API
+  description: Configurable risk rule engine for Broker Dealer OMS
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8085
+    description: Local development
+
+paths:
+  /api/v1/risk/rules:
+    get:
+      summary: List all risk rules
+      operationId: getRiskRules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of risk rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskRuleListResponse'
+
+  /api/v1/risk/rules/{ruleCode}:
+    patch:
+      summary: Update a risk rule configuration
+      operationId: updateRiskRule
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ruleCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRiskRuleRequest'
+      responses:
+        '200':
+          description: Risk rule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskRuleResponse'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: RULE_NOT_FOUND
+                  message: Risk rule not found
+                  details: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RiskRule:
+      type: object
+      properties:
+        ruleCode:
+          type: string
+        enabled:
+          type: boolean
+        thresholdValue:
+          type: string
+          nullable: true
+        description:
+          type: string
+
+    RiskRuleListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskRule'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    RiskRuleResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RiskRule'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    UpdateRiskRuleRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        thresholdValue:
+          type: string
+          nullable: true
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'

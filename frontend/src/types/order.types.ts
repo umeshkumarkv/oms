@@ -1,0 +1,49 @@
+export type OrderSide = 'BUY' | 'SELL'
+export type OrderType = 'MARKET' | 'LIMIT'
+export type TimeInForce = 'DAY' | 'GTC'
+export type OrderStatus =
+  | 'NEW'
+  | 'VALIDATED'
+  | 'RISK_CHECK_PASSED'
+  | 'RISK_REJECTED'
+  | 'ACCEPTED'
+  | 'SENT_TO_EXECUTION'
+  | 'PARTIALLY_FILLED'
+  | 'FILLED'
+  | 'CANCELLED'
+  | 'REJECTED'
+  | 'EXPIRED'
+export type ExpiryApplied = 'DEFAULT' | 'TRADER'
+
+export interface SubmitOrderRequest {
+  clientOrderId: string
+  clientId: string
+  symbol: string
+  side: OrderSide
+  orderType: OrderType
+  timeInForce: TimeInForce
+  quantity: number
+  limitPrice?: string
+  expiryDate?: string
+}
+
+export interface OrderSummary {
+  id: string
+  clientOrderId: string
+  clientId: string
+  symbol: string
+  side: OrderSide
+  orderType: OrderType
+  timeInForce: TimeInForce
+  quantity: number
+  limitPrice?: string
+  status: OrderStatus
+  createdAt: string
+}
+
+export interface SubmitOrderResponse {
+  orderId: string
+  status: OrderStatus
+  expiryDate?: string
+  expiryApplied?: ExpiryApplied
+}
