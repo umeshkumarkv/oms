@@ -1,9 +1,17 @@
-// TODO: implement — JIRA story BD-XX
+import http from './http'
+import { AuditRecord } from '../types/audit.types'
 
-export const getAuditTrail = (): Promise<null> => {
-  return Promise.resolve(null)
+export interface AuditTrailResponse {
+  records: AuditRecord[]
+  totalElements: number
 }
 
-export const getOrderAudit = (_orderId: string): Promise<null> => {
-  return Promise.resolve(null)
-}
+export const getAuditTrail = (params?: {
+  clientId?: string
+  page?: number
+  size?: number
+}): Promise<AuditTrailResponse> =>
+  http.get('/audit/trail', { params }).then((r) => r.data.data)
+
+export const getOrderAudit = (orderId: string): Promise<AuditRecord[]> =>
+  http.get(`/audit/orders/${orderId}`).then((r) => r.data.data)
