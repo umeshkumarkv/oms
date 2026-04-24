@@ -13,6 +13,62 @@ const SEED_CLIENTS = [
   { id: 'a5000000-0000-0000-0000-000000000005', name: 'Robert Wilson' },
 ]
 
+// ── Mock data — used when backend is offline (demo / local dev without Docker) ──
+const MOCK_PORTFOLIOS: Record<string, { client: Client; portfolio: Portfolio; fills: FillActivity[] }> = {
+  'a1000000-0000-0000-0000-000000000001': {
+    client: { clientId: 'a1000000-0000-0000-0000-000000000001', name: 'John Smith', status: 'ACTIVE', tradingEnabled: true, kycStatus: 'VERIFIED' },
+    portfolio: {
+      cashBalance: '500000.00',
+      reservedCash: '17500.00',
+      buyingPower: '482500.00',
+      holdings: [
+        { symbol: 'AAPL', quantity: 100, avgPrice: '150.00', currentPrice: '178.50', marketValue: '17850.00' },
+        { symbol: 'MSFT', quantity: 50,  avgPrice: '400.00', currentPrice: '415.20', marketValue: '20760.00' },
+      ],
+    },
+    fills: [
+      { auditId: 'f1', orderId: 'b2c3d4e5-0000-0000-0000-000000000001', symbol: 'AAPL', side: 'BUY',  filledQty: 50,  fillPrice: '178.50', fillValue: '8925.00',  fillType: 'FULL',    timestamp: new Date(Date.now() - 3_600_000).toISOString() },
+      { auditId: 'f2', orderId: 'b2c3d4e5-0000-0000-0000-000000000002', symbol: 'MSFT', side: 'BUY',  filledQty: 20,  fillPrice: '415.20', fillValue: '8304.00',  fillType: 'PARTIAL', timestamp: new Date(Date.now() - 1_800_000).toISOString() },
+    ],
+  },
+  'a2000000-0000-0000-0000-000000000002': {
+    client: { clientId: 'a2000000-0000-0000-0000-000000000002', name: 'Sarah Johnson', status: 'ACTIVE', tradingEnabled: true, kycStatus: 'VERIFIED' },
+    portfolio: {
+      cashBalance: '50000.00',
+      reservedCash: '0.00',
+      buyingPower: '50000.00',
+      holdings: [
+        { symbol: 'TSLA', quantity: 20, avgPrice: '170.00', currentPrice: '245.80', marketValue: '4916.00' },
+      ],
+    },
+    fills: [
+      { auditId: 'f3', orderId: 'b2c3d4e5-0000-0000-0000-000000000003', symbol: 'TSLA', side: 'SELL', filledQty: 5, fillPrice: '245.80', fillValue: '1229.00', fillType: 'FULL', timestamp: new Date(Date.now() - 900_000).toISOString() },
+    ],
+  },
+  'a3000000-0000-0000-0000-000000000003': {
+    client: { clientId: 'a3000000-0000-0000-0000-000000000003', name: 'Mike Davis', status: 'ACTIVE', tradingEnabled: false, kycStatus: 'VERIFIED' },
+    portfolio: { cashBalance: '200000.00', reservedCash: '0.00', buyingPower: '200000.00', holdings: [] },
+    fills: [],
+  },
+  'a4000000-0000-0000-0000-000000000004': {
+    client: { clientId: 'a4000000-0000-0000-0000-000000000004', name: 'Emily Chen', status: 'BLOCKED', tradingEnabled: true, kycStatus: 'VERIFIED' },
+    portfolio: {
+      cashBalance: '100000.00',
+      reservedCash: '1600.00',
+      buyingPower: '98400.00',
+      holdings: [
+        { symbol: 'GOOGL', quantity: 10, avgPrice: '160.00', currentPrice: '172.30', marketValue: '1723.00' },
+      ],
+    },
+    fills: [],
+  },
+  'a5000000-0000-0000-0000-000000000005': {
+    client: { clientId: 'a5000000-0000-0000-0000-000000000005', name: 'Robert Wilson', status: 'ACTIVE', tradingEnabled: true, kycStatus: 'EXPIRED' },
+    portfolio: { cashBalance: '75000.00', reservedCash: '0.00', buyingPower: '75000.00', holdings: [] },
+    fills: [],
+  },
+}
+
 const POLL_INTERVAL_MS = 15_000
 
 const formatCurrency = (value: string | number): string => {
@@ -38,11 +94,7 @@ const isToday = (iso: string): boolean => {
   try {
     const d = new Date(iso)
     const now = new Date()
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    )
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
   } catch {
     return false
   }
@@ -53,11 +105,7 @@ const parseFillActivities = (records: AuditRecord[]): FillActivity[] =>
     .filter((r) => r.entityType === 'EXECUTION' && isToday(r.eventTimestamp))
     .map((r) => {
       let meta: Record<string, unknown> = {}
-      try {
-        meta = r.metadata ? JSON.parse(r.metadata) : {}
-      } catch {
-        /* ignore malformed metadata */
-      }
+      try { meta = r.metadata ? JSON.parse(r.metadata) : {} } catch { /* ignore */ }
       return {
         auditId: r.id,
         orderId: (meta.orderId as string) ?? r.entityId,
@@ -71,13 +119,12 @@ const parseFillActivities = (records: AuditRecord[]): FillActivity[] =>
       }
     })
 
-// ── Styles ───────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
   page: { fontFamily: 'system-ui, sans-serif', padding: '24px' } as React.CSSProperties,
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' } as React.CSSProperties,
-  title: { fontSize: '22px', fontWeight: 700, color: '#1a2236', margin: 0 } as React.CSSProperties,
-  selector: { display: 'flex', alignItems: 'center', gap: '10px' } as React.CSSProperties,
+  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' } as React.CSSProperties,
   select: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px', background: '#fff', cursor: 'pointer' } as React.CSSProperties,
   badge: (status: string) => ({
     padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
@@ -106,7 +153,7 @@ const styles = {
   } as React.CSSProperties),
   emptyRow: { padding: '32px', textAlign: 'center' as const, color: '#9ca3af', fontSize: '13px' },
   loadingBox: { padding: '48px', textAlign: 'center' as const, color: '#9ca3af' } as React.CSSProperties,
-  errorBox: { padding: '16px 20px', background: '#fef2f2', color: '#b91c1c', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' } as React.CSSProperties,
+  mockBanner: { padding: '8px 16px', background: '#fef9c3', color: '#92400e', borderRadius: '6px', marginBottom: '16px', fontSize: '12px' } as React.CSSProperties,
   refreshNote: { fontSize: '11px', color: '#9ca3af' } as React.CSSProperties,
 }
 
@@ -118,12 +165,11 @@ const PortfolioPage: React.FC = () => {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [fills, setFills] = useState<FillActivity[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [usingMock, setUsingMock] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadData = async (clientId: string, showLoading = true) => {
     if (showLoading) setLoading(true)
-    setError(null)
     try {
       const [clientData, portfolioData, auditData] = await Promise.all([
         getClient(clientId),
@@ -133,9 +179,16 @@ const PortfolioPage: React.FC = () => {
       setClient(clientData)
       setPortfolio(portfolioData)
       setFills(parseFillActivities(auditData?.records ?? []))
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load portfolio data'
-      setError(msg)
+      setUsingMock(false)
+    } catch {
+      // Fall back to mock data so the UI is usable without the backend
+      const mock = MOCK_PORTFOLIOS[clientId]
+      if (mock) {
+        setClient(mock.client)
+        setPortfolio(mock.portfolio)
+        setFills(mock.fills)
+        setUsingMock(true)
+      }
     } finally {
       setLoading(false)
     }
@@ -143,24 +196,14 @@ const PortfolioPage: React.FC = () => {
 
   useEffect(() => {
     loadData(selectedClientId)
-
-    intervalRef.current = setInterval(() => {
-      loadData(selectedClientId, false)
-    }, POLL_INTERVAL_MS)
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
+    intervalRef.current = setInterval(() => loadData(selectedClientId, false), POLL_INTERVAL_MS)
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [selectedClientId])
 
-  const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedClientId(e.target.value)
-  }
-
   // ── Derived metrics ──────────────────────────────────────────────────────
-  const cashBalance = portfolio ? parseFloat(portfolio.cashBalance) : 0
-  const reservedCash = portfolio ? parseFloat(portfolio.reservedCash) : 0
-  const buyingPower = cashBalance - reservedCash
+  const cashBalance   = portfolio ? parseFloat(portfolio.cashBalance)  : 0
+  const reservedCash  = portfolio ? parseFloat(portfolio.reservedCash) : 0
+  const buyingPower   = cashBalance - reservedCash
   const holdingsValue = portfolio?.holdings.reduce((sum, h) => sum + parseFloat(h.marketValue), 0) ?? 0
   const portfolioValue = cashBalance + holdingsValue
 
@@ -169,25 +212,33 @@ const PortfolioPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      {/* ── Header ── */}
+
+      {/* ── Header: client selector on LEFT, refresh note on RIGHT ── */}
       <div style={styles.header}>
-        <h1 style={styles.title}>Portfolio</h1>
-        <div style={styles.selector}>
+        <div style={styles.headerLeft}>
           <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Client:</label>
-          <select style={styles.select} value={selectedClientId} onChange={handleClientChange}>
+          <select style={styles.select} value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}>
             {SEED_CLIENTS.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          {client && (
-            <span style={styles.badge(client.status)}>{client.status}</span>
+          {client && <span style={styles.badge(client.status)}>{client.status}</span>}
+          {client && !client.tradingEnabled && (
+            <span style={{ ...styles.badge('BLOCKED'), background: '#fef3c7', color: '#92400e' }}>Trading Disabled</span>
           )}
-          <span style={styles.refreshNote}>Auto-refreshes every 15s</span>
+          {client && client.kycStatus !== 'VERIFIED' && (
+            <span style={{ ...styles.badge('BLOCKED'), background: '#fef3c7', color: '#92400e' }}>KYC {client.kycStatus}</span>
+          )}
         </div>
+        <span style={styles.refreshNote}>Auto-refreshes every 15s</span>
       </div>
 
-      {/* ── Error ── */}
-      {error && <div style={styles.errorBox}>Error: {error}</div>}
+      {/* ── Mock data banner ── */}
+      {usingMock && (
+        <div style={styles.mockBanner}>
+          Demo mode — showing seed data. Start docker-compose to load live data.
+        </div>
+      )}
 
       {/* ── Loading ── */}
       {loading ? (
@@ -218,7 +269,9 @@ const PortfolioPage: React.FC = () => {
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>Holdings</h2>
-              <span style={styles.refreshNote}>{portfolio?.holdings.length ?? 0} position{portfolio?.holdings.length !== 1 ? 's' : ''}</span>
+              <span style={styles.refreshNote}>
+                {portfolio?.holdings.length ?? 0} position{portfolio?.holdings.length !== 1 ? 's' : ''}
+              </span>
             </div>
             <table style={styles.table}>
               <thead>
@@ -229,7 +282,7 @@ const PortfolioPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {portfolio?.holdings.length === 0 || !portfolio ? (
+                {!portfolio || portfolio.holdings.length === 0 ? (
                   <tr><td colSpan={6} style={styles.emptyRow}>No holdings</td></tr>
                 ) : (
                   portfolio.holdings.map((h) => {
