@@ -1,5 +1,7 @@
 export type ClientStatus = 'ACTIVE' | 'BLOCKED'
 export type KycStatus = 'VERIFIED' | 'PENDING' | 'EXPIRED'
+export type OrderSide = 'BUY' | 'SELL'
+export type FillType = 'PARTIAL' | 'FULL'
 
 export interface Client {
   clientId: string
@@ -22,4 +24,17 @@ export interface Portfolio {
   reservedCash: string
   buyingPower: string
   holdings: Holding[]
+}
+
+// Parsed from AuditRecord.metadata for entityType=EXECUTION
+export interface FillActivity {
+  auditId: string
+  orderId: string
+  symbol: string
+  side: OrderSide
+  filledQty: number
+  fillPrice: string
+  fillValue: string
+  fillType: FillType
+  timestamp: string
 }

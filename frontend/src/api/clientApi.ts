@@ -1,9 +1,8 @@
-// TODO: implement — JIRA story BD-XX
+import http from './http'
+import { Client, Portfolio } from '../types/client.types'
 
-export const getPortfolio = (_clientId: string): Promise<null> => {
-  return Promise.resolve(null)
-}
+export const getClient = (clientId: string): Promise<Client> =>
+  http.get(`/clients/${clientId}`).then((r) => r.data.data)
 
-export const getClient = (_clientId: string): Promise<null> => {
-  return Promise.resolve(null)
-}
+export const getPortfolio = (clientId: string): Promise<Portfolio> =>
+  http.get(`/clients/${clientId}/portfolio`).then((r) => r.data.data)
