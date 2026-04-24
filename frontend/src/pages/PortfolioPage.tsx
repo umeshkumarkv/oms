@@ -74,7 +74,7 @@ const parseFillActivities = (records: AuditRecord[]): FillActivity[] =>
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = {
-  page: { fontFamily: 'system-ui, sans-serif', padding: '24px', background: '#f5f6fa', minHeight: '100vh' } as React.CSSProperties,
+  page: { fontFamily: 'system-ui, sans-serif', padding: '24px' } as React.CSSProperties,
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' } as React.CSSProperties,
   title: { fontSize: '22px', fontWeight: 700, color: '#1a2236', margin: 0 } as React.CSSProperties,
   selector: { display: 'flex', alignItems: 'center', gap: '10px' } as React.CSSProperties,
