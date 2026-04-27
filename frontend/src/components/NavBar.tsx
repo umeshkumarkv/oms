@@ -96,24 +96,23 @@ const NavBar: React.FC = () => {
         ))}
       </div>
 
-      {/* New Order CTA — visible from every page */}
-      <button
-        onClick={() => navigate('/orders/new')}
-        style={{
-          padding: '7px 16px', borderRadius: '6px', border: 'none',
-          background: '#6366f1', color: '#fff',
-          fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '6px',
-          transition: 'background 0.15s',
-        }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#4f46e5' }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#6366f1' }}
-      >
-        + New Order
-      </button>
-
-      {/* Right: market status + user */}
+      {/* Right: New Order CTA + market status + user */}
       <div style={rightStyle}>
+        {/* New Order CTA — visible from every page */}
+        <button
+          onClick={() => navigate('/orders/new')}
+          style={{
+            padding: '7px 16px', borderRadius: '6px', border: 'none',
+            background: '#6366f1', color: '#fff',
+            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#4f46e5' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#6366f1' }}
+        >
+          + New Order
+        </button>
+
         {/* Market status pill */}
         <span style={{
           padding: '3px 10px',
