@@ -15,6 +15,12 @@ import java.util.UUID;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ClientNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleClientNotFoundException(ClientNotFoundException ex) {
+        log.warn("Client not found: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
         log.warn("Validation error: code={} message={}", ex.getErrorCode(), ex.getMessage());

@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,6 +23,10 @@ public class Client {
 
     @Column(name = "name", nullable = false, length = 200)
     private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false, length = 20)
+    private AccountType accountType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
