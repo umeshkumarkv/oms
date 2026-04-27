@@ -3,10 +3,13 @@ package com.brokerdealer.clientservice.controller;
 import com.brokerdealer.clientservice.domain.AccountType;
 import com.brokerdealer.clientservice.domain.ClientStatus;
 import com.brokerdealer.clientservice.domain.KycStatus;
+import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
+import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
+import com.brokerdealer.clientservice.exception.InvalidReservationException;
 import com.brokerdealer.clientservice.service.ClientService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +23,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ClientController.class)
@@ -227,6 +233,95 @@ class ClientControllerTest {
 
         mockMvc.perform(get("/api/v1/clients/{id}/portfolio", unknownId)
                         .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn200WithReservedCashResponseOnPositiveAdjustment() throws Exception {
+        ReservedCashResponse response = ReservedCashResponse.builder()
+                .clientId(CLIENT_001)
+                .reservedCash("15000.00")
+                .buyingPower("85000.00")
+                .build();
+
+        when(clientService.adjustReservedCash(eq(CLIENT_001), any(ReservedCashRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/reserved-cash", CLIENT_001)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"adjustment\":\"10000.00\",\"reason\":\"BUY order submitted\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.clientId").value(CLIENT_001.toString()))
+                .andExpect(jsonPath("$.data.reservedCash").value("15000.00"))
+                .andExpect(jsonPath("$.data.buyingPower").value("85000.00"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithReservedCashResponseOnNegativeAdjustment() throws Exception {
+        ReservedCashResponse response = ReservedCashResponse.builder()
+                .clientId(CLIENT_001)
+                .reservedCash("5000.00")
+                .buyingPower("95000.00")
+                .build();
+
+        when(clientService.adjustReservedCash(eq(CLIENT_001), any(ReservedCashRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/reserved-cash", CLIENT_001)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"adjustment\":\"-10000.00\",\"reason\":\"BUY order filled\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reservedCash").value("5000.00"))
+                .andExpect(jsonPath("$.data.buyingPower").value("95000.00"));
+    }
+
+    @Test
+    void shouldReturn422WhenReservedCashWouldGoBelowZero() throws Exception {
+        when(clientService.adjustReservedCash(eq(CLIENT_001), any(ReservedCashRequest.class)))
+                .thenThrow(new InvalidReservationException("RESERVED_CASH_BELOW_ZERO",
+                        "Reserved cash cannot go below 0"));
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/reserved-cash", CLIENT_001)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"adjustment\":\"-99999.00\",\"reason\":\"test\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("RESERVED_CASH_BELOW_ZERO"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn422WhenReservedCashWouldExceedCashBalance() throws Exception {
+        when(clientService.adjustReservedCash(eq(CLIENT_001), any(ReservedCashRequest.class)))
+                .thenThrow(new InvalidReservationException("RESERVED_CASH_EXCEEDS_BALANCE",
+                        "Reserved cash cannot exceed cash balance"));
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/reserved-cash", CLIENT_001)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"adjustment\":\"999999.00\",\"reason\":\"test\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("RESERVED_CASH_EXCEEDS_BALANCE"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn404WhenClientNotFoundOnReservedCashAdjustment() throws Exception {
+        UUID unknownId = UUID.randomUUID();
+        when(clientService.adjustReservedCash(eq(unknownId), any(ReservedCashRequest.class)))
+                .thenThrow(new ClientNotFoundException("CLIENT_NOT_FOUND",
+                        "Client not found: " + unknownId));
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/reserved-cash", unknownId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"adjustment\":\"1000.00\",\"reason\":\"test\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.meta.timestamp").exists());

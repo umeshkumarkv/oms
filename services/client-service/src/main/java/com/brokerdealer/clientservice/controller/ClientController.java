@@ -1,8 +1,11 @@
 package com.brokerdealer.clientservice.controller;
 
+import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
+import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.service.ClientService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -35,11 +38,12 @@ public class ClientController {
     }
 
     @PatchMapping("/{id}/reserved-cash")
-    public ResponseEntity<?> adjustReservedCash(
+    public ResponseEntity<Map<String, Object>> adjustReservedCash(
             @PathVariable UUID id,
-            @RequestBody Object request) {
-        // TODO: implement — JIRA story SCRUM-34
-        return ResponseEntity.ok().build();
+            @Valid @RequestBody ReservedCashRequest request) {
+        log.debug("PATCH /api/v1/clients/{}/reserved-cash", id);
+        ReservedCashResponse data = clientService.adjustReservedCash(id, request);
+        return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
     private Map<String, Object> buildSuccessResponse(Object data) {

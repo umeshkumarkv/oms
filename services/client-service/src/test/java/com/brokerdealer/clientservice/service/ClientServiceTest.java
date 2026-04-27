@@ -2,9 +2,12 @@ package com.brokerdealer.clientservice.service;
 
 import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.*;
+import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
+import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
+import com.brokerdealer.clientservice.exception.InvalidReservationException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
 import com.brokerdealer.clientservice.repository.HoldingRepository;
@@ -222,6 +225,79 @@ class ClientServiceTest {
         when(clientRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> clientService.getPortfolio(id))
+                .isInstanceOf(ClientNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo("CLIENT_NOT_FOUND");
+    }
+
+    private ReservedCashRequest buildReservedCashRequest(String adjustment) {
+        ReservedCashRequest req = new ReservedCashRequest();
+        req.setAdjustment(adjustment);
+        req.setReason("test reason");
+        return req;
+    }
+
+    @Test
+    void shouldIncreaseReservedCashOnPositiveAdjustment() {
+        UUID id = UUID.randomUUID();
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(clientRepository.save(any(Client.class))).thenReturn(client);
+
+        ReservedCashResponse result = clientService.adjustReservedCash(id, buildReservedCashRequest("10000.00"));
+
+        assertThat(result.getClientId()).isEqualTo(id);
+        assertThat(result.getReservedCash()).isEqualTo("15000.00");
+        assertThat(result.getBuyingPower()).isEqualTo("85000.00");
+    }
+
+    @Test
+    void shouldDecreaseReservedCashOnNegativeAdjustment() {
+        UUID id = UUID.randomUUID();
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("20000.00"));
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(clientRepository.save(any(Client.class))).thenReturn(client);
+
+        ReservedCashResponse result = clientService.adjustReservedCash(id, buildReservedCashRequest("-5000.00"));
+
+        assertThat(result.getReservedCash()).isEqualTo("15000.00");
+        assertThat(result.getBuyingPower()).isEqualTo("85000.00");
+    }
+
+    @Test
+    void shouldThrowInvalidReservationWhenResultWouldGoBelowZero() {
+        UUID id = UUID.randomUUID();
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+
+        assertThatThrownBy(() -> clientService.adjustReservedCash(id, buildReservedCashRequest("-10000.00")))
+                .isInstanceOf(InvalidReservationException.class)
+                .extracting("errorCode")
+                .isEqualTo("RESERVED_CASH_BELOW_ZERO");
+    }
+
+    @Test
+    void shouldThrowInvalidReservationWhenResultWouldExceedCashBalance() {
+        UUID id = UUID.randomUUID();
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+
+        assertThatThrownBy(() -> clientService.adjustReservedCash(id, buildReservedCashRequest("99999.00")))
+                .isInstanceOf(InvalidReservationException.class)
+                .extracting("errorCode")
+                .isEqualTo("RESERVED_CASH_EXCEEDS_BALANCE");
+    }
+
+    @Test
+    void shouldThrowClientNotFoundWhenAdjustingReservedCashForUnknownId() {
+        UUID id = UUID.randomUUID();
+        when(clientRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> clientService.adjustReservedCash(id, buildReservedCashRequest("1000.00")))
                 .isInstanceOf(ClientNotFoundException.class)
                 .extracting("errorCode")
                 .isEqualTo("CLIENT_NOT_FOUND");
