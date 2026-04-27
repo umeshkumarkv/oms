@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.*;
+import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +48,15 @@ class MarketDataServiceTest {
 
     @InjectMocks
     private MarketDataService marketDataService;
+
+    private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(marketDataService, "openTime", "09:30:00");
+        ReflectionTestUtils.setField(marketDataService, "closeTime", "16:00:00");
+        ReflectionTestUtils.setField(marketDataService, "timezone", "America/New_York");
+    }
 
     // --- getInstrument ---
 
@@ -95,40 +105,40 @@ class MarketDataServiceTest {
     @Test
     void shouldReturnMarketOpenDuringTradingHours() {
         // Tuesday 10:00 ET
-        ZonedDateTime tuesday10am = ZonedDateTime.of(2026, 4, 28, 10, 0, 0, 0, MarketDataService.NEW_YORK);
+        ZonedDateTime tuesday10am = ZonedDateTime.of(2026, 4, 28, 10, 0, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(tuesday10am)).isTrue();
     }
 
     @Test
     void shouldReturnMarketOpenAtExactOpenTime() {
         // Monday 09:30 ET
-        ZonedDateTime monday930 = ZonedDateTime.of(2026, 4, 27, 9, 30, 0, 0, MarketDataService.NEW_YORK);
+        ZonedDateTime monday930 = ZonedDateTime.of(2026, 4, 27, 9, 30, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(monday930)).isTrue();
     }
 
     @Test
     void shouldReturnMarketClosedBeforeOpenTime() {
         // Wednesday 09:29 ET
-        ZonedDateTime wednesday929 = ZonedDateTime.of(2026, 4, 29, 9, 29, 0, 0, MarketDataService.NEW_YORK);
+        ZonedDateTime wednesday929 = ZonedDateTime.of(2026, 4, 29, 9, 29, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(wednesday929)).isFalse();
     }
 
     @Test
     void shouldReturnMarketClosedAtCloseTime() {
         // Thursday 16:00 ET — close is exclusive
-        ZonedDateTime thursday16 = ZonedDateTime.of(2026, 4, 30, 16, 0, 0, 0, MarketDataService.NEW_YORK);
+        ZonedDateTime thursday16 = ZonedDateTime.of(2026, 4, 30, 16, 0, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(thursday16)).isFalse();
     }
 
     @Test
     void shouldReturnMarketClosedOnSaturday() {
-        ZonedDateTime saturday = ZonedDateTime.of(2026, 4, 25, 12, 0, 0, 0, MarketDataService.NEW_YORK);
+        ZonedDateTime saturday = ZonedDateTime.of(2026, 4, 25, 12, 0, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(saturday)).isFalse();
     }
 
     @Test
     void shouldReturnMarketClosedOnSunday() {
-        ZonedDateTime sunday = ZonedDateTime.of(2026, 4, 26, 12, 0, 0, 0, MarketDataService.NEW_YORK);
+        ZonedDateTime sunday = ZonedDateTime.of(2026, 4, 26, 12, 0, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(sunday)).isFalse();
     }
 

@@ -12,6 +12,7 @@ import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -25,9 +26,14 @@ import java.util.List;
 @Slf4j
 public class MarketDataService {
 
-    static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
-    static final LocalTime MARKET_OPEN  = LocalTime.of(9, 30);
-    static final LocalTime MARKET_CLOSE = LocalTime.of(16, 0);
+    @Value("${market.hours.open-time}")
+    private String openTime;
+
+    @Value("${market.hours.close-time}")
+    private String closeTime;
+
+    @Value("${market.hours.timezone}")
+    private String timezone;
 
     private final InstrumentRepository instrumentRepository;
     private final InstrumentMapper instrumentMapper;
@@ -44,14 +50,14 @@ public class MarketDataService {
     }
 
     public MarketHoursResponse getMarketHours() {
-        ZonedDateTime now = ZonedDateTime.now(NEW_YORK);
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of(timezone));
         log.debug("Checking market hours: now={}", now);
         boolean open = isMarketOpen(now);
         return MarketHoursResponse.builder()
                 .marketOpen(open)
-                .openTime("09:30:00")
-                .closeTime("16:00:00")
-                .timezone("America/New_York")
+                .openTime(openTime)
+                .closeTime(closeTime)
+                .timezone(timezone)
                 .nextOpenDate(null)
                 .build();
     }
@@ -78,6 +84,8 @@ public class MarketDataService {
             return false;
         }
         LocalTime time = now.toLocalTime();
-        return !time.isBefore(MARKET_OPEN) && time.isBefore(MARKET_CLOSE);
+        LocalTime open  = LocalTime.parse(openTime);
+        LocalTime close = LocalTime.parse(closeTime);
+        return !time.isBefore(open) && time.isBefore(close);
     }
 }
