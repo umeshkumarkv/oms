@@ -4,6 +4,8 @@ import com.brokerdealer.clientservice.domain.AccountType;
 import com.brokerdealer.clientservice.domain.ClientStatus;
 import com.brokerdealer.clientservice.domain.KycStatus;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
+import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
+import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
 import com.brokerdealer.clientservice.service.ClientService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.*;
@@ -133,5 +137,98 @@ class ClientControllerTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.kycStatus").value("EXPIRED"));
+    }
+
+    @Test
+    void shouldReturn200WithPortfolioForValidClient() throws Exception {
+        HoldingDetailResponse holding = HoldingDetailResponse.builder()
+                .symbol("AAPL")
+                .quantity(500)
+                .avgPrice("168.4000")
+                .currentPrice("185.00")
+                .marketValue("92500.00")
+                .unrealisedPnL("8300.00")
+                .build();
+        PortfolioResponse portfolio = PortfolioResponse.builder()
+                .cashBalance("100000.00")
+                .reservedCash("5000.00")
+                .buyingPower("95000.00")
+                .holdings(List.of(holding))
+                .build();
+
+        when(clientService.getPortfolio(CLIENT_001)).thenReturn(portfolio);
+
+        mockMvc.perform(get("/api/v1/clients/{id}/portfolio", CLIENT_001)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cashBalance").value("100000.00"))
+                .andExpect(jsonPath("$.data.reservedCash").value("5000.00"))
+                .andExpect(jsonPath("$.data.buyingPower").value("95000.00"))
+                .andExpect(jsonPath("$.data.holdings[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$.data.holdings[0].quantity").value(500))
+                .andExpect(jsonPath("$.data.holdings[0].currentPrice").value("185.00"))
+                .andExpect(jsonPath("$.data.holdings[0].marketValue").value("92500.00"))
+                .andExpect(jsonPath("$.data.holdings[0].unrealisedPnL").value("8300.00"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithEmptyHoldingsForClientWithNoPositions() throws Exception {
+        UUID client005 = UUID.fromString("a5000000-0000-0000-0000-000000000005");
+        PortfolioResponse portfolio = PortfolioResponse.builder()
+                .cashBalance("50000.00")
+                .reservedCash("0.00")
+                .buyingPower("50000.00")
+                .holdings(Collections.emptyList())
+                .build();
+
+        when(clientService.getPortfolio(client005)).thenReturn(portfolio);
+
+        mockMvc.perform(get("/api/v1/clients/{id}/portfolio", client005)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.holdings").isArray())
+                .andExpect(jsonPath("$.data.holdings").isEmpty());
+    }
+
+    @Test
+    void shouldReturn200WithNullPriceFieldsWhenMarketDataUnavailable() throws Exception {
+        HoldingDetailResponse holding = HoldingDetailResponse.builder()
+                .symbol("AAPL")
+                .quantity(500)
+                .avgPrice("168.4000")
+                .currentPrice(null)
+                .marketValue(null)
+                .unrealisedPnL(null)
+                .build();
+        PortfolioResponse portfolio = PortfolioResponse.builder()
+                .cashBalance("100000.00")
+                .reservedCash("0.00")
+                .buyingPower("100000.00")
+                .holdings(List.of(holding))
+                .build();
+
+        when(clientService.getPortfolio(CLIENT_001)).thenReturn(portfolio);
+
+        mockMvc.perform(get("/api/v1/clients/{id}/portfolio", CLIENT_001)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.holdings[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$.data.holdings[0].currentPrice").doesNotExist());
+    }
+
+    @Test
+    void shouldReturn404WithClientNotFoundOnPortfolioForUnknownId() throws Exception {
+        UUID unknownId = UUID.randomUUID();
+        when(clientService.getPortfolio(unknownId))
+                .thenThrow(new ClientNotFoundException("CLIENT_NOT_FOUND",
+                        "Client not found: " + unknownId));
+
+        mockMvc.perform(get("/api/v1/clients/{id}/portfolio", unknownId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
     }
 }

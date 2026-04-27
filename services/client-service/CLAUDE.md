@@ -68,7 +68,11 @@ See openapi.yaml for full schema.
 
 ## 8. REST Endpoints Called (Downstream Dependencies)
 
-None — client-service has no downstream service dependencies.
+| Service            | Endpoint                          | Purpose                                      | Circuit Breaker |
+|--------------------|-----------------------------------|----------------------------------------------|-----------------|
+| marketdata-service | GET /api/v1/market/{symbol}       | Fetch lastPrice for portfolio holdings       | Yes — fallback returns null price |
+
+Call via service discovery name (http://marketdata-service:8084) — never hardcoded port from frontend.
 
 ---
 
@@ -103,7 +107,8 @@ Holding:
 ## 10. What This Service Must NEVER Do
 
 - Never access order_schema, market_schema, risk_schema, execution_schema, audit_schema
-- Never call order-service, marketdata-service, risk-service, execution-service, or audit-service
+- Never call order-service, risk-service, execution-service, or audit-service
+- MAY call marketdata-service GET /api/v1/market/{symbol} for portfolio price enrichment — always with Resilience4j circuit breaker, fallback to null
 - Never execute orders or modify order state
 - Never apply risk rules
 - Never allow negative cash balance after reservation

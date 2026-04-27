@@ -1,7 +1,9 @@
 package com.brokerdealer.clientservice.service;
 
+import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.*;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
+import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
@@ -14,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,6 +35,9 @@ class ClientServiceTest {
 
     @Mock
     ClientMapper clientMapper;
+
+    @Mock
+    MarketDataClient marketDataClient;
 
     @InjectMocks
     ClientService clientService;
@@ -125,6 +132,99 @@ class ClientServiceTest {
         ClientProfileResponse result = clientService.getClient(id);
 
         assertThat(result.getStatus()).isEqualTo(ClientStatus.BLOCKED);
+    }
+
+    private Client buildClientWithBalance(UUID id, BigDecimal cashBalance, BigDecimal reservedCash) {
+        return Client.builder()
+                .id(id)
+                .name("Test Client")
+                .accountType(AccountType.CASH)
+                .status(ClientStatus.ACTIVE)
+                .tradingEnabled(true)
+                .kycStatus(KycStatus.VERIFIED)
+                .kycExpiryDate(LocalDate.of(2027, 12, 31))
+                .marginCallActive(false)
+                .cashBalance(cashBalance)
+                .reservedCash(reservedCash)
+                .dailyOrderCount(0)
+                .dailyOrderValue(BigDecimal.ZERO)
+                .build();
+    }
+
+    private Holding buildHolding(UUID clientId, String symbol, int quantity, String avgPrice) {
+        return Holding.builder()
+                .id(UUID.randomUUID())
+                .clientId(clientId)
+                .symbol(symbol)
+                .quantity(quantity)
+                .avgPrice(new BigDecimal(avgPrice))
+                .build();
+    }
+
+    @Test
+    void shouldReturnPortfolioWithHoldingsAndComputedValues() {
+        UUID id = UUID.fromString("a1000000-0000-0000-0000-000000000001");
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+        Holding aaplHolding = buildHolding(id, "AAPL", 500, "168.4000");
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(holdingRepository.findByClientId(id)).thenReturn(List.of(aaplHolding));
+        when(marketDataClient.getLastPrice("AAPL")).thenReturn(new BigDecimal("185.00"));
+
+        PortfolioResponse result = clientService.getPortfolio(id);
+
+        assertThat(result.getCashBalance()).isEqualTo("100000.00");
+        assertThat(result.getReservedCash()).isEqualTo("5000.00");
+        assertThat(result.getBuyingPower()).isEqualTo("95000.00");
+        assertThat(result.getHoldings()).hasSize(1);
+        assertThat(result.getHoldings().get(0).getSymbol()).isEqualTo("AAPL");
+        assertThat(result.getHoldings().get(0).getQuantity()).isEqualTo(500);
+        assertThat(result.getHoldings().get(0).getCurrentPrice()).isEqualTo("185.00");
+        assertThat(result.getHoldings().get(0).getMarketValue()).isEqualTo("92500.00");
+        assertThat(result.getHoldings().get(0).getUnrealisedPnL()).isEqualTo("8300.00");
+    }
+
+    @Test
+    void shouldReturnEmptyHoldingsForClientWithNoHoldings() {
+        UUID id = UUID.fromString("a5000000-0000-0000-0000-000000000005");
+        Client client = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(holdingRepository.findByClientId(id)).thenReturn(Collections.emptyList());
+
+        PortfolioResponse result = clientService.getPortfolio(id);
+
+        assertThat(result.getHoldings()).isEmpty();
+        assertThat(result.getBuyingPower()).isEqualTo("50000.00");
+    }
+
+    @Test
+    void shouldReturnNullPriceFieldsWhenMarketDataUnavailable() {
+        UUID id = UUID.fromString("a1000000-0000-0000-0000-000000000001");
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        Holding holding = buildHolding(id, "AAPL", 500, "168.4000");
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(holdingRepository.findByClientId(id)).thenReturn(List.of(holding));
+        when(marketDataClient.getLastPrice("AAPL")).thenReturn(null);
+
+        PortfolioResponse result = clientService.getPortfolio(id);
+
+        assertThat(result.getHoldings()).hasSize(1);
+        assertThat(result.getHoldings().get(0).getCurrentPrice()).isNull();
+        assertThat(result.getHoldings().get(0).getMarketValue()).isNull();
+        assertThat(result.getHoldings().get(0).getUnrealisedPnL()).isNull();
+    }
+
+    @Test
+    void shouldThrowClientNotFoundForUnknownIdOnPortfolio() {
+        UUID id = UUID.randomUUID();
+        when(clientRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> clientService.getPortfolio(id))
+                .isInstanceOf(ClientNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo("CLIENT_NOT_FOUND");
     }
 
     @Test
