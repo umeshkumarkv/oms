@@ -1,10 +1,17 @@
 package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
+import com.brokerdealer.marketdataservice.domain.MarketHoliday;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
+import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
+import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
+import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,7 +19,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.*;
+import org.springframework.test.util.ReflectionTestUtils;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,11 +37,31 @@ class MarketDataServiceTest {
     @Mock
     private InstrumentMapper instrumentMapper;
 
+    @Mock
+    private MarketHolidayRepository marketHolidayRepository;
+
+    @Mock
+    private MarketHolidayMapper marketHolidayMapper;
+
+    @Mock
+    private InstrumentSummaryMapper instrumentSummaryMapper;
+
     @InjectMocks
     private MarketDataService marketDataService;
 
+    private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(marketDataService, "openTime", "09:30:00");
+        ReflectionTestUtils.setField(marketDataService, "closeTime", "16:00:00");
+        ReflectionTestUtils.setField(marketDataService, "timezone", "America/New_York");
+    }
+
+    // --- getInstrument ---
+
     @Test
-    void getInstrument_validSymbol_returnsResponse() {
+    void shouldReturnInstrumentResponseWhenSymbolIsValid() {
         Instrument instrument = buildInstrument("AAPL", false);
         InstrumentResponse expected = buildResponse("AAPL", false);
 
@@ -48,7 +77,7 @@ class MarketDataServiceTest {
     }
 
     @Test
-    void getInstrument_haltedSymbol_returnsHaltedTrue() {
+    void shouldReturnHaltedTrueWhenSymbolIsHalted() {
         Instrument instrument = buildInstrument("HALT", true);
         InstrumentResponse expected = buildResponse("HALT", true);
 
@@ -57,20 +86,119 @@ class MarketDataServiceTest {
 
         InstrumentResponse result = marketDataService.getInstrument("HALT");
 
-        assertThat(result).isNotNull();
         assertThat(result.getSymbol()).isEqualTo("HALT");
         assertThat(result.getHalted()).isTrue();
         assertThat(result.getTradable()).isTrue();
     }
 
     @Test
-    void getInstrument_unknownSymbol_throwsSymbolNotFoundException() {
+    void shouldThrowSymbolNotFoundExceptionWhenSymbolIsUnknown() {
         when(instrumentRepository.findById("UNKNOWN")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> marketDataService.getInstrument("UNKNOWN"))
                 .isInstanceOf(SymbolNotFoundException.class)
                 .hasMessageContaining("UNKNOWN");
     }
+
+    // --- isMarketOpen ---
+
+    @Test
+    void shouldReturnMarketOpenDuringTradingHours() {
+        // Tuesday 10:00 ET
+        ZonedDateTime tuesday10am = ZonedDateTime.of(2026, 4, 28, 10, 0, 0, 0, NEW_YORK);
+        assertThat(marketDataService.isMarketOpen(tuesday10am)).isTrue();
+    }
+
+    @Test
+    void shouldReturnMarketOpenAtExactOpenTime() {
+        // Monday 09:30 ET
+        ZonedDateTime monday930 = ZonedDateTime.of(2026, 4, 27, 9, 30, 0, 0, NEW_YORK);
+        assertThat(marketDataService.isMarketOpen(monday930)).isTrue();
+    }
+
+    @Test
+    void shouldReturnMarketClosedBeforeOpenTime() {
+        // Wednesday 09:29 ET
+        ZonedDateTime wednesday929 = ZonedDateTime.of(2026, 4, 29, 9, 29, 0, 0, NEW_YORK);
+        assertThat(marketDataService.isMarketOpen(wednesday929)).isFalse();
+    }
+
+    @Test
+    void shouldReturnMarketClosedAtCloseTime() {
+        // Thursday 16:00 ET — close is exclusive
+        ZonedDateTime thursday16 = ZonedDateTime.of(2026, 4, 30, 16, 0, 0, 0, NEW_YORK);
+        assertThat(marketDataService.isMarketOpen(thursday16)).isFalse();
+    }
+
+    @Test
+    void shouldReturnMarketClosedOnSaturday() {
+        ZonedDateTime saturday = ZonedDateTime.of(2026, 4, 25, 12, 0, 0, 0, NEW_YORK);
+        assertThat(marketDataService.isMarketOpen(saturday)).isFalse();
+    }
+
+    @Test
+    void shouldReturnMarketClosedOnSunday() {
+        ZonedDateTime sunday = ZonedDateTime.of(2026, 4, 26, 12, 0, 0, 0, NEW_YORK);
+        assertThat(marketDataService.isMarketOpen(sunday)).isFalse();
+    }
+
+    // --- getMarketHours ---
+
+    @Test
+    void shouldReturnMarketHoursResponseWithCorrectFields() {
+        MarketHoursResponse result = marketDataService.getMarketHours();
+
+        assertThat(result).isNotNull();
+        assertThat(result.getOpenTime()).isEqualTo("09:30:00");
+        assertThat(result.getCloseTime()).isEqualTo("16:00:00");
+        assertThat(result.getTimezone()).isEqualTo("America/New_York");
+        assertThat(result.getMarketOpen()).isNotNull();
+        assertThat(result.getNextOpenDate()).isNull();
+    }
+
+    // --- getHolidays ---
+
+    @Test
+    void shouldReturnHolidayListOrderedByDate() {
+        MarketHoliday h1 = MarketHoliday.builder()
+                .holidayDate(LocalDate.of(2026, 1, 1))
+                .holidayName("New Year's Day")
+                .build();
+        MarketHolidayResponse r1 = MarketHolidayResponse.builder()
+                .holidayDate("2026-01-01")
+                .holidayName("New Year's Day")
+                .build();
+
+        when(marketHolidayRepository.findAllByOrderByHolidayDateAsc()).thenReturn(List.of(h1));
+        when(marketHolidayMapper.toResponse(h1)).thenReturn(r1);
+
+        List<MarketHolidayResponse> result = marketDataService.getHolidays();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getHolidayDate()).isEqualTo("2026-01-01");
+        assertThat(result.get(0).getHolidayName()).isEqualTo("New Year's Day");
+    }
+
+    // --- getInstruments ---
+
+    @Test
+    void shouldReturnInstrumentSummaryList() {
+        Instrument instrument = buildInstrument("AAPL", false);
+        InstrumentSummaryResponse summary = InstrumentSummaryResponse.builder()
+                .symbol("AAPL").tradable(true).halted(false).build();
+
+        when(instrumentRepository.findAll()).thenReturn(List.of(instrument));
+        when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(summary);
+
+        List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+        assertThat(result.get(0).getTradable()).isTrue();
+        assertThat(result.get(0).getHalted()).isFalse();
+    }
+
+    // --- helpers ---
 
     private Instrument buildInstrument(String symbol, boolean halted) {
         return Instrument.builder()
