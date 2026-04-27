@@ -9,10 +9,10 @@ const CURRENT_USER = { name: 'admin01', role: 'ADMIN' }
 
 // ── Seed users (static for POC — no user management API in Iteration 1) ──────
 const SEED_USERS = [
-  { username: 'trader01', fullName: 'John Smith',    role: 'TRADER', status: 'ACTIVE' },
-  { username: 'trader02', fullName: 'Sarah Johnson', role: 'TRADER', status: 'ACTIVE' },
-  { username: 'viewer01', fullName: 'Mike Davis',    role: 'VIEWER', status: 'ACTIVE' },
-  { username: 'admin01',  fullName: 'Umesh Kumar KV', role: 'ADMIN', status: 'ACTIVE' },
+  { username: 'trader01', fullName: 'John Smith',     role: 'TRADER', status: 'ACTIVE', lastLogin: '2026-04-27T09:31:00Z' },
+  { username: 'trader02', fullName: 'Sarah Johnson',  role: 'TRADER', status: 'ACTIVE', lastLogin: '2026-04-27T08:15:00Z' },
+  { username: 'viewer01', fullName: 'Mike Davis',     role: 'VIEWER', status: 'ACTIVE', lastLogin: '2026-04-26T14:22:00Z' },
+  { username: 'admin01',  fullName: 'Umesh Kumar KV', role: 'ADMIN',  status: 'ACTIVE', lastLogin: '2026-04-27T09:00:00Z' },
 ]
 
 // ── Demo scenarios (must match application.yml in marketdata-service) ─────────
@@ -589,12 +589,18 @@ const AdminPanelPage: React.FC = () => {
           <div style={s.card}>
             <h2 style={s.cardTitle}>
               User Management
-              <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>Read-only — Iteration 1</span>
+              {/* TODO: SCRUM-16 — wire Create User to real POST /api/v1/auth/users */}
+              <button
+                style={{ ...s.btn('primary'), fontSize: '12px', padding: '4px 10px' }}
+                onClick={() => showToast('User creation not available — Iteration 1', 'error')}
+              >
+                + Create User
+              </button>
             </h2>
             <table style={s.table}>
               <thead>
                 <tr>
-                  {['Username', 'Full Name', 'Role', 'Status'].map(h => (
+                  {['Username', 'Display Name', 'Role', 'Last Login', 'Status', ''].map(h => (
                     <th key={h} style={s.th}>{h}</th>
                   ))}
                 </tr>
@@ -605,13 +611,22 @@ const AdminPanelPage: React.FC = () => {
                     <td style={s.td}><span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 600, color: '#1a2236' }}>{u.username}</span></td>
                     <td style={s.td}><span style={{ fontSize: '12px', color: '#374151' }}>{u.fullName}</span></td>
                     <td style={s.td}><RoleBadge role={u.role} /></td>
+                    <td style={s.td}><span style={{ fontSize: '11px', color: '#9ca3af' }}>{fmtDate(u.lastLogin)}</span></td>
                     <td style={s.td}>
-                      <span style={{
-                        fontSize: '11px', fontWeight: 600,
-                        color: u.status === 'ACTIVE' ? '#059669' : '#9ca3af',
-                      }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: u.status === 'ACTIVE' ? '#059669' : '#9ca3af' }}>
                         {u.status}
                       </span>
+                    </td>
+                    <td style={s.td}>
+                      {/* TODO: SCRUM-16 — wire toggle to real PATCH /api/v1/auth/users/{username}/status */}
+                      <button
+                        style={{ ...s.btn('ghost'), fontSize: '11px', padding: '3px 8px', border: '1px solid #e5e7eb' }}
+                        disabled={u.username === CURRENT_USER.name}
+                        title={u.username === CURRENT_USER.name ? 'Cannot deactivate your own account' : undefined}
+                        onClick={() => showToast('User status toggle not available — Iteration 1', 'error')}
+                      >
+                        {u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                      </button>
                     </td>
                   </tr>
                 ))}

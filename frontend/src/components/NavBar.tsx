@@ -71,7 +71,7 @@ const NavBar: React.FC = () => {
   }, [])
 
   // TODO: replace with real user from auth context — JIRA SCRUM-16
-  const user = { name: 'trader.john', role: 'TRADER' }
+  const user = { name: 'admin01', role: 'ADMIN' }
 
   return (
     <nav style={navStyle}>
