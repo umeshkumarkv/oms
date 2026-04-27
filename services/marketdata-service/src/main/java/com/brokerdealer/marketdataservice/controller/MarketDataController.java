@@ -1,6 +1,9 @@
 package com.brokerdealer.marketdataservice.controller;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,15 +31,24 @@ public class MarketDataController {
     }
 
     @GetMapping("/hours")
-    public ResponseEntity<?> getMarketHours() {
-        // TODO: implement — JIRA story SCRUM-22
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> getMarketHours() {
+        log.debug("GET /api/v1/market/hours");
+        MarketHoursResponse data = marketDataService.getMarketHours();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @GetMapping("/holidays")
+    public ResponseEntity<Map<String, Object>> getHolidays() {
+        log.debug("GET /api/v1/market/holidays");
+        List<MarketHolidayResponse> data = marketDataService.getHolidays();
+        return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
     @GetMapping("/instruments")
-    public ResponseEntity<?> getInstruments() {
-        // TODO: implement — JIRA story SCRUM-22
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> getInstruments() {
+        log.debug("GET /api/v1/market/instruments");
+        List<InstrumentSummaryResponse> data = marketDataService.getInstruments();
+        return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
     private Map<String, Object> buildSuccessResponse(Object data) {
