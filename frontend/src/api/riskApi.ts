@@ -48,12 +48,16 @@ export const patchRiskRule = async (ruleCode: string, body: PatchRiskRuleRequest
     if (!res.data?.data) throw new Error('EMPTY_RESPONSE')
     return res.data.data
   } catch {
-    // Simulate successful update in stub mode
-    const rule = MOCK_RULES.find(r => r.ruleCode === ruleCode)
-    if (!rule) throw new Error('RULE_NOT_FOUND')
-    if (body.enabled !== undefined)        rule.enabled        = body.enabled
-    if (body.thresholdValue !== undefined) rule.thresholdValue = body.thresholdValue
-    return { ...rule }
+    // Simulate successful update in stub mode — replace entry, never mutate original object
+    const idx = MOCK_RULES.findIndex(r => r.ruleCode === ruleCode)
+    if (idx === -1) throw new Error('RULE_NOT_FOUND')
+    const updated: RiskRule = {
+      ...MOCK_RULES[idx],
+      ...(body.enabled        !== undefined ? { enabled:        body.enabled }        : {}),
+      ...(body.thresholdValue !== undefined ? { thresholdValue: body.thresholdValue } : {}),
+    }
+    MOCK_RULES.splice(idx, 1, updated)
+    return { ...updated }
   }
 }
 

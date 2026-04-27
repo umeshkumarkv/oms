@@ -374,7 +374,7 @@ const AdminPanelPage: React.FC = () => {
   const handleScenarioTrigger = async () => {
     setScenarioConfirm(false)
     setScenarioLoading(true)
-    const scn = DEMO_SCENARIOS.find(s => s.id === selectedScenario)!
+    const scn = DEMO_SCENARIOS.find(sc => sc.id === selectedScenario)!
     try {
       // TODO: SCRUM-27 — replace stub fallback in triggerScenario with real POST /api/v1/admin/scenario
       await triggerScenario(scn.id, scn.symbol)
@@ -441,7 +441,7 @@ const AdminPanelPage: React.FC = () => {
       {scenarioConfirm && (
         <ConfirmModal
           title="Trigger Demo Scenario"
-          message={`Start scenario: ${DEMO_SCENARIOS.find(s => s.id === selectedScenario)?.label}?`}
+          message={`Start scenario: ${DEMO_SCENARIOS.find(sc => sc.id === selectedScenario)?.label}?`}
           confirmLabel="Trigger"
           onConfirm={handleScenarioTrigger}
           onCancel={() => setScenarioConfirm(false)}
