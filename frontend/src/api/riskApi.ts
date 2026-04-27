@@ -35,7 +35,7 @@ const MOCK_AUDIT: RiskRuleAuditRecord[] = [
 export const getRiskRules = async (): Promise<RiskRule[]> => {
   try {
     const res = await http.get('/risk/rules')
-    return res.data.data
+    return res.data?.data ?? MOCK_RULES
   } catch {
     return MOCK_RULES
   }
@@ -45,6 +45,7 @@ export const getRiskRules = async (): Promise<RiskRule[]> => {
 export const patchRiskRule = async (ruleCode: string, body: PatchRiskRuleRequest): Promise<RiskRule> => {
   try {
     const res = await http.patch(`/risk/rules/${ruleCode}`, body)
+    if (!res.data?.data) throw new Error('EMPTY_RESPONSE')
     return res.data.data
   } catch {
     // Simulate successful update in stub mode
@@ -60,7 +61,7 @@ export const patchRiskRule = async (ruleCode: string, body: PatchRiskRuleRequest
 export const getRiskRuleAudit = async (): Promise<RiskRuleAuditRecord[]> => {
   try {
     const res = await http.get('/risk/rules/audit')
-    return res.data.data
+    return res.data?.data ?? MOCK_AUDIT
   } catch {
     return MOCK_AUDIT
   }
