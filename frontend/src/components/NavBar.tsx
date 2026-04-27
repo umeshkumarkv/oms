@@ -85,6 +85,7 @@ const NavBar: React.FC = () => {
           { to: '/orders', label: 'Blotter' },
           { to: '/market', label: 'Market Data' },
           { to: '/portfolio', label: 'Portfolio' },
+          ...(user.role === 'ADMIN' ? [{ to: '/admin', label: 'Admin' }] : []),
         ].map(({ to, label }) => (
           <NavLink
             key={to}
