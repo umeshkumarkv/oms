@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import OrderBlotterPage from './pages/OrderBlotterPage'
 import PortfolioPage from './pages/PortfolioPage'
 import AuditTrailPage from './pages/AuditTrailPage'
+import OrderEntryPage from './pages/OrderEntryPage'
 
 // Layout wrapper: NavBar + page content
 // TODO: add ProtectedRoute (redirect to / if no JWT) — JIRA SCRUM-18
@@ -27,6 +28,7 @@ const App: React.FC = () => {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/orders" element={<OrderBlotterPage />} />
+          <Route path="/orders/new" element={<OrderEntryPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/audit" element={<AuditTrailPage />} />
         </Route>

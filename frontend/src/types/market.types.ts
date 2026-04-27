@@ -16,3 +16,8 @@ export interface MarketHours {
   closeTime: string
   timezone: string
 }
+
+export interface Holiday {
+  holidayDate: string  // YYYY-MM-DD
+  holidayName: string
+}
