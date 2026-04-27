@@ -38,6 +38,7 @@ export interface OrderSummary {
   quantity: number
   limitPrice?: string
   status: OrderStatus
+  expiryDate?: string
   createdAt: string
 }
 
