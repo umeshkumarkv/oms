@@ -40,6 +40,24 @@ export interface OrderSummary {
   status: OrderStatus
   expiryDate?: string
   createdAt: string
+  filledQuantity?: number
+  avgFillPrice?: string
+}
+
+export type FillType = 'PARTIAL' | 'FULL'
+
+export interface Execution {
+  executionId: string
+  orderId: string
+  symbol: string
+  side: OrderSide
+  executedQty: number
+  executedPrice: string
+  fillType: FillType
+  fillValue: string
+  remainingQuantity: number
+  executionVenue: string
+  executedAt: string
 }
 
 export interface SubmitOrderResponse {
