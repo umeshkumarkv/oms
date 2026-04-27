@@ -1,6 +1,7 @@
 package com.brokerdealer.clientservice.controller;
 
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
+import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.service.ClientService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,9 +28,10 @@ public class ClientController {
     }
 
     @GetMapping("/{id}/portfolio")
-    public ResponseEntity<?> getPortfolio(@PathVariable UUID id) {
-        // TODO: implement — JIRA story SCRUM-34
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> getPortfolio(@PathVariable UUID id) {
+        log.debug("GET /api/v1/clients/{}/portfolio", id);
+        PortfolioResponse data = clientService.getPortfolio(id);
+        return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
     @PatchMapping("/{id}/reserved-cash")
