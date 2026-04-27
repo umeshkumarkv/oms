@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 
 // Compute market status based on current America/New_York time
 const getMarketStatus = (): { open: boolean; label: string } => {
@@ -61,6 +61,7 @@ const rightStyle: React.CSSProperties = {
 }
 
 const NavBar: React.FC = () => {
+  const navigate = useNavigate()
   const [market, setMarket] = useState(getMarketStatus())
 
   // Refresh market status every minute
@@ -94,6 +95,22 @@ const NavBar: React.FC = () => {
           </NavLink>
         ))}
       </div>
+
+      {/* New Order CTA — visible from every page */}
+      <button
+        onClick={() => navigate('/orders/new')}
+        style={{
+          padding: '7px 16px', borderRadius: '6px', border: 'none',
+          background: '#6366f1', color: '#fff',
+          fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '6px',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#4f46e5' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#6366f1' }}
+      >
+        + New Order
+      </button>
 
       {/* Right: market status + user */}
       <div style={rightStyle}>

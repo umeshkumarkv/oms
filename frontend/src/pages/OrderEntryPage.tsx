@@ -413,39 +413,8 @@ const OrderEntryPage: React.FC = () => {
           </button>
         </div>
 
-        {/* ── Right: Preview + Validation ── */}
+        {/* ── Right: Preview + Validation + Quote ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-          {/* Market Quote */}
-          <div style={s.card}>
-            <h2 style={s.cardTitle}>Market Quote</h2>
-            {!quote && !quoteLoading && (
-              <div style={{ color: '#9ca3af', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
-            )}
-            {quoteLoading && <div style={{ color: '#9ca3af', fontSize: '13px' }}>Loading quote…</div>}
-            {quote && !quoteLoading && (
-              <>
-                <div style={s.quoteSymbol}>
-                  {quote.symbol}
-                  {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
-                </div>
-                <div style={s.quotePrice}>${quote.lastPrice}</div>
-                <div style={s.quoteMeta}>
-                  {[
-                    { label: 'Bid',  value: `$${quote.bidPrice}` },
-                    { label: 'Ask',  value: `$${quote.askPrice}` },
-                    { label: 'Min Qty', value: quote.minQuantity.toLocaleString() },
-                    { label: 'Max Qty', value: quote.maxQuantity.toLocaleString() },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={s.quoteItem}>
-                      <div style={s.quoteItemLabel}>{label}</div>
-                      <div style={s.quoteItemVal}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
 
           {/* Order Preview */}
           <div style={s.card}>
@@ -506,6 +475,37 @@ const OrderEntryPage: React.FC = () => {
                 <span style={s.checkText(pass)}>{label}</span>
               </div>
             ))}
+          </div>
+
+          {/* Market Quote */}
+          <div style={s.card}>
+            <h2 style={s.cardTitle}>Market Quote</h2>
+            {!quote && !quoteLoading && (
+              <div style={{ color: '#9ca3af', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
+            )}
+            {quoteLoading && <div style={{ color: '#9ca3af', fontSize: '13px' }}>Loading quote…</div>}
+            {quote && !quoteLoading && (
+              <>
+                <div style={s.quoteSymbol}>
+                  {quote.symbol}
+                  {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
+                </div>
+                <div style={s.quotePrice}>${quote.lastPrice}</div>
+                <div style={s.quoteMeta}>
+                  {[
+                    { label: 'Bid',  value: `$${quote.bidPrice}` },
+                    { label: 'Ask',  value: `$${quote.askPrice}` },
+                    { label: 'Min Qty', value: quote.minQuantity.toLocaleString() },
+                    { label: 'Max Qty', value: quote.maxQuantity.toLocaleString() },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={s.quoteItem}>
+                      <div style={s.quoteItemLabel}>{label}</div>
+                      <div style={s.quoteItemVal}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
         </div>{/* end right col */}
