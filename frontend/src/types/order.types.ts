@@ -21,7 +21,7 @@ export interface SubmitOrderRequest {
   symbol: string
   side: OrderSide
   orderType: OrderType
-  timeInForce: TimeInForce
+  tif: TimeInForce
   quantity: number
   limitPrice?: string
   expiryDate?: string

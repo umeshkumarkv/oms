@@ -161,10 +161,10 @@ const OrderEntryPage: React.FC = () => {
     }, 400)
   }, [symbol]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update limit price pre-fill when side changes
+  // Update limit price pre-fill when side or quote changes
   useEffect(() => {
     if (quote) setLimitPrice(side === 'BUY' ? quote.askPrice : quote.bidPrice)
-  }, [side]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [side, quote])
 
   // ── Filtered symbol suggestions ──────────────────────────────────────────
   const suggestions = symbolInput.length >= 1
@@ -220,7 +220,7 @@ const OrderEntryPage: React.FC = () => {
         orderType,
         quantity: qty,
         limitPrice: orderType === 'LIMIT' ? limitPrice : undefined,
-        timeInForce: tif,
+        tif,
         expiryDate:  tif === 'GTC' && expiryDate ? expiryDate : undefined,
       })
       setToastMsg(`Order ${res.orderId} submitted successfully`)
