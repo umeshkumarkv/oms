@@ -1,0 +1,125 @@
+# BA Agent — SCRUM-59
+
+Decompose a business requirement into JIRA Epics and Stories with full acceptance criteria.
+
+## Usage
+```
+/ba-agent "plain English requirement"
+/ba-agent confluence:{pageId}
+```
+
+## Phase 0 — Understand the Requirement
+
+1. Parse the input — if it is a Confluence page ID, fetch the page content first
+2. Read `CLAUDE.md` fully — pay special attention to:
+   - Section 2: Tech Stack (what is locked)
+   - Section 3: Microservice boundaries (which service owns what)
+   - Section 6: Two-Level Validation rules
+   - Section 7: Kafka Topics
+   - Section 18: Out of Scope (CRITICAL — do not ticket these)
+3. Identify which microservice(s) are involved based on domain ownership
+4. Search JIRA for related existing tickets: `searchJiraIssuesUsingJql("project = SCRUM AND text ~ '{keyword}'")`
+5. For anything in the requirement that matches CLAUDE.md Section 18 — flag it explicitly to the user and do NOT create a ticket for it
+
+## Phase 1 — Decompose
+
+Rules for decomposition:
+- Each Story must live entirely within ONE microservice boundary
+- Each Story must be completable in ONE sprint
+- Each Story must have clear, curl-verifiable acceptance criteria
+- If the requirement spans multiple services, create one Story per service
+- Identify if an Epic already exists for this theme; if not, create one
+
+## Phase 2 — Draft Each Story
+
+For every Story, produce ALL of the following sections:
+
+### Summary format
+`{Verb} {HTTP method} /api/v1/{resource} — {brief outcome description}`
+
+Example: `Implement GET /api/v1/orders/{id} — order detail endpoint via API Gateway`
+
+### User Story
+```
+As a {role: trader | operations | admin}
+I want {feature}
+So that {business outcome}
+```
+
+### AI Context
+- Service name and port
+- Whether skeleton exists or needs creation
+- Seed data available (table name, row count, key values)
+- Call path: Frontend → API Gateway (8080) → {service} ({port})
+- Response fields and their source columns
+- Any external service calls required
+
+### Acceptance Criteria
+Each AC must be:
+- Testable with a single curl command against localhost:8080
+- Specific about HTTP status code, response field, and value
+- Cover: happy path, not-found (404), validation error (400/422)
+
+Format:
+```
+- [ ] GET http://localhost:8080/api/v1/{resource}/{id} returns 200 with {field}={value}
+- [ ] Unknown {id} returns 404 with error code {CODE}
+- [ ] Standard response envelope: { data: {}, meta: { timestamp, requestId } }
+```
+
+### Out of Scope
+Explicit list of what is NOT in this ticket, including:
+- Features that belong to other services
+- Features listed in CLAUDE.md Section 18
+- Features that are blocked by unimplemented dependencies
+
+### Tech Constraints
+```
+- Service: {service-name} (port {port}) — exposed via API Gateway port 8080
+- Read CLAUDE.md and services/{service}/CLAUDE.md before writing any code
+- Follow openapi.yaml exactly for response shape
+- Branch: ai/SCRUM-{n}-{slug} from develop
+- PR target: develop
+- Blocked by: SCRUM-{x} (if applicable)
+```
+
+### Story Points
+Estimate: 1 (trivial) | 2 (simple DB read) | 3 (service call) | 5 (complex logic) | 8 (multi-layer)
+
+## Phase 3 — Create in JIRA
+
+1. Create Epic if needed: `createJiraIssue(issueTypeName: "Epic", ...)`
+2. Create each Story linked to the Epic: `createJiraIssue(issueTypeName: "Story", parent: {epicKey}, ...)`
+3. Set blocked-by links using `createIssueLink` where dependencies exist
+4. Assign all tickets to the Principal Architect (accountId: 712020:a0088ae5-186b-4263-bf8d-41ed37df1f95)
+
+## Phase 4 — Report to User
+
+```
+BA Agent — Requirements Decomposition Complete
+
+EPIC
+  {SCRUM-key}: {epic summary}
+
+STORIES CREATED
+  {SCRUM-key}: {story summary} [{points} pts]
+  {SCRUM-key}: {story summary} [{points} pts]
+  ...
+
+BLOCKED-BY LINKS SET
+  {SCRUM-key} blocked by {SCRUM-key}
+
+OUT OF SCOPE (flagged, not ticketed)
+  - {item}: reason per CLAUDE.md Section 18
+
+AMBIGUITIES (need human decision)
+  - {question}
+```
+
+## Hard Stops — always pause and ask the user
+
+- Requirement mentions anything in CLAUDE.md Section 18 (Out of Scope for POC)
+- Cannot determine which microservice owns a domain concept
+- Requirement would require cross-service database access
+- Requirement would require a new microservice not in CLAUDE.md Section 3
+- Story points estimate is 13+ (story too large — needs splitting)
