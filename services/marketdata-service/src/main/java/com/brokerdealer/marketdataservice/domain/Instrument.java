@@ -41,4 +41,16 @@ public class Instrument {
 
     @Column(name = "data_timestamp")
     private Instant dataTimestamp;
+
+    @Column(name = "day_high", precision = 18, scale = 4)
+    private BigDecimal dayHigh;
+
+    @Column(name = "day_low", precision = 18, scale = 4)
+    private BigDecimal dayLow;
+
+    @Column(name = "previous_close", precision = 18, scale = 4)
+    private BigDecimal previousClose;
+
+    @Column(name = "volume")
+    private Long volume;
 }

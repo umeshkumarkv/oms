@@ -1,0 +1,3 @@
+market:
+  simulation:
+    bypass-market-hours: true
