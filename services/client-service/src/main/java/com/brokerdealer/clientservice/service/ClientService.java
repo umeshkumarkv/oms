@@ -3,16 +3,20 @@ package com.brokerdealer.clientservice.service;
 import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.Client;
 import com.brokerdealer.clientservice.domain.Holding;
+import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
+import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
+import com.brokerdealer.clientservice.exception.InvalidReservationException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
 import com.brokerdealer.clientservice.repository.HoldingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -85,8 +89,37 @@ public class ClientService {
                 .build();
     }
 
-    public Object adjustReservedCash(UUID id, Object request) {
-        // TODO: implement — JIRA story SCRUM-32
-        return null;
+    @Transactional
+    public ReservedCashResponse adjustReservedCash(UUID id, ReservedCashRequest request) {
+        log.debug("Adjusting reserved cash: clientId={}", id);
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ClientNotFoundException("CLIENT_NOT_FOUND",
+                        "Client not found: " + id));
+
+        BigDecimal adjustment = new BigDecimal(request.getAdjustment());
+        BigDecimal newReservedCash = client.getReservedCash().add(adjustment).setScale(2, RoundingMode.HALF_UP);
+
+        if (newReservedCash.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidReservationException("RESERVED_CASH_BELOW_ZERO",
+                    "Reserved cash cannot go below 0. Current: " + client.getReservedCash().toPlainString()
+                            + ", adjustment: " + adjustment.toPlainString());
+        }
+        if (newReservedCash.compareTo(client.getCashBalance()) > 0) {
+            throw new InvalidReservationException("RESERVED_CASH_EXCEEDS_BALANCE",
+                    "Reserved cash cannot exceed cash balance. Cash balance: " + client.getCashBalance().toPlainString()
+                            + ", requested reserved: " + newReservedCash.toPlainString());
+        }
+
+        client.setReservedCash(newReservedCash);
+        clientRepository.save(client);
+
+        BigDecimal buyingPower = client.getCashBalance().subtract(newReservedCash).setScale(2, RoundingMode.HALF_UP);
+        log.info("Reserved cash adjusted: clientId={} newReservedCash={} buyingPower={}", id, newReservedCash, buyingPower);
+
+        return ReservedCashResponse.builder()
+                .clientId(id)
+                .reservedCash(newReservedCash.toPlainString())
+                .buyingPower(buyingPower.toPlainString())
+                .build();
     }
 }

@@ -68,4 +68,8 @@ public class Client {
 
     @Column(name = "avg_order_qty")
     private Integer avgOrderQty;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }
