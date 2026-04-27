@@ -91,11 +91,12 @@ const s = {
   } as React.CSSProperties),
   expiryWarn: { fontSize: '11px', color: '#d97706', fontWeight: 600 } as React.CSSProperties,
 
-  // Quick actions
-  actions:    { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' } as React.CSSProperties,
-  actionBtn:  { padding: '14px', borderRadius: '10px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', textAlign: 'center' as const, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'box-shadow 0.15s' },
+  // Quick actions — 2×2 grid inside right column
+  actions:    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } as React.CSSProperties,
+  actionBtn:  { padding: '14px 10px', borderRadius: '10px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', textAlign: 'center' as const, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'box-shadow 0.15s' },
   actionIcon: { fontSize: '20px', marginBottom: '6px' } as React.CSSProperties,
-  actionLabel:{ fontSize: '13px', fontWeight: 600, color: '#374151' } as React.CSSProperties,
+  actionLabel:{ fontSize: '12px', fontWeight: 600, color: '#374151' } as React.CSSProperties,
+  rightCol:   { display: 'flex', flexDirection: 'column' as const, gap: '16px' },
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -235,31 +236,10 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div style={s.actions}>
-        {[
-          { icon: '📝', label: 'New Order',   path: '/orders/new' },
-          { icon: '📋', label: 'Blotter',     path: '/orders'     },
-          { icon: '💼', label: 'Portfolio',   path: '/portfolio'  },
-          { icon: '📈', label: 'Market Data', path: '/market'     },
-        ].map(({ icon, label, path }) => (
-          <button
-            key={path}
-            style={s.actionBtn}
-            onClick={() => navigate(path)}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)' }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)' }}
-          >
-            <div style={s.actionIcon}>{icon}</div>
-            <div style={s.actionLabel}>{label}</div>
-          </button>
-        ))}
-      </div>
-
-      {/* Two-column: Activity + GTD Expiring */}
+      {/* Two-column: Left=Recent Activity | Right=Quick Actions + GTD Expiring */}
       <div style={s.grid2}>
 
-        {/* Recent Activity (WebSocket) */}
+        {/* Left — Recent Activity (WebSocket) */}
         <div style={s.section}>
           <div style={s.sectionHeader}>
             <h2 style={s.sectionTitle}>Recent Activity</h2>
@@ -283,33 +263,66 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* GTC Expiring Soon */}
-        <div style={s.section}>
-          <div style={s.sectionHeader}>
-            <h2 style={s.sectionTitle}>GTC Expiring Soon</h2>
-            <span style={s.refreshNote}>Within 2 days</span>
+        {/* Right — Quick Actions + GTD Expiring Soon stacked */}
+        <div style={s.rightCol}>
+
+          {/* Quick Actions — 2×2 grid */}
+          <div style={s.section}>
+            <div style={s.sectionHeader}>
+              <h2 style={s.sectionTitle}>Quick Actions</h2>
+            </div>
+            <div style={{ padding: '16px' }}>
+              <div style={s.actions}>
+                {[
+                  { icon: '📝', label: 'New Order',   path: '/orders/new' },
+                  { icon: '📋', label: 'View Blotter', path: '/orders'    },
+                  { icon: '💼', label: 'Portfolio',   path: '/portfolio'  },
+                  { icon: '📈', label: 'Market Data', path: '/market'     },
+                ].map(({ icon, label, path }) => (
+                  <button
+                    key={path}
+                    style={s.actionBtn}
+                    onClick={() => navigate(path)}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)' }}
+                  >
+                    <div style={s.actionIcon}>{icon}</div>
+                    <div style={s.actionLabel}>{label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <div style={s.sectionBody}>
-            {loading ? (
-              <div style={s.emptyMsg}>Loading…</div>
-            ) : !metrics || metrics.gtcExpiringSoon.length === 0 ? (
-              <div style={s.emptyMsg}>No GTC orders expiring within 2 days</div>
-            ) : (
-              metrics.gtcExpiringSoon.map((order) => (
-                <div key={order.id} style={s.gtdRow}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 600, color: '#1a2236', fontSize: '13px' }}>{order.symbol}</span>
-                    <span style={s.sidePill(order.side)}>{order.side}</span>
-                    <span style={{ color: '#6b7280', fontSize: '12px' }}>{order.quantity.toLocaleString()} shares</span>
+
+          {/* GTD Expiring Soon */}
+          <div style={s.section}>
+            <div style={s.sectionHeader}>
+              <h2 style={s.sectionTitle}>GTC Expiring Soon</h2>
+              <span style={s.refreshNote}>Within 2 days</span>
+            </div>
+            <div style={s.sectionBody}>
+              {loading ? (
+                <div style={s.emptyMsg}>Loading…</div>
+              ) : !metrics || metrics.gtcExpiringSoon.length === 0 ? (
+                <div style={s.emptyMsg}>No GTC orders expiring within 2 days</div>
+              ) : (
+                metrics.gtcExpiringSoon.map((order) => (
+                  <div key={order.id} style={s.gtdRow}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 600, color: '#1a2236', fontSize: '13px' }}>{order.symbol}</span>
+                      <span style={s.sidePill(order.side)}>{order.side}</span>
+                      <span style={{ color: '#6b7280', fontSize: '12px' }}>{order.quantity.toLocaleString()} shares</span>
+                    </div>
+                    <div style={s.expiryWarn}>
+                      Expires {order.expiryDate ? formatDate(order.expiryDate) : '—'}
+                    </div>
                   </div>
-                  <div style={s.expiryWarn}>
-                    Expires {order.expiryDate ? formatDate(order.expiryDate) : '—'}
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+
+        </div>{/* end right col */}
 
       </div>
     </div>
