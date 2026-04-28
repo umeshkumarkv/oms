@@ -75,7 +75,15 @@ public class MarketDataService {
     MarketHoursResponse getMarketHoursAt(ZonedDateTime now) {
         log.debug("Checking market hours: now={}", now);
         boolean open = isMarketOpen(now);
-        String nextOpenDate = open ? null : computeNextOpenDate(now.toLocalDate().plusDays(1));
+        String nextOpenDate = null;
+        if (!open) {
+            // If before market open, today may still open — search from today.
+            // If at/after close (or weekend/holiday), today is done — search from tomorrow.
+            LocalDate startCandidate = now.toLocalTime().isBefore(LocalTime.parse(openTime))
+                    ? now.toLocalDate()
+                    : now.toLocalDate().plusDays(1);
+            nextOpenDate = computeNextOpenDate(startCandidate);
+        }
         return MarketHoursResponse.builder()
                 .marketOpen(open)
                 .openTime(openTime)

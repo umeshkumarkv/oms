@@ -210,6 +210,18 @@ class MarketDataServiceTest {
     }
 
     @Test
+    void shouldReturnTodayAsNextOpenDateWhenBeforeMarketOpen() {
+        // Tuesday 00:45 ET — market hasn't opened yet today, so nextOpenDate should be today
+        ZonedDateTime tuesdayEarlyMorning = ZonedDateTime.of(2026, 4, 28, 0, 45, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 28))).thenReturn(false);
+
+        MarketHoursResponse result = marketDataService.getMarketHoursAt(tuesdayEarlyMorning);
+
+        assertThat(result.getMarketOpen()).isFalse();
+        assertThat(result.getNextOpenDate()).isEqualTo("2026-04-28");
+    }
+
+    @Test
     void shouldReturnNextOpenDateSkippingHolidayWhenMarketClosed() {
         // Thursday evening before Good Friday 2026-04-03 (holiday) + weekend → next open Mon 2026-04-06
         ZonedDateTime thursdayEvening = ZonedDateTime.of(2026, 4, 2, 18, 0, 0, 0, NEW_YORK);

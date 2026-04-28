@@ -213,6 +213,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: brokerdealer
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=market_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
+      SPRING_PROFILES_ACTIVE: dev
     depends_on:
       - kafka
       - redis
