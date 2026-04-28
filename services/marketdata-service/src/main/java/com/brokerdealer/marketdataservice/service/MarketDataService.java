@@ -49,22 +49,23 @@ public class MarketDataService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     public InstrumentResponse getInstrument(String symbol) {
-        log.debug("Fetching instrument: symbol={}", symbol);
-        String cacheKey = CACHE_KEY_PREFIX + symbol;
+        String normalised = symbol.toUpperCase();
+        log.debug("Fetching instrument: symbol={}", normalised);
+        String cacheKey = CACHE_KEY_PREFIX + normalised;
 
         Object cached = redisTemplate.opsForValue().get(cacheKey);
         if (cached instanceof InstrumentResponse hit) {
-            log.debug("Cache hit: symbol={}", symbol);
+            log.debug("Cache hit: symbol={}", normalised);
             return hit;
         }
 
-        InstrumentResponse response = instrumentRepository.findById(symbol)
+        InstrumentResponse response = instrumentRepository.findById(normalised)
                 .map(instrumentMapper::toResponse)
                 .orElseThrow(() -> new SymbolNotFoundException("SYMBOL_NOT_FOUND",
-                        "Symbol not found: " + symbol));
+                        "Symbol not found: " + normalised));
 
         redisTemplate.opsForValue().set(cacheKey, response, CACHE_TTL);
-        log.debug("Cache populated: symbol={}", symbol);
+        log.debug("Cache populated: symbol={}", normalised);
         return response;
     }
 

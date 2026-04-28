@@ -107,6 +107,20 @@ class MarketDataServiceTest {
     }
 
     @Test
+    void shouldNormaliseSymbolToUppercaseBeforeLookup() {
+        Instrument instrument = buildInstrument("AAPL", false);
+        InstrumentResponse expected = buildResponse("AAPL", false);
+
+        when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
+        when(instrumentMapper.toResponse(instrument)).thenReturn(expected);
+
+        InstrumentResponse result = marketDataService.getInstrument("aapl");
+
+        assertThat(result.getSymbol()).isEqualTo("AAPL");
+        verify(valueOperations).set(eq("market:price:AAPL"), eq(expected), any(Duration.class));
+    }
+
+    @Test
     void shouldThrowSymbolNotFoundExceptionWhenSymbolIsUnknown() {
         when(instrumentRepository.findById("UNKNOWN")).thenReturn(Optional.empty());
 
