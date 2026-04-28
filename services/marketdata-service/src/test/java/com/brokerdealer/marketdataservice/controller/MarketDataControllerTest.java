@@ -62,6 +62,27 @@ class MarketDataControllerTest {
     }
 
     @Test
+    void shouldReturn200WhenSymbolIsLowercase() throws Exception {
+        InstrumentResponse response = InstrumentResponse.builder()
+                .symbol("AAPL")
+                .bidPrice("174.95")
+                .askPrice("175.05")
+                .lastPrice("175.00")
+                .tradable(true)
+                .halted(false)
+                .minQuantity(1)
+                .maxQuantity(10000)
+                .dataTimestamp("2026-04-27T06:00:00Z")
+                .build();
+
+        when(marketDataService.getInstrument("aapl")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/market/aapl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.symbol").value("AAPL"));
+    }
+
+    @Test
     void shouldReturn200WithHaltedTrueWhenSymbolIsHalted() throws Exception {
         InstrumentResponse response = InstrumentResponse.builder()
                 .symbol("HALT")
