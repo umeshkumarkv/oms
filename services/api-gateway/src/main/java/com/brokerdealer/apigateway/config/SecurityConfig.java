@@ -27,7 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/login").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().permitAll() // TODO: change to authenticated() after JWT impl
+                        .anyRequest().permitAll() // JWT validation enforced by JwtValidationFilter
                 )
                 .addFilterBefore(jwtValidationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
