@@ -62,11 +62,11 @@ public class PriceTickService {
     void tickInstrument(Instrument instrument, boolean resetDay) {
         BigDecimal currentPrice = instrument.getLastPrice();
 
-        // ±0.1%–0.5% change, 52% up / 48% down
+        // ±0.1%–0.5% change (1–5 permille), 52% up / 48% down — no double arithmetic
         boolean up = ThreadLocalRandom.current().nextInt(100) < 52;
-        double changePct = 0.001 + ThreadLocalRandom.current().nextDouble(0.004);
+        BigDecimal changePct = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(5), 3);
         BigDecimal change = currentPrice
-                .multiply(BigDecimal.valueOf(changePct))
+                .multiply(changePct)
                 .setScale(4, RoundingMode.HALF_UP);
 
         BigDecimal newPrice = up ? currentPrice.add(change) : currentPrice.subtract(change);
