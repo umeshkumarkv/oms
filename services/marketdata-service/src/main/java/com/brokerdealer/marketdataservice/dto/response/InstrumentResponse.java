@@ -10,9 +10,14 @@ public class InstrumentResponse {
     String bidPrice;
     String askPrice;
     String lastPrice;
+    String dayHigh;
+    String dayLow;
+    String previousClose;
+    Long volume;
     Boolean tradable;
     Boolean halted;
     Integer minQuantity;
     Integer maxQuantity;
     String dataTimestamp;
 }
+

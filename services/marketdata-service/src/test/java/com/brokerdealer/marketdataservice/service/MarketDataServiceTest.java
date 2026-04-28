@@ -12,21 +12,27 @@ import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.*;
-import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MarketDataServiceTest {
@@ -46,19 +52,27 @@ class MarketDataServiceTest {
     @Mock
     private InstrumentSummaryMapper instrumentSummaryMapper;
 
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private ValueOperations<String, Object> valueOperations;
+
     @InjectMocks
     private MarketDataService marketDataService;
 
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(marketDataService, "openTime", "09:30:00");
         ReflectionTestUtils.setField(marketDataService, "closeTime", "16:00:00");
         ReflectionTestUtils.setField(marketDataService, "timezone", "America/New_York");
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(valueOperations.get(anyString())).thenReturn(null); // cache miss by default
     }
 
-    // --- getInstrument ---
+    // --- getInstrument: cache miss ---
 
     @Test
     void shouldReturnInstrumentResponseWhenSymbolIsValid() {
@@ -74,6 +88,7 @@ class MarketDataServiceTest {
         assertThat(result.getSymbol()).isEqualTo("AAPL");
         assertThat(result.getHalted()).isFalse();
         assertThat(result.getTradable()).isTrue();
+        verify(valueOperations).set(eq("market:price:AAPL"), eq(expected), any(Duration.class));
     }
 
     @Test
@@ -100,12 +115,26 @@ class MarketDataServiceTest {
                 .hasMessageContaining("UNKNOWN");
     }
 
+    // --- getInstrument: cache hit ---
+
+    @Test
+    void shouldReturnInstrumentFromCacheWhenCacheHit() {
+        InstrumentResponse cached = buildResponse("AAPL", false);
+        when(valueOperations.get("market:price:AAPL")).thenReturn(cached);
+
+        InstrumentResponse result = marketDataService.getInstrument("AAPL");
+
+        assertThat(result.getSymbol()).isEqualTo("AAPL");
+        verifyNoInteractions(instrumentRepository);
+    }
+
     // --- isMarketOpen ---
 
     @Test
     void shouldReturnMarketOpenDuringTradingHours() {
-        // Tuesday 10:00 ET
+        // Tuesday 10:00 ET — not a holiday
         ZonedDateTime tuesday10am = ZonedDateTime.of(2026, 4, 28, 10, 0, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 28))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(tuesday10am)).isTrue();
     }
 
@@ -113,6 +142,7 @@ class MarketDataServiceTest {
     void shouldReturnMarketOpenAtExactOpenTime() {
         // Monday 09:30 ET
         ZonedDateTime monday930 = ZonedDateTime.of(2026, 4, 27, 9, 30, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 27))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(monday930)).isTrue();
     }
 
@@ -142,18 +172,69 @@ class MarketDataServiceTest {
         assertThat(marketDataService.isMarketOpen(sunday)).isFalse();
     }
 
-    // --- getMarketHours ---
+    @Test
+    void shouldReturnMarketClosedOnHoliday() {
+        // Good Friday 2026-04-03 during trading hours
+        ZonedDateTime goodFriday = ZonedDateTime.of(2026, 4, 3, 11, 0, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 3))).thenReturn(true);
+        assertThat(marketDataService.isMarketOpen(goodFriday)).isFalse();
+    }
+
+    // --- getMarketHoursAt ---
 
     @Test
-    void shouldReturnMarketHoursResponseWithCorrectFields() {
-        MarketHoursResponse result = marketDataService.getMarketHours();
+    void shouldReturnMarketHoursResponseWithCorrectFieldsWhenOpen() {
+        ZonedDateTime tuesday10am = ZonedDateTime.of(2026, 4, 28, 10, 0, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 28))).thenReturn(false);
 
-        assertThat(result).isNotNull();
+        MarketHoursResponse result = marketDataService.getMarketHoursAt(tuesday10am);
+
         assertThat(result.getOpenTime()).isEqualTo("09:30:00");
         assertThat(result.getCloseTime()).isEqualTo("16:00:00");
         assertThat(result.getTimezone()).isEqualTo("America/New_York");
-        assertThat(result.getMarketOpen()).isNotNull();
+        assertThat(result.getMarketOpen()).isTrue();
         assertThat(result.getNextOpenDate()).isNull();
+    }
+
+    @Test
+    void shouldReturnNextOpenDateSkippingWeekendsWhenMarketClosed() {
+        // Friday 18:00 ET — market closed, next open is Monday 2026-04-27
+        ZonedDateTime fridayEvening = ZonedDateTime.of(2026, 4, 24, 18, 0, 0, 0, NEW_YORK);
+        // Saturday 2026-04-25 and Sunday 2026-04-26 are weekends, Monday 2026-04-27 is open
+        when(marketHolidayRepository.existsById(any(LocalDate.class))).thenReturn(false);
+
+        MarketHoursResponse result = marketDataService.getMarketHoursAt(fridayEvening);
+
+        assertThat(result.getMarketOpen()).isFalse();
+        assertThat(result.getNextOpenDate()).isEqualTo("2026-04-27");
+    }
+
+    @Test
+    void shouldReturnTodayAsNextOpenDateWhenBeforeMarketOpen() {
+        // Tuesday 00:45 ET — market hasn't opened yet today, so nextOpenDate should be today
+        ZonedDateTime tuesdayEarlyMorning = ZonedDateTime.of(2026, 4, 28, 0, 45, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 28))).thenReturn(false);
+
+        MarketHoursResponse result = marketDataService.getMarketHoursAt(tuesdayEarlyMorning);
+
+        assertThat(result.getMarketOpen()).isFalse();
+        assertThat(result.getNextOpenDate()).isEqualTo("2026-04-28");
+    }
+
+    @Test
+    void shouldReturnNextOpenDateSkippingHolidayWhenMarketClosed() {
+        // Thursday evening before Good Friday 2026-04-03 (holiday) + weekend → next open Mon 2026-04-06
+        ZonedDateTime thursdayEvening = ZonedDateTime.of(2026, 4, 2, 18, 0, 0, 0, NEW_YORK);
+        // Only 2026-04-03 is a holiday; all other dates are normal trading days
+        when(marketHolidayRepository.existsById(any(LocalDate.class))).thenAnswer(inv -> {
+            LocalDate date = inv.getArgument(0);
+            return LocalDate.of(2026, 4, 3).equals(date);
+        });
+
+        MarketHoursResponse result = marketDataService.getMarketHoursAt(thursdayEvening);
+
+        assertThat(result.getMarketOpen()).isFalse();
+        assertThat(result.getNextOpenDate()).isEqualTo("2026-04-06");
     }
 
     // --- getHolidays ---
