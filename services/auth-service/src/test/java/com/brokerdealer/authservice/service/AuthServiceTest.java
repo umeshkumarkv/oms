@@ -117,6 +117,18 @@ class AuthServiceTest {
     }
 
     @Test
+    void shouldReturnNullForGetCurrentUser() {
+        Object result = authService.getCurrentUser("some-token");
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void shouldCompleteLogoutWithoutError() {
+        authService.logout("some-token");
+        // stub — no exception expected
+    }
+
+    @Test
     void shouldSetExpiryEightHoursFromNow() {
         LoginRequest request = new LoginRequest();
         request.setUsername("trader.john");

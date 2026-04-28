@@ -16,8 +16,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import com.brokerdealer.authservice.exception.ValidationException;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -101,5 +104,46 @@ class AuthControllerTest {
                         .content("{\"username\":\"trader.john\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void shouldReturn200OnLogout() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer test-token"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldReturn200OnGetMe() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldReturn400OnValidationException() throws Exception {
+        when(authService.login(any()))
+                .thenThrow(new ValidationException("VALIDATION_FAILED", "Validation failed"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"trader.john\",\"password\":\"Demo@1234\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturn500OnUnexpectedException() throws Exception {
+        when(authService.login(any()))
+                .thenThrow(new RuntimeException("Unexpected error"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"trader.john\",\"password\":\"Demo@1234\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
     }
 }
