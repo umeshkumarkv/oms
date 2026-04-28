@@ -1,6 +1,7 @@
 package com.brokerdealer.authservice.service;
 
 import com.brokerdealer.authservice.domain.User;
+import com.brokerdealer.authservice.domain.UserStatus;
 import com.brokerdealer.authservice.dto.request.LoginRequest;
 import com.brokerdealer.authservice.dto.response.LoginData;
 import com.brokerdealer.authservice.exception.AuthException;
@@ -42,6 +43,12 @@ public class AuthService {
             log.info("Login attempt: username={} role={} result=failure reason=bad_credentials",
                     user.getUsername(), user.getRole());
             throw new AuthException("UNAUTHORIZED", "Username or password is incorrect");
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            log.info("Login attempt: username={} role={} result=failure reason=account_inactive",
+                    user.getUsername(), user.getRole());
+            throw new AuthException("ACCOUNT_INACTIVE", "Account is inactive");
         }
 
         Instant now = Instant.now();

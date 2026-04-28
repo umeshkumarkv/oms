@@ -2,6 +2,7 @@ package com.brokerdealer.authservice.service;
 
 import com.brokerdealer.authservice.domain.User;
 import com.brokerdealer.authservice.domain.UserRole;
+import com.brokerdealer.authservice.domain.UserStatus;
 import com.brokerdealer.authservice.dto.request.LoginRequest;
 import com.brokerdealer.authservice.dto.response.LoginData;
 import com.brokerdealer.authservice.exception.AuthException;
@@ -50,6 +51,7 @@ class AuthServiceTest {
                 .username("trader.john")
                 .passwordHash("$2a$10$hashedpassword")
                 .role(UserRole.TRADER)
+                .status(UserStatus.ACTIVE)
                 .createdAt(Instant.now())
                 .build();
     }
@@ -126,6 +128,30 @@ class AuthServiceTest {
     void shouldCompleteLogoutWithoutError() {
         authService.logout("some-token");
         // stub — no exception expected
+    }
+
+    @Test
+    void shouldThrowAccountInactiveForInactiveUser() {
+        User inactiveUser = User.builder()
+                .id(UUID.randomUUID())
+                .username("trader.john")
+                .passwordHash("$2a$10$hashedpassword")
+                .role(UserRole.TRADER)
+                .status(UserStatus.INACTIVE)
+                .createdAt(Instant.now())
+                .build();
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("trader.john");
+        request.setPassword("Demo@1234");
+
+        when(userRepository.findByUsernameIgnoreCase("trader.john")).thenReturn(Optional.of(inactiveUser));
+        when(passwordEncoder.matches("Demo@1234", inactiveUser.getPasswordHash())).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AuthException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "ACCOUNT_INACTIVE")
+                .hasMessage("Account is inactive");
     }
 
     @Test
