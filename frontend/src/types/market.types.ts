@@ -8,6 +8,11 @@ export interface Instrument {
   minQuantity: number
   maxQuantity: number
   dataTimestamp: string
+  // Only returned by GET /market/{symbol}
+  dayHigh?: string
+  dayLow?: string
+  previousClose?: string
+  volume?: number
 }
 
 export interface MarketHours {

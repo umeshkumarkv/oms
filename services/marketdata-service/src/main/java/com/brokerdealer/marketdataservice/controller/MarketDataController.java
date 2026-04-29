@@ -1,7 +1,6 @@
 package com.brokerdealer.marketdataservice.controller;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
-import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
@@ -47,7 +46,7 @@ public class MarketDataController {
     @GetMapping("/instruments")
     public ResponseEntity<Map<String, Object>> getInstruments() {
         log.debug("GET /api/v1/market/instruments");
-        List<InstrumentSummaryResponse> data = marketDataService.getInstruments();
+        List<InstrumentResponse> data = marketDataService.getInstruments();
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 

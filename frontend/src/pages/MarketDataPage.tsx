@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getInstruments, getMarketHours } from '../api/marketApi'
+import { getInstrument, getInstruments, getMarketHours } from '../api/marketApi'
 import { Instrument, MarketHours } from '../types/market.types'
 import { marketDataWs, PriceTick } from '../services/websocketService'
 
 // TODO: replace with auth context — SCRUM-16
 const CURRENT_USER = { name: 'trader.john', role: 'TRADER' }
 
-const POLL_MS = 10_000
+const POLL_MS = 1_000
 const SPARKLINE_MAX = 20
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -128,45 +128,42 @@ const s = {
 const MarketDataPage: React.FC = () => {
   const navigate = useNavigate()
 
-  const [instruments, setInstruments]   = useState<LiveInstrument[]>([])
-  const [marketHours, setMarketHours]   = useState<MarketHours | null>(null)
-  const [selected, setSelected]         = useState<string | null>(null)
-  const [loading, setLoading]           = useState(true)
-  const [wsLive, setWsLive]             = useState(false)
+  const [instruments, setInstruments]     = useState<LiveInstrument[]>([])
+  const [marketHours, setMarketHours]     = useState<MarketHours | null>(null)
+  const [selected, setSelected]           = useState<string | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<LiveInstrument | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [loading, setLoading]             = useState(true)
+  const [wsLive, setWsLive]               = useState(false)
 
   const instrumentsRef = useRef<LiveInstrument[]>([])
   instrumentsRef.current = instruments
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  const buildLive = (inst: Instrument): LiveInstrument => ({
-    ...inst,
-    change: 0,
-    changePct: 0,
-    priceHistory: [Number(inst.lastPrice)],
-  })
+  const buildLive = (inst: Instrument): LiveInstrument => {
+    const last      = Number(inst.lastPrice)
+    const prevClose = inst.previousClose ? Number(inst.previousClose) : last
+    const change    = last - prevClose
+    const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
+    return { ...inst, change, changePct, priceHistory: [last] }
+  }
 
   const applyTick = useCallback((tick: PriceTick) => {
-    setInstruments(prev =>
-      prev.map(inst => {
-        if (inst.symbol !== tick.symbol) return inst
-        const last = Number(tick.lastPrice)
-        const prev0 = Number(inst.lastPrice)
-        const change = last - prev0
-        const changePct = prev0 !== 0 ? (change / prev0) * 100 : 0
-        const priceHistory = [...inst.priceHistory, last].slice(-SPARKLINE_MAX)
-        return {
-          ...inst,
-          bidPrice: tick.bidPrice,
-          askPrice: tick.askPrice,
-          lastPrice: tick.lastPrice,
-          dataTimestamp: tick.dataTimestamp,
-          change,
-          changePct,
-          priceHistory,
-        }
-      })
-    )
+    const updateLive = (inst: LiveInstrument): LiveInstrument => {
+      const last      = Number(tick.lastPrice)
+      const prevClose = tick.previousClose ? Number(tick.previousClose)
+                      : inst.previousClose  ? Number(inst.previousClose) : last
+      const change    = last - prevClose
+      const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
+      const priceHistory = [...inst.priceHistory, last].slice(-SPARKLINE_MAX)
+      return { ...inst, bidPrice: tick.bidPrice, askPrice: tick.askPrice, lastPrice: tick.lastPrice,
+               previousClose: tick.previousClose ?? inst.previousClose,
+               dataTimestamp: tick.dataTimestamp, change, changePct, priceHistory }
+    }
+
+    setInstruments(prev => prev.map(inst => inst.symbol === tick.symbol ? updateLive(inst) : inst))
+    setSelectedDetail(prev => prev?.symbol === tick.symbol ? updateLive(prev) : prev)
   }, [])
 
   // ── Initial load ─────────────────────────────────────────────────────────
@@ -175,9 +172,46 @@ const MarketDataPage: React.FC = () => {
     if (showSpinner) setLoading(true)
     const [insts, hours] = await Promise.all([getInstruments(), getMarketHours()])
     const live: LiveInstrument[] = (insts as Instrument[]).map(buildLive)
-    setInstruments(live)
+    setInstruments(prev => live.map(next => {
+      const existing  = prev.find(p => p.symbol === next.symbol)
+      const last      = Number(next.lastPrice)
+      const prevClose = next.previousClose ? Number(next.previousClose) : last
+      const change    = last - prevClose
+      const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
+      const priceHistory = existing ? [...existing.priceHistory, last].slice(-SPARKLINE_MAX) : [last]
+      return { ...next, change, changePct, priceHistory }
+    }))
+    setSelectedDetail(prev => {
+      if (!prev) return prev
+      const updated   = live.find(i => i.symbol === prev.symbol)
+      if (!updated) return prev
+      const last      = Number(updated.lastPrice)
+      const prevClose = updated.previousClose ? Number(updated.previousClose) : last
+      const change    = last - prevClose
+      const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
+      const priceHistory = [...prev.priceHistory, last].slice(-SPARKLINE_MAX)
+      return { ...prev, bidPrice: updated.bidPrice, askPrice: updated.askPrice,
+               lastPrice: updated.lastPrice, previousClose: updated.previousClose,
+               dataTimestamp: updated.dataTimestamp, change, changePct, priceHistory }
+    })
     setMarketHours(hours)
     if (showSpinner) setLoading(false)
+  }, [])
+
+  // ── Symbol selection — calls /market/{symbol} for full detail ────────────
+
+  const handleSelectSymbol = useCallback(async (symbol: string) => {
+    setSelected(symbol)
+    setDetailLoading(true)
+    const inst = await getInstrument(symbol)
+    if (inst) {
+      const last      = Number(inst.lastPrice)
+      const prevClose = inst.previousClose ? Number(inst.previousClose) : last
+      const change    = last - prevClose
+      const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
+      setSelectedDetail({ ...inst, change, changePct, priceHistory: [last] })
+    }
+    setDetailLoading(false)
   }, [])
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
@@ -215,8 +249,7 @@ const MarketDataPage: React.FC = () => {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const open     = marketHours?.marketOpen ?? false
-  const selectedInst = instruments.find(i => i.symbol === selected) ?? null
+  const open = marketHours?.marketOpen ?? false
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -230,7 +263,7 @@ const MarketDataPage: React.FC = () => {
           {marketHours && (
             <span style={s.pill(open)}>{open ? 'MARKET OPEN' : 'MARKET CLOSED'}</span>
           )}
-          <span style={s.wsPill(wsLive)}>{wsLive ? '● Live' : '○ Polling'}</span>
+          <span style={s.wsPill(wsLive)}>{wsLive ? '● Live' : '○ Polling 1s'}</span>
           {marketHours && (
             <span style={s.note}>{marketHours.openTime} – {marketHours.closeTime} {marketHours.timezone}</span>
           )}
@@ -240,7 +273,7 @@ const MarketDataPage: React.FC = () => {
       {/* WS reconnecting banner */}
       {!wsLive && (
         <div style={s.warnBanner}>
-          Live updates paused — reconnecting… Prices refresh every 10 s.
+          Connecting to live feed — polling every 1s.
           {marketHours?.nextOpenDate && !open && (
             <span> Next open: <strong>{marketHours.nextOpenDate}</strong>.</span>
           )}
@@ -283,7 +316,7 @@ const MarketDataPage: React.FC = () => {
                       <tr
                         key={inst.symbol}
                         style={isSelected ? s.selectedRow : undefined}
-                        onClick={() => setSelected(inst.symbol)}
+                        onClick={() => handleSelectSymbol(inst.symbol)}
                       >
                         <td style={s.td}>
                           <span style={s.symbolCell}>{inst.symbol}</span>
@@ -313,52 +346,72 @@ const MarketDataPage: React.FC = () => {
 
         {/* Right — Quote Card */}
         <div style={s.card}>
-          {!selectedInst ? (
+          {!selected ? (
             <div style={s.noSelect}>
               <div style={{ fontSize: '28px', marginBottom: '8px' }}>📈</div>
               Select a symbol from the watchlist to view its quote
             </div>
+          ) : detailLoading ? (
+            <div style={s.noSelect}>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>Loading {selected}…</div>
+            </div>
+          ) : !selectedDetail ? (
+            <div style={s.noSelect}>
+              <div style={{ fontSize: '13px', color: '#dc2626' }}>Failed to load {selected}</div>
+            </div>
           ) : (
             <>
-              <div style={s.qSymbol}>{selectedInst.symbol}</div>
-              <div style={s.qPrice}>${fmt(selectedInst.lastPrice)}</div>
-              <div style={s.qChange(selectedInst.changePct)}>
-                {arrow(selectedInst.changePct)}&nbsp;
-                {selectedInst.change >= 0 ? '+' : ''}{fmt(selectedInst.change)}&nbsp;
-                ({selectedInst.changePct >= 0 ? '+' : ''}{selectedInst.changePct.toFixed(2)}%)
+              <div style={s.qSymbol}>{selectedDetail.symbol}</div>
+              <div style={s.qPrice}>${fmt(selectedDetail.lastPrice)}</div>
+              <div style={s.qChange(selectedDetail.changePct)}>
+                {arrow(selectedDetail.changePct)}&nbsp;
+                {selectedDetail.change >= 0 ? '+' : ''}{fmt(selectedDetail.change)}&nbsp;
+                ({selectedDetail.changePct >= 0 ? '+' : ''}{selectedDetail.changePct.toFixed(2)}%)
               </div>
 
               <div style={s.details}>
                 <div>
                   <div style={s.detLabel}>Bid</div>
-                  <div style={s.detValue}>${fmt(selectedInst.bidPrice)}</div>
+                  <div style={s.detValue}>${fmt(selectedDetail.bidPrice)}</div>
                 </div>
                 <div>
                   <div style={s.detLabel}>Ask</div>
-                  <div style={s.detValue}>${fmt(selectedInst.askPrice)}</div>
+                  <div style={s.detValue}>${fmt(selectedDetail.askPrice)}</div>
                 </div>
                 <div>
                   <div style={s.detLabel}>Spread</div>
-                  <div style={s.detValue}>{spread(selectedInst.bidPrice, selectedInst.askPrice)}</div>
+                  <div style={s.detValue}>{spread(selectedDetail.bidPrice, selectedDetail.askPrice)}</div>
+                </div>
+                <div>
+                  <div style={s.detLabel}>Prev Close</div>
+                  <div style={s.detValue}>{selectedDetail.previousClose ? `$${fmt(selectedDetail.previousClose)}` : '—'}</div>
+                </div>
+                <div>
+                  <div style={s.detLabel}>Day High</div>
+                  <div style={s.detValue}>{selectedDetail.dayHigh ? `$${fmt(selectedDetail.dayHigh)}` : '—'}</div>
+                </div>
+                <div>
+                  <div style={s.detLabel}>Day Low</div>
+                  <div style={s.detValue}>{selectedDetail.dayLow ? `$${fmt(selectedDetail.dayLow)}` : '—'}</div>
                 </div>
                 <div>
                   <div style={s.detLabel}>Min Qty</div>
-                  <div style={s.detValue}>{selectedInst.minQuantity.toLocaleString()}</div>
+                  <div style={s.detValue}>{selectedDetail.minQuantity?.toLocaleString() ?? '—'}</div>
                 </div>
                 <div>
                   <div style={s.detLabel}>Max Qty</div>
-                  <div style={s.detValue}>{selectedInst.maxQuantity.toLocaleString()}</div>
+                  <div style={s.detValue}>{selectedDetail.maxQuantity?.toLocaleString() ?? '—'}</div>
                 </div>
                 <div>
                   <div style={s.detLabel}>Status</div>
                   <div style={s.detValue}>
-                    {selectedInst.halted ? 'HALTED' : selectedInst.tradable ? 'ACTIVE' : 'CLOSED'}
+                    {selectedDetail.halted ? 'HALTED' : selectedDetail.tradable ? 'ACTIVE' : 'CLOSED'}
                   </div>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <div style={s.detLabel}>Last Updated</div>
                   <div style={s.detValue}>
-                    {new Date(selectedInst.dataTimestamp).toLocaleTimeString('en-US', {
+                    {new Date(selectedDetail.dataTimestamp).toLocaleTimeString('en-US', {
                       timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit',
                     })} ET
                   </div>
@@ -366,17 +419,17 @@ const MarketDataPage: React.FC = () => {
               </div>
 
               <div style={s.sparkRow}>
-                <div style={s.sparkLabel}>Price history (last {selectedInst.priceHistory.length} ticks)</div>
-                <Sparkline prices={selectedInst.priceHistory} positive={selectedInst.changePct >= 0} />
+                <div style={s.sparkLabel}>Price history (last {selectedDetail.priceHistory.length} ticks)</div>
+                <Sparkline prices={selectedDetail.priceHistory} positive={selectedDetail.changePct >= 0} />
               </div>
 
               {CURRENT_USER.role === 'TRADER' ? (
                 <button
                   style={s.orderBtn}
-                  onClick={() => navigate(`/orders/new?symbol=${selectedInst.symbol}`)}
-                  disabled={selectedInst.halted || !selectedInst.tradable}
+                  onClick={() => navigate(`/orders/new?symbol=${selectedDetail.symbol}`)}
+                  disabled={selectedDetail.halted || !selectedDetail.tradable}
                 >
-                  New Order — {selectedInst.symbol}
+                  New Order — {selectedDetail.symbol}
                 </button>
               ) : (
                 <button style={s.disabledBtn} disabled>

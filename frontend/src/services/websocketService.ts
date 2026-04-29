@@ -4,6 +4,7 @@ export interface PriceTick {
   bidPrice: string
   askPrice: string
   lastPrice: string
+  previousClose: string
   dataTimestamp: string
 }
 
