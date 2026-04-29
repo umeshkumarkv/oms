@@ -58,12 +58,14 @@ public class MarketDataWebSocketHandler extends TextWebSocketHandler {
         sessions.values().removeIf(session -> {
             if (!session.isOpen()) return true;
             try {
-                session.sendMessage(message);
+                synchronized (session) {
+                    session.sendMessage(message);
+                }
+                return false;
             } catch (IOException e) {
                 log.warn("WS send failed, removing session: sessionId={}", session.getId());
                 return true;
             }
-            return false;
         });
     }
 
