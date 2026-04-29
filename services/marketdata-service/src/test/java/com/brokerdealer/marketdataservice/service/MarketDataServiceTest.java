@@ -274,6 +274,37 @@ class MarketDataServiceTest {
         assertThat(result.get(0).getHolidayName()).isEqualTo("New Year's Day");
     }
 
+    // --- DST transition — verifies ZoneId.of("America/New_York") not a fixed UTC offset ---
+
+    @Test
+    void shouldReturnMarketOpenOnFirstTradingDayAfterSpringForward() {
+        // 2026-03-08 (Sunday) is the US spring-forward day — clocks advance 2:00→3:00 AM.
+        // 2026-03-09 (Monday) is the first trading day in EDT (UTC-4).
+        // 09:30 EDT = 13:30 UTC. A hardcoded UTC-5 offset would compute 09:30 EST = 14:30 UTC
+        // and give a different wall-clock answer. ZoneId.of("America/New_York") handles this.
+        ZonedDateTime monday930Edt = ZonedDateTime.of(2026, 3, 9, 9, 30, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 3, 9))).thenReturn(false);
+        assertThat(marketDataService.isMarketOpen(monday930Edt)).isTrue();
+    }
+
+    @Test
+    void shouldReturnMarketOpenOnFirstTradingDayAfterFallBack() {
+        // 2026-11-01 (Sunday) is the US fall-back day — clocks retreat 2:00→1:00 AM.
+        // 2026-11-02 (Monday) is the first trading day back in EST (UTC-5).
+        // 09:30 EST = 14:30 UTC. Proper ZoneId handling required for correct boundary check.
+        ZonedDateTime monday930Est = ZonedDateTime.of(2026, 11, 2, 9, 30, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 11, 2))).thenReturn(false);
+        assertThat(marketDataService.isMarketOpen(monday930Est)).isTrue();
+    }
+
+    @Test
+    void shouldReturnMarketClosedAtExactCloseOnDstTransitionDay() {
+        // 2026-03-09 16:00 EDT — close boundary is exclusive regardless of DST offset
+        ZonedDateTime closeTimeEdt = ZonedDateTime.of(2026, 3, 9, 16, 0, 0, 0, NEW_YORK);
+        when(marketHolidayRepository.existsById(LocalDate.of(2026, 3, 9))).thenReturn(false);
+        assertThat(marketDataService.isMarketOpen(closeTimeEdt)).isFalse();
+    }
+
     // --- getInstruments ---
 
     @Test
