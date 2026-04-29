@@ -1,0 +1,14 @@
+# Use this workspace to collaborate
+workspace:
+  id: 3ec2cbe0-22e9-4525-85cc-fb04d7e4e4e5
+
+localResources:
+  specs:
+    - ..\services\api-gateway\openapi.yaml
+    - ..\services\auth-service\openapi.yaml
+    - ..\services\audit-service\openapi.yaml
+    - ..\services\client-service\openapi.yaml
+    - ..\services\execution-service\openapi.yaml
+    - ..\services\marketdata-service\openapi.yaml
+    - ..\services\order-service\openapi.yaml
+    - ..\services\risk-service\openapi.yaml
