@@ -1,104 +1,103 @@
-import { WebSocketEvent } from '../types/market.types'
+export interface PriceTick {
+  type: 'MARKET_DATA_TICK'
+  symbol: string
+  bidPrice: string
+  askPrice: string
+  lastPrice: string
+  dataTimestamp: string
+}
 
-const WS_URL = 'ws://localhost:8080/ws/v1'
+export interface MarketStatusEvent {
+  type: 'MARKET_OPEN' | 'MARKET_CLOSE'
+  timestamp: string
+}
 
-type EventHandler = (event: WebSocketEvent) => void
-type VoidHandler = () => void
+type TickHandler = (tick: PriceTick) => void
+type MarketStatusHandler = (event: MarketStatusEvent) => void
+type ConnectionHandler = (connected: boolean) => void
 
-class WebSocketService {
+class MarketDataWebSocketService {
   private ws: WebSocket | null = null
-  private messageHandlers: Set<EventHandler> = new Set()
-  private connectHandlers: Set<VoidHandler> = new Set()
-  private disconnectHandlers: Set<VoidHandler> = new Set()
-  private reconnectDelay = 1000
-  private reconnecting = false
-  private shouldReconnect = true
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private tickHandlers: TickHandler[] = []
+  private marketStatusHandlers: MarketStatusHandler[] = []
+  private connectionHandlers: ConnectionHandler[] = []
+  private connected = false
 
   connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return
     }
-    this.shouldReconnect = true
-    this.openConnection()
-  }
-
-  disconnect(): void {
-    this.shouldReconnect = false
-    this.reconnecting = false
-    this.reconnectDelay = 1000
-    this.ws?.close()
-    this.ws = null
-  }
-
-  onMessage(handler: EventHandler): () => void {
-    this.messageHandlers.add(handler)
-    return () => this.messageHandlers.delete(handler)
-  }
-
-  onConnect(handler: VoidHandler): () => void {
-    this.connectHandlers.add(handler)
-    return () => this.connectHandlers.delete(handler)
-  }
-
-  onDisconnect(handler: VoidHandler): () => void {
-    this.disconnectHandlers.add(handler)
-    return () => this.disconnectHandlers.delete(handler)
-  }
-
-  private openConnection(): void {
-    try {
-      this.ws = new WebSocket(WS_URL)
-    } catch {
-      this.scheduleReconnect()
-      return
-    }
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const url = `${protocol}://${window.location.host}/ws/v1`
+    this.ws = new WebSocket(url)
 
     this.ws.onopen = () => {
       const token = localStorage.getItem('token')
       if (token) {
         this.ws!.send(JSON.stringify({ type: 'AUTH', token: `Bearer ${token}` }))
       }
-      this.reconnectDelay = 1000
-      this.reconnecting = false
-      this.connectHandlers.forEach((fn) => fn())
     }
 
-    this.ws.onmessage = (event: MessageEvent) => {
+    this.ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data as string) as WebSocketEvent
-        // AUTH_OK is not a WebSocketEvent — ignore it silently
-        if (!('type' in data) || data.type === ('AUTH_OK' as string)) return
-        this.messageHandlers.forEach((fn) => fn(data))
+        const msg = JSON.parse(event.data as string)
+        if (msg.type === 'AUTH_OK') {
+          this.connected = true
+          this.connectionHandlers.forEach(h => h(true))
+        } else if (msg.type === 'MARKET_DATA_TICK') {
+          this.tickHandlers.forEach(h => h(msg as PriceTick))
+        } else if (msg.type === 'MARKET_OPEN' || msg.type === 'MARKET_CLOSE') {
+          this.marketStatusHandlers.forEach(h => h(msg as MarketStatusEvent))
+        } else if (msg.type === 'PING') {
+          this.ws!.send(JSON.stringify({ type: 'PONG' }))
+        }
       } catch {
-        // malformed message — ignore
+        // ignore malformed frames
       }
     }
 
     this.ws.onclose = () => {
-      this.disconnectHandlers.forEach((fn) => fn())
-      if (this.shouldReconnect) {
-        this.scheduleReconnect()
+      if (this.connected) {
+        this.connected = false
+        this.connectionHandlers.forEach(h => h(false))
       }
+      this.reconnectTimer = setTimeout(() => this.connect(), 5000)
     }
 
     this.ws.onerror = () => {
-      // onclose fires after onerror — reconnect handled there
       this.ws?.close()
     }
   }
 
-  private scheduleReconnect(): void {
-    if (this.reconnecting || !this.shouldReconnect) return
-    this.reconnecting = true
-    const delay = this.reconnectDelay
-    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000)
-    setTimeout(() => {
-      this.reconnecting = false
-      if (this.shouldReconnect) {
-        this.openConnection()
-      }
-    }, delay)
+  disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    this.ws?.close()
+    this.ws = null
+    this.connected = false
+  }
+
+  isConnected(): boolean {
+    return this.connected
+  }
+
+  onTick(handler: TickHandler): () => void {
+    this.tickHandlers.push(handler)
+    return () => { this.tickHandlers = this.tickHandlers.filter(h => h !== handler) }
+  }
+
+  onMarketStatus(handler: MarketStatusHandler): () => void {
+    this.marketStatusHandlers.push(handler)
+    return () => { this.marketStatusHandlers = this.marketStatusHandlers.filter(h => h !== handler) }
+  }
+
+  onConnectionChange(handler: ConnectionHandler): () => void {
+    this.connectionHandlers.push(handler)
+    return () => { this.connectionHandlers = this.connectionHandlers.filter(h => h !== handler) }
   }
 }
 
-export const websocketService = new WebSocketService()
+export const marketDataWs = new MarketDataWebSocketService()
