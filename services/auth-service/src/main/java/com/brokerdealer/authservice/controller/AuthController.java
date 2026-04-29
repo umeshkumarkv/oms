@@ -1,12 +1,13 @@
 package com.brokerdealer.authservice.controller;
 
 import com.brokerdealer.authservice.dto.request.LoginRequest;
-import com.brokerdealer.authservice.dto.response.LoginResponse;
+import com.brokerdealer.authservice.dto.response.LoginData;
 import com.brokerdealer.authservice.dto.response.LogoutResponse;
 import com.brokerdealer.authservice.dto.response.MeResponse;
 import com.brokerdealer.authservice.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
+@Slf4j
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -23,12 +25,8 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse loginResponse = authService.login(request);
-        return ResponseEntity.ok(buildResponse(Map.of(
-                "token", loginResponse.getToken(),
-                "expiresAt", loginResponse.getExpiresAt().toString(),
-                "role", loginResponse.getRole()
-        )));
+        LoginData loginData = authService.login(request);
+        return ResponseEntity.ok(buildResponse(loginData));
     }
 
     @PostMapping("/logout")
@@ -50,7 +48,7 @@ public class AuthController {
         )));
     }
 
-    private Map<String, Object> buildResponse(Map<String, Object> data) {
+    private Map<String, Object> buildResponse(Object data) {
         return Map.of(
                 "data", data,
                 "meta", Map.of(

@@ -31,7 +31,7 @@ public class JwtService {
     private final String jwtSecret;
 
     public JwtService(RedisTemplate<String, Object> redisTemplate,
-                      @Value("${JWT_SECRET:dev-secret-key-change-in-production-min-32-chars}") String jwtSecret) {
+                      @Value("${JWT_SECRET}") String jwtSecret) {
         this.redisTemplate = redisTemplate;
         this.jwtSecret = jwtSecret;
     }
@@ -45,7 +45,7 @@ public class JwtService {
                 .claim(CLAIM_ROLE, role.name())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
-                .signWith(getSigningKey())
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 

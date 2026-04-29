@@ -22,6 +22,8 @@ public class SecurityConfig {
         // The API Gateway validates JWTs for all other services.
         http
             .csrf(AbstractHttpConfigurer::disable)
+            .formLogin(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();

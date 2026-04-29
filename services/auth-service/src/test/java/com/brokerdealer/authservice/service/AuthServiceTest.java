@@ -2,14 +2,17 @@ package com.brokerdealer.authservice.service;
 
 import com.brokerdealer.authservice.domain.User;
 import com.brokerdealer.authservice.domain.UserRole;
+import com.brokerdealer.authservice.domain.UserStatus;
 import com.brokerdealer.authservice.dto.request.LoginRequest;
-import com.brokerdealer.authservice.dto.response.LoginResponse;
+import com.brokerdealer.authservice.dto.response.LoginData;
 import com.brokerdealer.authservice.dto.response.LogoutResponse;
 import com.brokerdealer.authservice.dto.response.MeResponse;
+import com.brokerdealer.authservice.exception.AuthException;
 import com.brokerdealer.authservice.exception.InvalidTokenException;
 import com.brokerdealer.authservice.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,63 +44,126 @@ class AuthServiceTest {
     @InjectMocks
     private AuthService authService;
 
-    @Test
-    void shouldLoginSuccessfully() {
-        UUID userId = UUID.randomUUID();
-        User user = User.builder()
-                .id(userId)
+    private User testUser;
+
+    @BeforeEach
+    void setUp() {
+        testUser = User.builder()
+                .id(UUID.randomUUID())
                 .username("trader.john")
-                .passwordHash("hashed")
+                .passwordHash("$2a$10$hashedpassword")
                 .role(UserRole.TRADER)
+                .status(UserStatus.ACTIVE)
+                .createdAt(Instant.now())
+                .build();
+    }
+
+    @Test
+    void shouldReturnLoginDataOnSuccessfulLogin() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("trader.john");
+        request.setPassword("Demo@1234");
+
+        when(userRepository.findByUsernameIgnoreCase("trader.john")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("Demo@1234", testUser.getPasswordHash())).thenReturn(true);
+        when(jwtService.generateToken(testUser.getId(), testUser.getUsername(), testUser.getRole()))
+                .thenReturn("jwt-token");
+
+        LoginData result = authService.login(request);
+
+        assertThat(result.getToken()).isEqualTo("jwt-token");
+        assertThat(result.getRole()).isEqualTo("TRADER");
+        assertThat(result.getUserId()).isEqualTo(testUser.getId().toString());
+        assertThat(result.getDisplayName()).isEqualTo("trader.john");
+        assertThat(result.getExpiresAt()).isNotBlank();
+    }
+
+    @Test
+    void shouldThrowAuthExceptionWhenUserNotFound() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("unknown.user");
+        request.setPassword("Demo@1234");
+
+        when(userRepository.findByUsernameIgnoreCase("unknown.user")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AuthException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "UNAUTHORIZED")
+                .hasMessage("Username or password is incorrect");
+    }
+
+    @Test
+    void shouldThrowAuthExceptionOnWrongPassword() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("trader.john");
+        request.setPassword("WrongPassword");
+
+        when(userRepository.findByUsernameIgnoreCase("trader.john")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("WrongPassword", testUser.getPasswordHash())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AuthException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "UNAUTHORIZED")
+                .hasMessage("Username or password is incorrect");
+    }
+
+    @Test
+    void shouldThrowAccountInactiveForInactiveUser() {
+        User inactiveUser = User.builder()
+                .id(UUID.randomUUID())
+                .username("trader.john")
+                .passwordHash("$2a$10$hashedpassword")
+                .role(UserRole.TRADER)
+                .status(UserStatus.INACTIVE)
+                .createdAt(Instant.now())
                 .build();
 
         LoginRequest request = new LoginRequest();
         request.setUsername("trader.john");
         request.setPassword("Demo@1234");
 
-        when(userRepository.findByUsername("trader.john")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("Demo@1234", "hashed")).thenReturn(true);
-        when(jwtService.generateToken(userId, "trader.john", UserRole.TRADER)).thenReturn("jwt-token");
-
-        LoginResponse response = authService.login(request);
-
-        assertThat(response.getToken()).isEqualTo("jwt-token");
-        assertThat(response.getRole()).isEqualTo("TRADER");
-        assertThat(response.getExpiresAt()).isAfter(Instant.now());
-    }
-
-    @Test
-    void shouldThrowInvalidTokenExceptionWhenUserNotFound() {
-        LoginRequest request = new LoginRequest();
-        request.setUsername("unknown");
-        request.setPassword("pass");
-
-        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameIgnoreCase("trader.john")).thenReturn(Optional.of(inactiveUser));
+        when(passwordEncoder.matches("Demo@1234", inactiveUser.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(InvalidTokenException.class)
-                .hasMessageContaining("incorrect");
+                .isInstanceOf(AuthException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "ACCOUNT_INACTIVE")
+                .hasMessage("Account is inactive");
     }
 
     @Test
-    void shouldThrowInvalidTokenExceptionWhenPasswordDoesNotMatch() {
-        User user = User.builder()
-                .id(UUID.randomUUID())
-                .username("trader.john")
-                .passwordHash("hashed")
-                .role(UserRole.TRADER)
-                .build();
+    void shouldPerformCaseInsensitiveUsernameLookup() {
+        LoginRequest request = new LoginRequest();
+        request.setUsername("TRADER.JOHN");
+        request.setPassword("Demo@1234");
 
+        when(userRepository.findByUsernameIgnoreCase("TRADER.JOHN")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("Demo@1234", testUser.getPasswordHash())).thenReturn(true);
+        when(jwtService.generateToken(any(), any(), any())).thenReturn("jwt-token");
+
+        LoginData result = authService.login(request);
+
+        assertThat(result).isNotNull();
+        verify(userRepository).findByUsernameIgnoreCase("TRADER.JOHN");
+    }
+
+    @Test
+    void shouldSetExpiryEightHoursFromNow() {
         LoginRequest request = new LoginRequest();
         request.setUsername("trader.john");
-        request.setPassword("wrong");
+        request.setPassword("Demo@1234");
 
-        when(userRepository.findByUsername("trader.john")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+        when(userRepository.findByUsernameIgnoreCase("trader.john")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("Demo@1234", testUser.getPasswordHash())).thenReturn(true);
+        when(jwtService.generateToken(any(), any(), any())).thenReturn("jwt-token");
 
-        assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(InvalidTokenException.class)
-                .hasMessageContaining("incorrect");
+        Instant before = Instant.now();
+        LoginData result = authService.login(request);
+        Instant after = Instant.now();
+
+        Instant expiresAt = Instant.parse(result.getExpiresAt());
+        assertThat(expiresAt).isAfter(before.plusSeconds(8 * 3600 - 5));
+        assertThat(expiresAt).isBefore(after.plusSeconds(8 * 3600 + 5));
     }
 
     @Test

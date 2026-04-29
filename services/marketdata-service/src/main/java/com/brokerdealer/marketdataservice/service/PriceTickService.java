@@ -2,6 +2,7 @@ package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
+import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,7 @@ public class PriceTickService {
     private final InstrumentRepository instrumentRepository;
     private final MarketDataService marketDataService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final MarketDataWebSocketHandler webSocketHandler;
 
     @Value("${market.simulation.bypass-market-hours:false}")
     private boolean bypassMarketHours;
@@ -106,5 +108,8 @@ public class PriceTickService {
         // invalidate Redis cache so next read fetches fresh data
         redisTemplate.delete(CACHE_KEY_PREFIX + instrument.getSymbol());
         log.debug("Ticked: symbol={} newPrice={}", instrument.getSymbol(), newPrice.toPlainString());
+
+        // push live tick to all authenticated WebSocket clients
+        webSocketHandler.broadcastTick(instrument);
     }
 }

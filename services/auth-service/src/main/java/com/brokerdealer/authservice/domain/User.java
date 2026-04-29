@@ -29,6 +29,10 @@ public class User {
     @Column(name = "role", nullable = false, length = 20)
     private UserRole role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 10)
+    private UserStatus status;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
