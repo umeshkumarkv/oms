@@ -4,21 +4,20 @@ import com.brokerdealer.authservice.domain.User;
 import com.brokerdealer.authservice.domain.UserStatus;
 import com.brokerdealer.authservice.dto.request.LoginRequest;
 import com.brokerdealer.authservice.dto.response.LoginData;
+import com.brokerdealer.authservice.dto.response.LogoutResponse;
+import com.brokerdealer.authservice.dto.response.MeResponse;
 import com.brokerdealer.authservice.exception.AuthException;
+import com.brokerdealer.authservice.exception.InvalidTokenException;
 import com.brokerdealer.authservice.repository.UserRepository;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,9 +26,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
-    @Value("${JWT_SECRET}")
-    private String jwtSecret;
+    private final JwtService jwtService;
 
     public LoginData login(LoginRequest request) {
         User user = userRepository.findByUsernameIgnoreCase(request.getUsername())
@@ -51,19 +48,8 @@ public class AuthService {
             throw new AuthException("ACCOUNT_INACTIVE", "Account is inactive");
         }
 
-        Instant now = Instant.now();
-        Instant expiresAt = now.plus(8, ChronoUnit.HOURS);
-
-        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-
-        String token = Jwts.builder()
-                .subject(user.getId().toString())
-                .claim("username", user.getUsername())
-                .claim("role", user.getRole().name())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(expiresAt))
-                .signWith(key, Jwts.SIG.HS256)
-                .compact();
+        String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole());
+        Instant expiresAt = Instant.now().plusSeconds(8 * 3600L);
 
         log.info("Login attempt: username={} role={} result=success", user.getUsername(), user.getRole());
 
@@ -76,12 +62,53 @@ public class AuthService {
                 .build();
     }
 
-    public void logout(String token) {
-        // TODO: implement — JIRA story SCRUM-17
+    public LogoutResponse logout(String bearerToken) {
+        String token = extractRawToken(bearerToken);
+        Claims claims = parseToken(token);
+        jwtService.blacklistToken(token, claims);
+        log.info("User logout: userId={}", claims.get(CLAIM_USER_ID));
+        return LogoutResponse.builder().message("Logged out successfully").build();
     }
 
-    public Object getCurrentUser(String token) {
-        // TODO: implement — JIRA story SCRUM-17
-        return null;
+    public MeResponse getCurrentUser(String bearerToken) {
+        String token = extractRawToken(bearerToken);
+        Claims claims = parseToken(token);
+
+        if (jwtService.isBlacklisted(token)) {
+            throw new InvalidTokenException("UNAUTHORIZED", "Token has been invalidated");
+        }
+
+        UUID userId = UUID.fromString(claims.get(CLAIM_USER_ID, String.class));
+        String username = claims.get(CLAIM_USERNAME, String.class);
+        String role = claims.get(CLAIM_ROLE, String.class);
+
+        log.debug("ME request: userId={}", userId);
+
+        return MeResponse.builder()
+                .userId(userId)
+                .username(username)
+                .role(role)
+                .displayName(username)
+                .build();
     }
+
+    private String extractRawToken(String bearerToken) {
+        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
+            throw new InvalidTokenException("UNAUTHORIZED", "Token is missing or invalid");
+        }
+        return bearerToken.substring(7);
+    }
+
+    private Claims parseToken(String token) {
+        try {
+            return jwtService.parseAndValidate(token);
+        } catch (JwtException e) {
+            log.warn("JWT validation failed: {}", e.getMessage());
+            throw new InvalidTokenException("UNAUTHORIZED", "Token is missing or invalid");
+        }
+    }
+
+    private static final String CLAIM_USER_ID = "userId";
+    private static final String CLAIM_USERNAME = "username";
+    private static final String CLAIM_ROLE = "role";
 }
