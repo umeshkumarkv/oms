@@ -3,6 +3,7 @@ package com.brokerdealer.marketdataservice.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -21,10 +22,35 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(ScenarioNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleScenarioNotFoundException(ScenarioNotFoundException ex) {
+        log.warn("Scenario not found: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(SymbolHaltedException.class)
+    public ResponseEntity<Map<String, Object>> handleSymbolHaltedException(SymbolHaltedException ex) {
+        log.warn("Symbol halted: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(AccessForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessForbiddenException(AccessForbiddenException ex) {
+        log.warn("Access denied: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        HttpStatus status = "UNAUTHORIZED".equals(ex.getErrorCode()) ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN;
+        return buildErrorResponse(status, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
         log.warn("Validation error: code={} message={}", ex.getErrorCode(), ex.getMessage());
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        log.warn("Request validation failed: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed", List.of());
     }
 
     @ExceptionHandler(Exception.class)

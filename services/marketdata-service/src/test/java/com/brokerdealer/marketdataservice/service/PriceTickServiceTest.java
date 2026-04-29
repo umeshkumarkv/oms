@@ -36,6 +36,9 @@ class PriceTickServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private ScenarioService scenarioService;
+
     @InjectMocks
     private PriceTickService priceTickService;
 
@@ -149,6 +152,39 @@ class PriceTickServiceTest {
         ArgumentCaptor<Instrument> captor = ArgumentCaptor.forClass(Instrument.class);
         verify(instrumentRepository).save(captor.capture());
         assertThat(captor.getValue().getSymbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void shouldApplyScenarioIncrementWhenScenarioIsActive() {
+        Instrument instrument = buildInstrument("AAPL", new BigDecimal("175.00"));
+        instrument.setDayHigh(new BigDecimal("180.00"));
+        instrument.setDayLow(new BigDecimal("170.00"));
+        instrument.setVolume(1000L);
+        BigDecimal increment = new BigDecimal("0.8750"); // 5% of 175 / 10 ticks
+
+        when(scenarioService.hasActiveScenario("AAPL")).thenReturn(true);
+        when(scenarioService.applyScenarioTick("AAPL")).thenReturn(increment);
+
+        priceTickService.tickInstrument(instrument, false);
+
+        // new price should be ~175.875 (175 + 0.875)
+        assertThat(instrument.getLastPrice()).isGreaterThan(new BigDecimal("175.00"));
+    }
+
+    @Test
+    void shouldFallBackToRandomWalkWhenScenarioReturnsNull() {
+        Instrument instrument = buildInstrument("AAPL", new BigDecimal("175.00"));
+        instrument.setDayHigh(new BigDecimal("180.00"));
+        instrument.setDayLow(new BigDecimal("170.00"));
+        instrument.setVolume(1000L);
+
+        when(scenarioService.hasActiveScenario("AAPL")).thenReturn(true);
+        when(scenarioService.applyScenarioTick("AAPL")).thenReturn(null);
+
+        priceTickService.tickInstrument(instrument, false);
+
+        // random walk was applied — price should still be valid
+        assertThat(instrument.getLastPrice()).isGreaterThanOrEqualTo(new BigDecimal("0.01"));
     }
 
     @Test

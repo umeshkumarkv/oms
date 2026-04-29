@@ -46,6 +46,28 @@ market:
     timezone: "America/New_York"
   simulation:
     bypass-market-hours: true
+  scenarios:
+    items:
+      "[SCN-AAPL-DROP-5PCT]":
+        symbol: AAPL
+        direction-pct: "-5"
+        ticks: 10
+      "[SCN-AAPL-RISE-5PCT]":
+        symbol: AAPL
+        direction-pct: "5"
+        ticks: 10
+      "[SCN-TSLA-DROP-5PCT]":
+        symbol: TSLA
+        direction-pct: "-5"
+        ticks: 10
+      "[SCN-TSLA-RISE-5PCT]":
+        symbol: TSLA
+        direction-pct: "5"
+        ticks: 10
+      "[SCN-MSFT-RISE-3PCT]":
+        symbol: MSFT
+        direction-pct: "3"
+        ticks: 6
 
 server:
   port: 8084
