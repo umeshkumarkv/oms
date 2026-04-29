@@ -35,6 +35,7 @@ public class PriceTickService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final MarketDataWebSocketHandler webSocketHandler;
     private final ObjectMapper objectMapper;
+    private final ScenarioService scenarioService;
 
     @Value("${market.simulation.bypass-market-hours:false}")
     private boolean bypassMarketHours;
@@ -67,16 +68,20 @@ public class PriceTickService {
     void tickInstrument(Instrument instrument, boolean resetDay) {
         BigDecimal currentPrice = instrument.getLastPrice();
 
-        // ±0.1%–0.5% change (1–5 permille), 52% up / 48% down — no double arithmetic
-        boolean up = ThreadLocalRandom.current().nextInt(100) < 52;
-        BigDecimal changePct = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(5), 3);
-        BigDecimal change = currentPrice
-                .multiply(changePct)
-                .setScale(4, RoundingMode.HALF_UP);
-
-        BigDecimal newPrice = up ? currentPrice.add(change) : currentPrice.subtract(change);
-        if (newPrice.compareTo(MIN_PRICE) < 0) {
-            newPrice = MIN_PRICE;
+        BigDecimal newPrice;
+        if (scenarioService.hasActiveScenario(instrument.getSymbol())) {
+            BigDecimal increment = scenarioService.applyScenarioTick(instrument.getSymbol());
+            if (increment == null) {
+                // scenario just completed on this call — fall through to random walk for this tick
+                newPrice = computeRandomWalkPrice(currentPrice);
+            } else {
+                newPrice = currentPrice.add(increment).setScale(4, RoundingMode.HALF_UP);
+                if (newPrice.compareTo(MIN_PRICE) < 0) {
+                    newPrice = MIN_PRICE;
+                }
+            }
+        } else {
+            newPrice = computeRandomWalkPrice(currentPrice);
         }
 
         // recompute bid/ask preserving the existing spread
@@ -113,6 +118,14 @@ public class PriceTickService {
         log.debug("Ticked: symbol={} newPrice={}", instrument.getSymbol(), newPrice.toPlainString());
 
         broadcastTick(instrument);
+    }
+
+    private BigDecimal computeRandomWalkPrice(BigDecimal currentPrice) {
+        boolean up = ThreadLocalRandom.current().nextInt(100) < 52;
+        BigDecimal changePct = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(5), 3);
+        BigDecimal change = currentPrice.multiply(changePct).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal newPrice = up ? currentPrice.add(change) : currentPrice.subtract(change);
+        return newPrice.compareTo(MIN_PRICE) < 0 ? MIN_PRICE : newPrice;
     }
 
     private void broadcastTick(Instrument instrument) {
