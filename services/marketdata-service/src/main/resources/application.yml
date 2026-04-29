@@ -39,16 +39,13 @@ spring:
       port: ${SPRING_REDIS_PORT:6379}
       timeout: 2000ms
 
-jwt:
-  secret: ${JWT_SECRET:dev-secret-key-change-in-production-min-32-chars}
-
 market:
   hours:
     open-time: "09:30:00"
     close-time: "16:00:00"
     timezone: "America/New_York"
   simulation:
-    bypass-market-hours: false
+    bypass-market-hours: true
 
 server:
   port: 8084

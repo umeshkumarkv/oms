@@ -3,12 +3,10 @@ package com.brokerdealer.marketdataservice.service;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.domain.MarketHoliday;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
-import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
-import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
@@ -48,9 +46,6 @@ class MarketDataServiceTest {
 
     @Mock
     private MarketHolidayMapper marketHolidayMapper;
-
-    @Mock
-    private InstrumentSummaryMapper instrumentSummaryMapper;
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
@@ -308,20 +303,24 @@ class MarketDataServiceTest {
     // --- getInstruments ---
 
     @Test
-    void shouldReturnInstrumentSummaryList() {
+    void shouldReturnInstrumentListWithFullPriceData() {
         Instrument instrument = buildInstrument("AAPL", false);
-        InstrumentSummaryResponse summary = InstrumentSummaryResponse.builder()
-                .symbol("AAPL").tradable(true).halted(false).build();
+        InstrumentResponse response = buildResponse("AAPL", false);
 
         when(instrumentRepository.findAll()).thenReturn(List.of(instrument));
-        when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(summary);
+        when(instrumentMapper.toResponse(instrument)).thenReturn(response);
 
-        List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
+        List<InstrumentResponse> result = marketDataService.getInstruments();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
         assertThat(result.get(0).getTradable()).isTrue();
         assertThat(result.get(0).getHalted()).isFalse();
+        assertThat(result.get(0).getLastPrice()).isEqualTo("175.00");
+        assertThat(result.get(0).getBidPrice()).isEqualTo("174.95");
+        assertThat(result.get(0).getAskPrice()).isEqualTo("175.05");
+        assertThat(result.get(0).getMinQuantity()).isEqualTo(1);
+        assertThat(result.get(0).getMaxQuantity()).isEqualTo(10000);
     }
 
     // --- helpers ---

@@ -12,10 +12,11 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    private final MarketDataWebSocketHandler handler;
+    private final MarketDataWebSocketHandler marketDataWebSocketHandler;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(handler, "/ws/v1").setAllowedOrigins("*");
+        registry.addHandler(marketDataWebSocketHandler, "/ws/v1")
+                .setAllowedOriginPatterns("*");
     }
 }

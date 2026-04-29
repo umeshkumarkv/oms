@@ -36,13 +36,6 @@ spring:
           uri: http://audit-service:8087
           predicates:
             - Path=/api/v1/audit/**
-        # WebSocket: marketdata-service live price ticks — must be before /ws/**
-        # Note: Spring Cloud Gateway MVC does not support ws:// scheme — use http://
-        # The HTTP Upgrade header handles the WebSocket handshake transparently.
-        - id: marketdata-websocket
-          uri: http://marketdata-service:8084
-          predicates:
-            - Path=/ws/v1
         # WebSocket connections are proxied directly to notification-service.
         # The service validates JWT on the STOMP CONNECT frame internally.
         - id: notification-service-ws
@@ -57,7 +50,7 @@ spring:
       timeout: 2000ms
 
 server:
-  port: 8080
+  port: 9090
 
 management:
   endpoints:

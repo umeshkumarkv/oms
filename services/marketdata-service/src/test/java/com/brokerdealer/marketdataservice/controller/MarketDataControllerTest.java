@@ -1,7 +1,6 @@
 package com.brokerdealer.marketdataservice.controller;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
-import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.GlobalExceptionHandler;
@@ -159,10 +158,14 @@ class MarketDataControllerTest {
     }
 
     @Test
-    void shouldReturn200WithInstrumentSummaryList() throws Exception {
-        List<InstrumentSummaryResponse> instruments = List.of(
-                InstrumentSummaryResponse.builder().symbol("AAPL").tradable(true).halted(false).build(),
-                InstrumentSummaryResponse.builder().symbol("HALT").tradable(true).halted(true).build()
+    void shouldReturn200WithInstrumentListIncludingPrices() throws Exception {
+        List<InstrumentResponse> instruments = List.of(
+                InstrumentResponse.builder().symbol("AAPL").bidPrice("174.95").askPrice("175.05")
+                        .lastPrice("175.00").tradable(true).halted(false)
+                        .minQuantity(1).maxQuantity(10000).dataTimestamp("2026-04-27T06:00:00Z").build(),
+                InstrumentResponse.builder().symbol("HALT").bidPrice("49.90").askPrice("50.10")
+                        .lastPrice("50.00").tradable(true).halted(true)
+                        .minQuantity(1).maxQuantity(10000).dataTimestamp("2026-04-27T06:00:00Z").build()
         );
 
         when(marketDataService.getInstruments()).thenReturn(instruments);
@@ -171,6 +174,7 @@ class MarketDataControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$.data[0].lastPrice").value("175.00"))
                 .andExpect(jsonPath("$.data[0].tradable").value(true))
                 .andExpect(jsonPath("$.data[0].halted").value(false))
                 .andExpect(jsonPath("$.data[1].symbol").value("HALT"))

@@ -4,7 +4,6 @@ import { getOrders } from '../api/orderApi'
 import { getMarketHours } from '../api/marketApi'
 import { OrderSummary } from '../types/order.types'
 import { MarketHours } from '../types/market.types'
-import { websocketService } from '../services/websocketService'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -127,8 +126,8 @@ const DashboardPage: React.FC = () => {
   const [metrics, setMetrics]           = useState<Metrics | null>(null)
   const [marketHours, setMarketHours]   = useState<MarketHours | null>(null)
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
-  const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([])
-  const [wsDisconnected, setWsDisconnected] = useState(false)
+  // WebSocket activity events — populated by future SCRUM-25 integration
+  const [activityEvents] = useState<ActivityEvent[]>([])
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -171,46 +170,6 @@ const DashboardPage: React.FC = () => {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [loadDataWithMockDetection])
 
-  useEffect(() => {
-    websocketService.connect()
-
-    const unsubMessage = websocketService.onMessage((event) => {
-      if (event.type === 'MARKET_OPEN' || event.type === 'MARKET_CLOSE') {
-        setMarketHours((prev) => prev ? { ...prev, marketOpen: event.type === 'MARKET_OPEN' } : prev)
-        setActivityEvents((prev) => [
-          {
-            id: crypto.randomUUID(),
-            color: event.type === 'MARKET_OPEN' ? '#10b981' : '#6b7280',
-            message: event.type === 'MARKET_OPEN' ? 'Market opened at 09:30 ET' : 'Market closed at 16:00 ET',
-            timestamp: event.timestamp,
-          },
-          ...prev,
-        ].slice(0, 20))
-      } else if (event.type === 'MARKET_DATA_TICK') {
-        const sign = parseFloat(event.change) >= 0 ? '+' : ''
-        setActivityEvents((prev) => [
-          {
-            id: crypto.randomUUID(),
-            color: parseFloat(event.change) >= 0 ? '#10b981' : '#ef4444',
-            message: `${event.symbol}  ${event.lastPrice}  (${sign}${event.changePct}%)`,
-            timestamp: event.timestamp,
-          },
-          ...prev,
-        ].slice(0, 20))
-      }
-    })
-
-    const unsubConnect = websocketService.onConnect(() => setWsDisconnected(false))
-    const unsubDisconnect = websocketService.onDisconnect(() => setWsDisconnected(true))
-
-    return () => {
-      unsubMessage()
-      unsubConnect()
-      unsubDisconnect()
-      websocketService.disconnect()
-    }
-  }, [])
-
   const open = marketHours?.marketOpen ?? false
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -235,13 +194,6 @@ const DashboardPage: React.FC = () => {
       {usingMock && (
         <div style={s.mockBanner}>
           Demo mode — showing seed data. Start docker-compose to load live data.
-        </div>
-      )}
-
-      {/* WebSocket reconnecting banner */}
-      {wsDisconnected && (
-        <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#991b1b', borderRadius: '6px', marginBottom: '16px', fontSize: '12px', border: '1px solid #fca5a5' }}>
-          Live updates paused — reconnecting…
         </div>
       )}
 

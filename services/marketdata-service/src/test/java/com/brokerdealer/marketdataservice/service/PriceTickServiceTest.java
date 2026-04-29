@@ -3,6 +3,7 @@ package com.brokerdealer.marketdataservice.service;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,6 +32,9 @@ class PriceTickServiceTest {
 
     @Mock
     private MarketDataWebSocketHandler webSocketHandler;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private PriceTickService priceTickService;

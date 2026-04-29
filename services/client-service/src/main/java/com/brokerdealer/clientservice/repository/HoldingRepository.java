@@ -5,13 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface HoldingRepository extends JpaRepository<Holding, UUID> {
 
     List<Holding> findByClientId(UUID clientId);
-
-    Optional<Holding> findByClientIdAndSymbol(UUID clientId, String symbol);
 }

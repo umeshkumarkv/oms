@@ -3,6 +3,7 @@ package com.brokerdealer.marketdataservice.service;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -32,13 +34,14 @@ public class PriceTickService {
     private final MarketDataService marketDataService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final MarketDataWebSocketHandler webSocketHandler;
+    private final ObjectMapper objectMapper;
 
     @Value("${market.simulation.bypass-market-hours:false}")
     private boolean bypassMarketHours;
 
     private volatile LocalDate lastResetDate;
 
-    @Scheduled(fixedDelay = 2000)
+    @Scheduled(fixedDelay = 1000)
     public void tick() {
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/New_York"));
         if (!bypassMarketHours && !marketDataService.isMarketOpen(now)) {
@@ -109,7 +112,26 @@ public class PriceTickService {
         redisTemplate.delete(CACHE_KEY_PREFIX + instrument.getSymbol());
         log.debug("Ticked: symbol={} newPrice={}", instrument.getSymbol(), newPrice.toPlainString());
 
-        // push live tick to all authenticated WebSocket clients
-        webSocketHandler.broadcastTick(instrument);
+        broadcastTick(instrument);
+    }
+
+    private void broadcastTick(Instrument instrument) {
+        try {
+            String previousClose = instrument.getPreviousClose() != null
+                    ? instrument.getPreviousClose().toPlainString()
+                    : instrument.getLastPrice().toPlainString();
+            String json = objectMapper.writeValueAsString(Map.of(
+                    "type", "MARKET_DATA_TICK",
+                    "symbol", instrument.getSymbol(),
+                    "bidPrice", instrument.getBidPrice().toPlainString(),
+                    "askPrice", instrument.getAskPrice().toPlainString(),
+                    "lastPrice", instrument.getLastPrice().toPlainString(),
+                    "previousClose", previousClose,
+                    "dataTimestamp", instrument.getDataTimestamp().toString()
+            ));
+            webSocketHandler.broadcast(json);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast tick: symbol={} error={}", instrument.getSymbol(), e.getMessage());
+        }
     }
 }

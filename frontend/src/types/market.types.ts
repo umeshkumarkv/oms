@@ -8,6 +8,11 @@ export interface Instrument {
   minQuantity: number
   maxQuantity: number
   dataTimestamp: string
+  // Only returned by GET /market/{symbol}
+  dayHigh?: string
+  dayLow?: string
+  previousClose?: string
+  volume?: number
 }
 
 export interface MarketHours {
@@ -15,29 +20,10 @@ export interface MarketHours {
   openTime: string
   closeTime: string
   timezone: string
+  nextOpenDate?: string
 }
 
 export interface Holiday {
   holidayDate: string  // YYYY-MM-DD
   holidayName: string
 }
-
-export interface MarketTickEvent {
-  type: 'MARKET_DATA_TICK'
-  symbol: string
-  lastPrice: string
-  bidPrice: string
-  askPrice: string
-  change: string
-  changePct: string
-  volume: number
-  timestamp: string
-}
-
-export interface MarketStatusEvent {
-  type: 'MARKET_OPEN' | 'MARKET_CLOSE'
-  marketStatus: 'OPEN' | 'CLOSED'
-  timestamp: string
-}
-
-export type WebSocketEvent = MarketTickEvent | MarketStatusEvent
