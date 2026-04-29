@@ -2,6 +2,7 @@ package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
+import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,6 +28,9 @@ class PriceTickServiceTest {
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private MarketDataWebSocketHandler webSocketHandler;
 
     @InjectMocks
     private PriceTickService priceTickService;
