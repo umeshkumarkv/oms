@@ -28,7 +28,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${JWT_SECRET:dev-secret-key-change-in-production-min-32-chars}")
+    @Value("${JWT_SECRET}")
     private String jwtSecret;
 
     public LoginData login(LoginRequest request) {
