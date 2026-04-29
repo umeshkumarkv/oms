@@ -62,7 +62,7 @@ public class AuthService {
                 .claim("role", user.getRole().name())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
 
         log.info("Login attempt: username={} role={} result=success", user.getUsername(), user.getRole());
