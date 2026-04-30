@@ -1,13 +1,20 @@
-// TODO: implement — JIRA story BD-XX
+import axios from 'axios'
 
-export const login = (_username: string, _password: string): Promise<null> => {
-  return Promise.resolve(null)
+export interface LoginResponse {
+  token: string
+  expiresAt: string
+  role: string
+  userId: string
+  displayName: string
 }
 
-export const logout = (): Promise<null> => {
-  return Promise.resolve(null)
-}
+// Uses a plain axios instance (no auth token required for login)
+const authHttp = axios.create({
+  baseURL: '/api/v1',
+  headers: { 'Content-Type': 'application/json' },
+})
 
-export const me = (): Promise<null> => {
-  return Promise.resolve(null)
+export const login = async (username: string, password: string): Promise<LoginResponse> => {
+  const res = await authHttp.post<{ data: LoginResponse }>('/auth/login', { username, password })
+  return res.data.data
 }
