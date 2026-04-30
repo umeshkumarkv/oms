@@ -8,6 +8,7 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,12 @@ import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -30,11 +37,15 @@ public class JwtValidationFilter extends OncePerRequestFilter {
     private static final String ACTUATOR_PATH = "/actuator";
     private static final String BLACKLIST_PREFIX = "auth:blacklist:";
 
+    static final String HEADER_USER_ID = "X-User-Id";
+    static final String HEADER_USERNAME = "X-Username";
+    static final String HEADER_USER_ROLE = "X-User-Role";
+
     private final String jwtSecret;
     private final RedisTemplate<String, Object> redisTemplate;
 
     public JwtValidationFilter(
-            @Value("${JWT_SECRET:dev-secret-key-change-in-production-min-32-chars}") String jwtSecret,
+            @Value("${JWT_SECRET}") String jwtSecret,
             RedisTemplate<String, Object> redisTemplate) {
         this.jwtSecret = jwtSecret;
         this.redisTemplate = redisTemplate;
@@ -55,7 +66,7 @@ public class JwtValidationFilter extends OncePerRequestFilter {
 
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             log.warn("Missing or invalid Authorization header for path: {}", path);
-            writeUnauthorizedResponse(response, "UNAUTHORIZED", "Token is missing or invalid");
+            writeErrorResponse(response, "UNAUTHORIZED", "Token is missing or invalid");
             return;
         }
 
@@ -70,23 +81,33 @@ public class JwtValidationFilter extends OncePerRequestFilter {
 
             if (Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + token))) {
                 log.warn("Blacklisted token attempt: userId={}", claims.get("userId"));
-                writeUnauthorizedResponse(response, "UNAUTHORIZED", "Token has been invalidated");
+                writeErrorResponse(response, "TOKEN_REVOKED", "Token has been revoked");
                 return;
             }
 
-            log.debug("JWT validated: userId={}", claims.get("userId"));
-            filterChain.doFilter(request, response);
+            String userId = claims.get("userId", String.class);
+            String username = claims.get("username", String.class);
+            String role = claims.get("role", String.class);
+
+            log.debug("JWT validated: userId={} role={}", userId, role);
+
+            MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(request);
+            mutableRequest.putHeader(HEADER_USER_ID, userId);
+            mutableRequest.putHeader(HEADER_USERNAME, username);
+            mutableRequest.putHeader(HEADER_USER_ROLE, role);
+
+            filterChain.doFilter(mutableRequest, response);
 
         } catch (ExpiredJwtException e) {
-            log.warn("Expired JWT token: {}", e.getMessage());
-            writeUnauthorizedResponse(response, "UNAUTHORIZED", "Token has expired");
+            log.warn("Expired JWT token for path: {}", path);
+            writeErrorResponse(response, "TOKEN_EXPIRED", "Token has expired");
         } catch (JwtException e) {
-            log.warn("Invalid JWT token: {}", e.getMessage());
-            writeUnauthorizedResponse(response, "UNAUTHORIZED", "Token is missing or invalid");
+            log.warn("Invalid JWT token for path: {}", path);
+            writeErrorResponse(response, "UNAUTHORIZED", "Token is missing or invalid");
         }
     }
 
-    private void writeUnauthorizedResponse(HttpServletResponse response, String code, String message)
+    private void writeErrorResponse(HttpServletResponse response, String code, String message)
             throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
@@ -99,5 +120,44 @@ public class JwtValidationFilter extends OncePerRequestFilter {
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Wraps HttpServletRequest to allow adding headers for downstream services.
+     * Required because HttpServletRequest headers are immutable by the Servlet spec.
+     */
+    static class MutableHttpServletRequest extends HttpServletRequestWrapper {
+
+        private final Map<String, String> extraHeaders = new HashMap<>();
+
+        MutableHttpServletRequest(HttpServletRequest request) {
+            super(request);
+        }
+
+        void putHeader(String name, String value) {
+            extraHeaders.put(name, value);
+        }
+
+        @Override
+        public String getHeader(String name) {
+            String extra = extraHeaders.get(name);
+            return extra != null ? extra : super.getHeader(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaders(String name) {
+            String extra = extraHeaders.get(name);
+            if (extra != null) {
+                return Collections.enumeration(Collections.singletonList(extra));
+            }
+            return super.getHeaders(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaderNames() {
+            Set<String> names = new HashSet<>(Collections.list(super.getHeaderNames()));
+            names.addAll(extraHeaders.keySet());
+            return Collections.enumeration(names);
+        }
     }
 }
