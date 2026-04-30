@@ -504,8 +504,8 @@ const OrderEntryPage: React.FC = () => {
                   {[
                     { label: 'Bid',     value: `$${quote.bidPrice}`           },
                     { label: 'Ask',     value: `$${quote.askPrice}`           },
-                    { label: 'Min Qty', value: quote.minQuantity.toLocaleString() },
-                    { label: 'Max Qty', value: quote.maxQuantity.toLocaleString() },
+                    { label: 'Min Qty', value: quote.minQuantity?.toLocaleString() ?? '—' },
+                    { label: 'Max Qty', value: quote.maxQuantity?.toLocaleString() ?? '—' },
                   ].map(({ label, value }) => (
                     <div key={label} style={s.quoteItem}>
                       <div style={s.quoteItemLabel}>{label}</div>
