@@ -1,73 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { getClient, getPortfolio } from '../api/clientApi'
+import { getClient, getClients, getPortfolio } from '../api/clientApi'
 import { getAuditTrail } from '../api/auditApi'
 import { Client, FillActivity, Holding, Portfolio } from '../types/client.types'
 import { AuditRecord } from '../types/audit.types'
-
-// Seed clients — POC: hardcoded for simplicity (no GET /api/v1/clients list endpoint)
-const SEED_CLIENTS = [
-  { id: 'a1000000-0000-0000-0000-000000000001', name: 'John Smith' },
-  { id: 'a2000000-0000-0000-0000-000000000002', name: 'Sarah Johnson' },
-  { id: 'a3000000-0000-0000-0000-000000000003', name: 'Mike Davis' },
-  { id: 'a4000000-0000-0000-0000-000000000004', name: 'Emily Chen' },
-  { id: 'a5000000-0000-0000-0000-000000000005', name: 'Robert Wilson' },
-]
-
-// ── Mock data — used when backend is offline (demo / local dev without Docker) ──
-const MOCK_PORTFOLIOS: Record<string, { client: Client; portfolio: Portfolio; fills: FillActivity[] }> = {
-  'a1000000-0000-0000-0000-000000000001': {
-    client: { clientId: 'a1000000-0000-0000-0000-000000000001', name: 'John Smith', status: 'ACTIVE', tradingEnabled: true, kycStatus: 'VERIFIED' },
-    portfolio: {
-      cashBalance: '500000.00',
-      reservedCash: '17500.00',
-      buyingPower: '482500.00',
-      holdings: [
-        { symbol: 'AAPL', quantity: 100, avgPrice: '150.00', currentPrice: '178.50', marketValue: '17850.00' },
-        { symbol: 'MSFT', quantity: 50,  avgPrice: '400.00', currentPrice: '415.20', marketValue: '20760.00' },
-      ],
-    },
-    fills: [
-      { auditId: 'f1', orderId: 'b2c3d4e5-0000-0000-0000-000000000001', symbol: 'AAPL', side: 'BUY',  filledQty: 50,  fillPrice: '178.50', fillValue: '8925.00',  fillType: 'FULL',    timestamp: new Date(Date.now() - 3_600_000).toISOString() },
-      { auditId: 'f2', orderId: 'b2c3d4e5-0000-0000-0000-000000000002', symbol: 'MSFT', side: 'BUY',  filledQty: 20,  fillPrice: '415.20', fillValue: '8304.00',  fillType: 'PARTIAL', timestamp: new Date(Date.now() - 1_800_000).toISOString() },
-    ],
-  },
-  'a2000000-0000-0000-0000-000000000002': {
-    client: { clientId: 'a2000000-0000-0000-0000-000000000002', name: 'Sarah Johnson', status: 'ACTIVE', tradingEnabled: true, kycStatus: 'VERIFIED' },
-    portfolio: {
-      cashBalance: '50000.00',
-      reservedCash: '0.00',
-      buyingPower: '50000.00',
-      holdings: [
-        { symbol: 'TSLA', quantity: 20, avgPrice: '170.00', currentPrice: '245.80', marketValue: '4916.00' },
-      ],
-    },
-    fills: [
-      { auditId: 'f3', orderId: 'b2c3d4e5-0000-0000-0000-000000000003', symbol: 'TSLA', side: 'SELL', filledQty: 5, fillPrice: '245.80', fillValue: '1229.00', fillType: 'FULL', timestamp: new Date(Date.now() - 900_000).toISOString() },
-    ],
-  },
-  'a3000000-0000-0000-0000-000000000003': {
-    client: { clientId: 'a3000000-0000-0000-0000-000000000003', name: 'Mike Davis', status: 'ACTIVE', tradingEnabled: false, kycStatus: 'VERIFIED' },
-    portfolio: { cashBalance: '200000.00', reservedCash: '0.00', buyingPower: '200000.00', holdings: [] },
-    fills: [],
-  },
-  'a4000000-0000-0000-0000-000000000004': {
-    client: { clientId: 'a4000000-0000-0000-0000-000000000004', name: 'Emily Chen', status: 'BLOCKED', tradingEnabled: true, kycStatus: 'VERIFIED' },
-    portfolio: {
-      cashBalance: '100000.00',
-      reservedCash: '1600.00',
-      buyingPower: '98400.00',
-      holdings: [
-        { symbol: 'GOOGL', quantity: 10, avgPrice: '160.00', currentPrice: '172.30', marketValue: '1723.00' },
-      ],
-    },
-    fills: [],
-  },
-  'a5000000-0000-0000-0000-000000000005': {
-    client: { clientId: 'a5000000-0000-0000-0000-000000000005', name: 'Robert Wilson', status: 'ACTIVE', tradingEnabled: true, kycStatus: 'EXPIRED' },
-    portfolio: { cashBalance: '75000.00', reservedCash: '0.00', buyingPower: '75000.00', holdings: [] },
-    fills: [],
-  },
-}
 
 const POLL_INTERVAL_MS = 15_000
 
@@ -153,22 +88,29 @@ const styles = {
   } as React.CSSProperties),
   emptyRow: { padding: '32px', textAlign: 'center' as const, color: '#9ca3af', fontSize: '13px' },
   loadingBox: { padding: '48px', textAlign: 'center' as const, color: '#9ca3af' } as React.CSSProperties,
-  mockBanner: { padding: '8px 16px', background: '#fef9c3', color: '#92400e', borderRadius: '6px', marginBottom: '16px', fontSize: '12px' } as React.CSSProperties,
   refreshNote: { fontSize: '11px', color: '#9ca3af' } as React.CSSProperties,
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const PortfolioPage: React.FC = () => {
-  const [selectedClientId, setSelectedClientId] = useState<string>(SEED_CLIENTS[0].id)
+  const [clients, setClients] = useState<Client[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [client, setClient] = useState<Client | null>(null)
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [fills, setFills] = useState<FillActivity[]>([])
   const [loading, setLoading] = useState(true)
-  const [usingMock, setUsingMock] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  useEffect(() => {
+    getClients().then((list) => {
+      setClients(list)
+      if (list.length > 0) setSelectedClientId(list[0].clientId)
+    }).catch(() => { /* dropdown stays empty */ })
+  }, [])
+
   const loadData = async (clientId: string, showLoading = true) => {
+    if (!clientId) return
     if (showLoading) setLoading(true)
     try {
       const [clientData, portfolioData, auditData] = await Promise.all([
@@ -179,16 +121,6 @@ const PortfolioPage: React.FC = () => {
       setClient(clientData)
       setPortfolio(portfolioData)
       setFills(parseFillActivities(auditData?.records ?? []))
-      setUsingMock(false)
-    } catch {
-      // Fall back to mock data so the UI is usable without the backend
-      const mock = MOCK_PORTFOLIOS[clientId]
-      if (mock) {
-        setClient(mock.client)
-        setPortfolio(mock.portfolio)
-        setFills(mock.fills)
-        setUsingMock(true)
-      }
     } finally {
       setLoading(false)
     }
@@ -218,9 +150,12 @@ const PortfolioPage: React.FC = () => {
         <div style={styles.headerLeft}>
           <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Client:</label>
           <select style={styles.select} value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}>
-            {SEED_CLIENTS.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
+            {clients.length === 0
+              ? <option value="">Loading clients…</option>
+              : clients.map((c) => (
+                  <option key={c.clientId} value={c.clientId}>{c.name}</option>
+                ))
+            }
           </select>
           {client && <span style={styles.badge(client.status)}>{client.status}</span>}
           {client && !client.tradingEnabled && (
@@ -232,13 +167,6 @@ const PortfolioPage: React.FC = () => {
         </div>
         <span style={styles.refreshNote}>Auto-refreshes every 15s</span>
       </div>
-
-      {/* ── Mock data banner ── */}
-      {usingMock && (
-        <div style={styles.mockBanner}>
-          Demo mode — showing seed data. Start docker-compose to load live data.
-        </div>
-      )}
 
       {/* ── Loading ── */}
       {loading ? (

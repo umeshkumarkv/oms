@@ -33,6 +33,13 @@ public class ClientService {
     private final ClientMapper clientMapper;
     private final MarketDataClient marketDataClient;
 
+    public List<ClientProfileResponse> getAllClients() {
+        log.debug("Fetching all client profiles");
+        return clientRepository.findAll().stream()
+                .map(clientMapper::toProfileResponse)
+                .toList();
+    }
+
     public ClientProfileResponse getClient(UUID id) {
         log.debug("Fetching client profile: clientId={}", id);
         return clientRepository.findById(id)

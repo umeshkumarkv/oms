@@ -4,8 +4,26 @@ import axios from 'axios'
 // Axios interceptors cannot use React hooks, so this is the standard pattern.
 let authToken: string | null = null
 
+export interface CurrentUser {
+  token: string
+  userId: string
+  username: string
+  role: string
+  displayName: string
+}
+
+let currentUser: CurrentUser | null = null
+
 export function setApiToken(token: string | null): void {
   authToken = token
+}
+
+export function setCurrentUser(user: CurrentUser | null): void {
+  currentUser = user
+}
+
+export function getCurrentUser(): CurrentUser | null {
+  return currentUser
 }
 
 const apiClient = axios.create({

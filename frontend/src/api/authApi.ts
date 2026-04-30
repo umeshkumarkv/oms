@@ -1,4 +1,5 @@
 import axios from 'axios'
+export { getCurrentUser } from './apiClient'
 
 export interface LoginResponse {
   token: string

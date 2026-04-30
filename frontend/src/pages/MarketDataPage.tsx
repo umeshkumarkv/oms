@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getInstrument, getInstruments, getMarketHours } from '../api/marketApi'
 import { Instrument, MarketHours } from '../types/market.types'
 import { marketDataWs, PriceTick } from '../services/websocketService'
-
-// TODO: replace with auth context — SCRUM-16
-const CURRENT_USER = { name: 'trader.john', role: 'TRADER' }
+import { getCurrentUser } from '../api/authApi'
 
 const POLL_MS = 1_000
 const SPARKLINE_MAX = 20
@@ -423,7 +421,7 @@ const MarketDataPage: React.FC = () => {
                 <Sparkline prices={selectedDetail.priceHistory} positive={selectedDetail.changePct >= 0} />
               </div>
 
-              {CURRENT_USER.role === 'TRADER' ? (
+              {(getCurrentUser() === null || getCurrentUser()?.role === 'TRADER') ? (
                 <button
                   style={s.orderBtn}
                   onClick={() => navigate(`/orders/new?symbol=${selectedDetail.symbol}`)}
