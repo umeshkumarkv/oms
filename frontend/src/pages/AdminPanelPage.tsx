@@ -248,9 +248,9 @@ const AdminPanelPage: React.FC = () => {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
 
-  // Role guard
+  // Role guard — only enforce when a JWT is present (auth-service stub issues no token yet)
   useEffect(() => {
-    if (currentUser?.role !== 'ADMIN') navigate('/dashboard', { replace: true })
+    if (currentUser !== null && currentUser.role !== 'ADMIN') navigate('/dashboard', { replace: true })
   }, [navigate, currentUser?.role])
 
   // Risk rules state
@@ -391,7 +391,7 @@ const AdminPanelPage: React.FC = () => {
     new Date(iso).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (currentUser?.role !== 'ADMIN') return null
+  if (currentUser !== null && currentUser.role !== 'ADMIN') return null
 
   return (
     <div style={s.page}>

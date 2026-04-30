@@ -421,7 +421,7 @@ const MarketDataPage: React.FC = () => {
                 <Sparkline prices={selectedDetail.priceHistory} positive={selectedDetail.changePct >= 0} />
               </div>
 
-              {getCurrentUser()?.role === 'TRADER' ? (
+              {(getCurrentUser() === null || getCurrentUser()?.role === 'TRADER') ? (
                 <button
                   style={s.orderBtn}
                   onClick={() => navigate(`/orders/new?symbol=${selectedDetail.symbol}`)}
