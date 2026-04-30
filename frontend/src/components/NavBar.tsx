@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { Bell, Menu, Plus, TrendingUp, X } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
+import { Bell, Menu, TrendingUp, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const getMarketStatus = (): { open: boolean; label: string } => {
@@ -23,7 +23,6 @@ interface NavBarProps {
 }
 
 const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
-  const navigate = useNavigate()
   const [market, setMarket] = useState(getMarketStatus())
   const { user: authUser, logout } = useAuth()
 
@@ -106,27 +105,6 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
 
       {/* Right section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-
-        {/* New Order CTA */}
-        <button
-          onClick={() => navigate('/orders/new')}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-md)',
-            border: 'none',
-            background: 'var(--color-primary)',
-            color: '#fff',
-            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            transition: 'background 0.15s',
-            flexShrink: 0,
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-primary-dark)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-primary)' }}
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          New Order
-        </button>
 
         {/* Market status pill */}
         <span style={{
