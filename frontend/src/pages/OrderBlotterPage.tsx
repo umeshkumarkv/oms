@@ -16,106 +16,118 @@ const ALL_STATUSES: OrderStatus[] = [
 interface StatusConfig { bg: string; color: string; label: string; strikethrough?: boolean }
 
 const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
-  NEW:               { bg: '#f3f4f6', color: '#6b7280', label: 'NEW' },
-  VALIDATED:         { bg: '#f3f4f6', color: '#6b7280', label: 'VALIDATED' },
-  RISK_CHECK_PASSED: { bg: '#dbeafe', color: '#1d4ed8', label: 'RISK PASSED' },
-  ACCEPTED:          { bg: '#dbeafe', color: '#1d4ed8', label: 'ACCEPTED' },
-  SENT_TO_EXECUTION: { bg: '#fef3c7', color: '#d97706', label: 'SENT TO EXEC' },
-  PARTIALLY_FILLED:  { bg: '#fed7aa', color: '#ea580c', label: 'PARTIAL FILL' },
-  FILLED:            { bg: '#d1fae5', color: '#059669', label: 'FILLED' },
-  REJECTED:          { bg: '#fee2e2', color: '#dc2626', label: 'REJECTED' },
-  RISK_REJECTED:     { bg: '#fee2e2', color: '#dc2626', label: 'RISK REJECTED' },
-  EXPIRED:           { bg: '#f3f4f6', color: '#9ca3af', label: 'EXPIRED',   strikethrough: true },
-  CANCELLED:         { bg: '#f3f4f6', color: '#9ca3af', label: 'CANCELLED', strikethrough: true },
+  NEW:               { bg: '#f3f4f6', color: '#6b7280',  label: 'NEW'          },
+  VALIDATED:         { bg: '#f3f4f6', color: '#6b7280',  label: 'VALIDATED'    },
+  RISK_CHECK_PASSED: { bg: '#dbeafe', color: '#1d4ed8',  label: 'RISK PASSED'  },
+  ACCEPTED:          { bg: '#dbeafe', color: '#1d4ed8',  label: 'ACCEPTED'     },
+  SENT_TO_EXECUTION: { bg: '#fef3c7', color: '#d97706',  label: 'SENT TO EXEC' },
+  PARTIALLY_FILLED:  { bg: '#fed7aa', color: '#ea580c',  label: 'PARTIAL FILL' },
+  FILLED:            { bg: '#d1fae5', color: '#059669',  label: 'FILLED'       },
+  REJECTED:          { bg: '#fee2e2', color: '#dc2626',  label: 'REJECTED'     },
+  RISK_REJECTED:     { bg: '#fee2e2', color: '#dc2626',  label: 'RISK REJECTED'},
+  EXPIRED:           { bg: '#f3f4f6', color: '#9ca3af',  label: 'EXPIRED',     strikethrough: true },
+  CANCELLED:         { bg: '#f3f4f6', color: '#9ca3af',  label: 'CANCELLED',   strikethrough: true },
+}
+
+const stateTimelineDotColor = (state: string): string => {
+  if (['FILLED'].includes(state))                      return 'var(--color-success)'
+  if (['REJECTED', 'RISK_REJECTED'].includes(state))   return 'var(--color-error)'
+  if (['EXPIRED', 'CANCELLED'].includes(state))        return 'var(--color-text-muted)'
+  if (['PARTIALLY_FILLED'].includes(state))            return '#ea580c'
+  if (['SENT_TO_EXECUTION'].includes(state))           return 'var(--color-warning)'
+  return 'var(--color-primary)'
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = {
-  page:     { fontFamily: 'system-ui, sans-serif', padding: '20px', minHeight: 'calc(100vh - 52px)', background: '#f5f6fa' } as React.CSSProperties,
+  page:     { fontFamily: "'Inter', system-ui, sans-serif", padding: '20px', minHeight: 'calc(100vh - 52px)', background: 'var(--color-bg)' } as React.CSSProperties,
   header:   { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' } as React.CSSProperties,
-  title:    { margin: 0, fontSize: '20px', fontWeight: 700, color: '#1a2236' } as React.CSSProperties,
-  subtitle: { fontSize: '12px', color: '#9ca3af', marginTop: '3px' } as React.CSSProperties,
+  title:    { margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
+  subtitle: { fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '3px' } as React.CSSProperties,
 
-  toolbar:  {
-    background: '#fff', borderRadius: '10px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  toolbar: {
+    background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)',
+    boxShadow: 'var(--shadow-sm)',
     padding: '12px 16px', marginBottom: '12px',
     display: 'flex', flexWrap: 'wrap' as const, gap: '8px', alignItems: 'center',
   } as React.CSSProperties,
 
-  input:  { padding: '7px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px', outline: 'none', background: '#fff' } as React.CSSProperties,
-  select: { padding: '7px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px', background: '#fff', outline: 'none', cursor: 'pointer' } as React.CSSProperties,
+  input:  { padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '13px', outline: 'none', background: '#fff', color: 'var(--color-text-primary)' } as React.CSSProperties,
+  select: { padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '13px', background: '#fff', outline: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' } as React.CSSProperties,
 
-  toggleGrp: { display: 'flex', borderRadius: '6px', border: '1px solid #d1d5db', overflow: 'hidden' } as React.CSSProperties,
+  toggleGrp: { display: 'flex', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', overflow: 'hidden' } as React.CSSProperties,
   toggleBtn: (active: boolean, color?: string) => ({
     padding: '6px 11px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-    border: 'none', background: active ? (color ?? '#6366f1') : '#f9fafb',
-    color: active ? '#fff' : '#6b7280', transition: 'background 0.15s',
+    border: 'none', background: active ? (color ?? 'var(--color-primary)') : '#f9fafb',
+    color: active ? '#fff' : 'var(--color-text-secondary)', transition: 'background 0.15s',
   } as React.CSSProperties),
 
-  tableCard:  { background: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' as const } as React.CSSProperties,
-  table:      { width: '100%', borderCollapse: 'collapse' as const, fontSize: '13px', minWidth: '1100px' } as React.CSSProperties,
-  th:         {
+  tableCard: { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', overflowX: 'auto' as const } as React.CSSProperties,
+  table:     { width: '100%', borderCollapse: 'collapse' as const, fontSize: '13px', minWidth: '1100px' } as React.CSSProperties,
+  th:        {
     padding: '10px 12px', textAlign: 'left' as const, fontSize: '11px',
-    fontWeight: 700, color: '#6b7280', borderBottom: '1px solid #f0f0f0',
+    fontWeight: 700, color: 'var(--color-text-secondary)',
+    borderBottom: '1px solid var(--color-border-light)',
     background: '#fafafa', whiteSpace: 'nowrap' as const,
-    textTransform: 'uppercase' as const, letterSpacing: '0.03em',
+    textTransform: 'uppercase' as const, letterSpacing: '0.04em',
+    position: 'sticky' as const, top: 0, zIndex: 10,
   } as React.CSSProperties,
-  td:         { padding: '10px 12px', borderBottom: '1px solid #f8f8f8', verticalAlign: 'middle' as const, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  tdR:        { padding: '10px 12px', borderBottom: '1px solid #f8f8f8', verticalAlign: 'middle' as const, whiteSpace: 'nowrap' as const, textAlign: 'right' as const } as React.CSSProperties,
+  td:  { padding: '10px 12px', borderBottom: '1px solid var(--color-border-light)', verticalAlign: 'middle' as const, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tdR: { padding: '10px 12px', borderBottom: '1px solid var(--color-border-light)', verticalAlign: 'middle' as const, whiteSpace: 'nowrap' as const, textAlign: 'right' as const } as React.CSSProperties,
 
   pagination: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', padding: '0 2px' } as React.CSSProperties,
-  pgInfo:     { fontSize: '12px', color: '#6b7280' } as React.CSSProperties,
+  pgInfo:     { fontSize: '12px', color: 'var(--color-text-secondary)' } as React.CSSProperties,
   pgControls: { display: 'flex', gap: '4px', alignItems: 'center' } as React.CSSProperties,
   pgBtn:      (disabled: boolean) => ({
-    padding: '5px 11px', borderRadius: '6px', border: '1px solid #d1d5db',
-    background: disabled ? '#f9fafb' : '#fff', color: disabled ? '#9ca3af' : '#374151',
+    padding: '5px 11px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
+    background: disabled ? '#f9fafb' : '#fff', color: disabled ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
     fontSize: '12px', cursor: disabled ? 'not-allowed' : 'pointer', fontWeight: 500,
   } as React.CSSProperties),
 
   btn: (variant: 'primary' | 'secondary' | 'ghost') => {
     const map = {
-      primary:   { background: '#6366f1', color: '#fff',     border: 'none' },
-      secondary: { background: '#fff',    color: '#374151',  border: '1px solid #d1d5db' },
-      ghost:     { background: 'transparent', color: '#6b7280', border: 'none' },
+      primary:   { background: 'var(--color-primary)', color: '#fff',                  border: 'none' },
+      secondary: { background: '#fff',                 color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' },
+      ghost:     { background: 'transparent',          color: 'var(--color-text-muted)',   border: 'none' },
     }
     return {
-      padding: '7px 14px', borderRadius: '6px', fontSize: '13px',
+      padding: '7px 14px', borderRadius: 'var(--radius-md)', fontSize: '13px',
       fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s', ...map[variant],
     } as React.CSSProperties
   },
 
   wsPill: (connected: boolean) => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 600,
+    padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: '11px', fontWeight: 600,
     background: connected ? 'rgba(16,185,129,0.1)' : 'rgba(156,163,175,0.1)',
-    color: connected ? '#059669' : '#9ca3af',
-    border: `1px solid ${connected ? '#10b981' : '#d1d5db'}`,
+    color: connected ? 'var(--color-success)' : 'var(--color-text-muted)',
+    border: `1px solid ${connected ? 'rgba(16,185,129,0.3)' : 'var(--color-border)'}`,
   } as React.CSSProperties),
 
-  empty:  { padding: '40px', textAlign: 'center' as const, color: '#9ca3af', fontSize: '13px' } as React.CSSProperties,
+  empty: { padding: '40px', textAlign: 'center' as const, color: 'var(--color-text-muted)', fontSize: '13px' } as React.CSSProperties,
 
   // Drawer
   overlay: (open: boolean) => ({
-    position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.25)',
+    position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.2)',
     zIndex: 199, display: open ? 'block' : 'none',
   }),
   drawer: (open: boolean) => ({
     position: 'fixed' as const, top: '52px', right: 0,
     width: '500px', height: 'calc(100vh - 52px)',
-    background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
+    background: '#fff', boxShadow: '-4px 0 32px rgba(0,0,0,0.12)',
     zIndex: 200, display: 'flex', flexDirection: 'column' as const,
     transform: open ? 'translateX(0)' : 'translateX(100%)',
-    transition: 'transform 0.3s ease', overflowY: 'hidden' as const,
+    transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+    overflowY: 'hidden' as const,
   }),
-  dHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 } as React.CSSProperties,
-  dBody:   { overflowY: 'auto' as const, flex: 1, padding: '20px' } as React.CSSProperties,
-  dSection:{ marginBottom: '22px' } as React.CSSProperties,
-  dSTitle: { fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid #f0f0f0' } as React.CSSProperties,
-  kvGrid:  { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } as React.CSSProperties,
-  kvItem:  { background: '#f9fafb', borderRadius: '6px', padding: '8px 10px' } as React.CSSProperties,
-  kvLabel: { fontSize: '10px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const } as React.CSSProperties,
-  kvValue: { fontSize: '13px', fontWeight: 600, color: '#1a2236', marginTop: '2px' } as React.CSSProperties,
+  dHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--color-border-light)', flexShrink: 0 } as React.CSSProperties,
+  dBody:    { overflowY: 'auto' as const, flex: 1, padding: '20px' } as React.CSSProperties,
+  dSection: { marginBottom: '22px' } as React.CSSProperties,
+  dSTitle:  { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
+  kvGrid:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } as React.CSSProperties,
+  kvItem:   { background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '8px 10px' } as React.CSSProperties,
+  kvLabel:  { fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const } as React.CSSProperties,
+  kvValue:  { fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginTop: '2px' } as React.CSSProperties,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,7 +154,7 @@ const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
   const cfg = STATUS_CONFIG[status] ?? { bg: '#f3f4f6', color: '#6b7280', label: status }
   return (
     <span style={{
-      display: 'inline-block', padding: '2px 7px', borderRadius: '4px',
+      display: 'inline-block', padding: '2px 7px', borderRadius: 'var(--radius-sm)',
       fontSize: '11px', fontWeight: 700, background: cfg.bg, color: cfg.color,
       textDecoration: cfg.strikethrough ? 'line-through' : 'none',
     }}>
@@ -153,10 +165,10 @@ const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
 
 const SideBadge: React.FC<{ side: 'BUY' | 'SELL' }> = ({ side }) => (
   <span style={{
-    display: 'inline-block', padding: '2px 7px', borderRadius: '4px',
+    display: 'inline-block', padding: '2px 7px', borderRadius: 'var(--radius-sm)',
     fontSize: '11px', fontWeight: 700,
-    background: side === 'BUY' ? '#dbeafe' : '#fce7f3',
-    color:      side === 'BUY' ? '#1d4ed8' : '#be185d',
+    background: side === 'BUY' ? 'var(--color-buy-bg)' : 'var(--color-sell-bg)',
+    color:      side === 'BUY' ? 'var(--color-buy)'    : 'var(--color-sell)',
   }}>
     {side}
   </span>
@@ -165,7 +177,7 @@ const SideBadge: React.FC<{ side: 'BUY' | 'SELL' }> = ({ side }) => (
 interface StatusDropdownProps {
   selected: OrderStatus[]
   onToggle: (s: OrderStatus) => void
-  onClear: () => void
+  onClear:  () => void
 }
 
 const StatusDropdown: React.FC<StatusDropdownProps> = ({ selected, onToggle, onClear }) => {
@@ -185,11 +197,11 @@ const StatusDropdown: React.FC<StatusDropdownProps> = ({ selected, onToggle, onC
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          padding: '7px 10px', borderRadius: '6px', border: '1px solid #d1d5db',
+          padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)',
           background: selected.length > 0 ? '#f0f4ff' : '#fff',
           fontSize: '13px', cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: '6px',
-          color: selected.length > 0 ? '#6366f1' : '#374151', fontWeight: 500,
+          color: selected.length > 0 ? 'var(--color-primary)' : 'var(--color-text-primary)', fontWeight: 500,
         }}
       >
         {selected.length === 0 ? 'All Statuses' : `Status (${selected.length})`}
@@ -199,18 +211,18 @@ const StatusDropdown: React.FC<StatusDropdownProps> = ({ selected, onToggle, onC
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-          background: '#fff', border: '1px solid #d1d5db', borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 300,
+          background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)', zIndex: 300,
           minWidth: '210px', padding: '6px',
         }}>
           <div
             onClick={onClear}
-            style={{ padding: '6px 8px', fontSize: '12px', color: '#6366f1', cursor: 'pointer', borderRadius: '4px', fontWeight: 600, marginBottom: '4px' }}
+            style={{ padding: '6px 8px', fontSize: '12px', color: 'var(--color-primary)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', fontWeight: 600, marginBottom: '4px' }}
           >
             Clear all
           </div>
           {ALL_STATUSES.map(status => {
-            const cfg = STATUS_CONFIG[status]
+            const cfg     = STATUS_CONFIG[status]
             const checked = selected.includes(status)
             return (
               <div
@@ -218,14 +230,14 @@ const StatusDropdown: React.FC<StatusDropdownProps> = ({ selected, onToggle, onC
                 onClick={() => onToggle(status)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '5px 8px', borderRadius: '4px', cursor: 'pointer',
+                  padding: '5px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   background: checked ? '#f0f4ff' : 'transparent', marginBottom: '1px',
                 }}
               >
                 <div style={{
                   width: '14px', height: '14px', borderRadius: '3px',
-                  border: `1.5px solid ${checked ? '#6366f1' : '#d1d5db'}`,
-                  background: checked ? '#6366f1' : '#fff',
+                  border: `1.5px solid ${checked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: checked ? 'var(--color-primary)' : '#fff',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
                   {checked && <span style={{ color: '#fff', fontSize: '10px', lineHeight: 1 }}>✓</span>}
@@ -249,16 +261,13 @@ const StatusDropdown: React.FC<StatusDropdownProps> = ({ selected, onToggle, onC
 const OrderBlotterPage: React.FC = () => {
   const navigate = useNavigate()
 
-  // Orders data
   const [orders,      setOrders]      = useState<OrderSummary[]>([])
   const [loading,     setLoading]     = useState(true)
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set())
 
-  // Clients for filter dropdown
   const [clients, setClients] = useState<Client[]>([])
   const clientNameMap = new Map(clients.map(c => [c.clientId, c.name]))
 
-  // Filters
   const [searchText,     setSearchText]     = useState('')
   const [filterClientId, setFilterClientId] = useState('')
   const [filterStatuses, setFilterStatuses] = useState<OrderStatus[]>([])
@@ -267,35 +276,27 @@ const OrderBlotterPage: React.FC = () => {
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo,   setFilterDateTo]   = useState('')
 
-  // Pagination
   const [page,     setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
-  // Drawer
   const [drawerOpen,    setDrawerOpen]    = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderSummary | null>(null)
   const [drawerFills,   setDrawerFills]   = useState<Execution[]>([])
   const [drawerAudit,   setDrawerAudit]   = useState<AuditRecord[]>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
 
-  // WebSocket stub — always disconnected until SCRUM-25 is implemented
   const wsConnected = false
 
-  // ── Flash animation helper ───────────────────────────────────────────────
   const flashRow = useCallback((orderId: string) => {
     setFlashingIds(prev => new Set([...prev, orderId]))
     setTimeout(() => setFlashingIds(prev => { const n = new Set(prev); n.delete(orderId); return n }), 300)
   }, [])
-
-  // keep flashRow stable in deps without lint warning
   void flashRow
 
-  // ── Load clients (for filter dropdown) ───────────────────────────────────
   useEffect(() => {
-    getClients().then(setClients).catch(() => { /* filter shows IDs if clients fail */ })
+    getClients().then(setClients).catch(() => {})
   }, [])
 
-  // ── Load orders ──────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
     setLoading(true)
     const params: GetOrdersParams = {}
@@ -310,14 +311,12 @@ const OrderBlotterPage: React.FC = () => {
 
   useEffect(() => { loadOrders() }, [loadOrders])
 
-  // Auto-refresh every 15s when WebSocket is disconnected
   useEffect(() => {
     if (wsConnected) return
     const id = setInterval(loadOrders, 15_000)
     return () => clearInterval(id)
   }, [wsConnected, loadOrders])
 
-  // ── Open drawer ──────────────────────────────────────────────────────────
   const openDrawer = useCallback(async (order: OrderSummary) => {
     setSelectedOrder(order)
     setDrawerOpen(true)
@@ -338,7 +337,6 @@ const OrderBlotterPage: React.FC = () => {
 
   const closeDrawer = () => { setDrawerOpen(false); setSelectedOrder(null) }
 
-  // ── Client-side filtering ────────────────────────────────────────────────
   const filteredOrders = orders.filter(o => {
     if (searchText) {
       const q = searchText.toLowerCase()
@@ -358,10 +356,8 @@ const OrderBlotterPage: React.FC = () => {
   const totalPages    = Math.max(1, Math.ceil(totalFiltered / pageSize))
   const pagedOrders   = filteredOrders.slice((page - 1) * pageSize, page * pageSize)
 
-  // Reset to page 1 on filter change
   useEffect(() => { setPage(1) }, [searchText, filterStatuses, filterTif, filterSide, filterDateFrom, filterDateTo])
 
-  // ── Export CSV ───────────────────────────────────────────────────────────
   const handleExportCsv = () => {
     const headers = ['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit Price', 'Status', 'Filled Qty', 'Avg Fill Price', 'TIF', 'Created At']
     const rows = filteredOrders.map(o => [
@@ -384,11 +380,14 @@ const OrderBlotterPage: React.FC = () => {
   const toggleStatus = (status: OrderStatus) =>
     setFilterStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
 
+  // Drawer side accent
+  const drawerAccent = selectedOrder?.side === 'BUY' ? 'var(--color-buy)' : 'var(--color-sell)'
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={s.header}>
         <div>
           <h1 style={s.title}>Order Blotter</h1>
@@ -408,9 +407,8 @@ const OrderBlotterPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Filter Toolbar ── */}
+      {/* Filter Toolbar */}
       <div style={s.toolbar}>
-        {/* Free-text search */}
         <input
           style={{ ...s.input, width: '190px' }}
           placeholder="Search ID, symbol, ref…"
@@ -418,18 +416,15 @@ const OrderBlotterPage: React.FC = () => {
           onChange={e => setSearchText(e.target.value)}
         />
 
-        {/* Client dropdown */}
         <select style={s.select} value={filterClientId} onChange={e => setFilterClientId(e.target.value)}>
           <option value="">All Clients</option>
           {clients.map(c => <option key={c.clientId} value={c.clientId}>{c.name}</option>)}
         </select>
 
-        {/* Status multi-select */}
         <StatusDropdown selected={filterStatuses} onToggle={toggleStatus} onClear={() => setFilterStatuses([])} />
 
-        {/* TIF toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280' }}>TIF</span>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>TIF</span>
           <div style={s.toggleGrp}>
             {(['ALL', 'DAY', 'GTC'] as const).map(t => (
               <button key={t} style={s.toggleBtn(filterTif === t)} onClick={() => setFilterTif(t)}>{t}</button>
@@ -437,9 +432,8 @@ const OrderBlotterPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Side toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280' }}>Side</span>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Side</span>
           <div style={s.toggleGrp}>
             {(['ALL', 'BUY', 'SELL'] as const).map(side => (
               <button key={side} style={s.toggleBtn(filterSide === side)} onClick={() => setFilterSide(side)}>{side}</button>
@@ -447,22 +441,20 @@ const OrderBlotterPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Date range */}
         <input style={{ ...s.input, width: '130px' }} type="date" value={filterDateFrom} title="From date"
           onChange={e => setFilterDateFrom(e.target.value)} />
-        <span style={{ fontSize: '12px', color: '#9ca3af' }}>–</span>
+        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>–</span>
         <input style={{ ...s.input, width: '130px' }} type="date" value={filterDateTo} title="To date"
           onChange={e => setFilterDateTo(e.target.value)} />
 
         <div style={{ flex: 1 }} />
 
-        {/* Export CSV */}
         <button style={s.btn('secondary')} onClick={handleExportCsv} title="Export current filtered view as CSV">
           ⬇ Export CSV
         </button>
       </div>
 
-      {/* ── Table ── */}
+      {/* Table */}
       <div style={s.tableCard}>
         <table style={s.table}>
           <thead>
@@ -490,51 +482,57 @@ const OrderBlotterPage: React.FC = () => {
                       background: isFlashing ? '#fef9c3' : isSelected ? '#f0f7ff' : 'transparent',
                       transition: 'background 0.3s',
                     }}
-                    onMouseEnter={e => { if (!isFlashing && !isSelected) (e.currentTarget as HTMLTableRowElement).style.background = '#f9fafb' }}
-                    onMouseLeave={e => { if (!isFlashing && !isSelected) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}
+                    onMouseEnter={e => {
+                      if (!isFlashing && !isSelected)
+                        (e.currentTarget as HTMLTableRowElement).style.background = 'var(--color-bg)'
+                    }}
+                    onMouseLeave={e => {
+                      if (!isFlashing && !isSelected)
+                        (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'
+                    }}
                   >
                     <td style={s.td}>
-                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#6366f1' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--color-primary)' }}>
                         …{order.id.slice(-8)}
                       </span>
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '12px', color: '#374151' }}>{order.clientOrderId}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>{order.clientOrderId}</span>
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                         {clientNameMap.get(order.clientId) ?? order.clientId.slice(-8)}
                       </span>
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontWeight: 700, color: '#1a2236' }}>{order.symbol}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{order.symbol}</span>
                     </td>
                     <td style={s.td}><SideBadge side={order.side} /></td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '12px', color: '#374151' }}>{order.orderType}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{order.orderType}</span>
                     </td>
                     <td style={s.tdR}>{order.quantity.toLocaleString()}</td>
                     <td style={s.tdR}>
                       {order.limitPrice
                         ? fmtUsd(order.limitPrice)
-                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                        : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
                     </td>
                     <td style={s.td}><StatusBadge status={order.status} /></td>
                     <td style={s.tdR}>
                       {order.filledQuantity != null
                         ? order.filledQuantity.toLocaleString()
-                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                        : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
                     </td>
                     <td style={s.tdR}>
                       {order.avgFillPrice
                         ? fmtUsd(order.avgFillPrice)
-                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                        : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '11px', color: '#6b7280' }}>{order.timeInForce}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{order.timeInForce}</span>
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '11px', color: '#9ca3af' }} title={new Date(order.createdAt).toLocaleString()}>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }} title={new Date(order.createdAt).toLocaleString()}>
                         {relTime(order.createdAt)}
                       </span>
                     </td>
@@ -546,7 +544,7 @@ const OrderBlotterPage: React.FC = () => {
         </table>
       </div>
 
-      {/* ── Pagination ── */}
+      {/* Pagination */}
       <div style={s.pagination}>
         <span style={s.pgInfo}>
           {pagedOrders.length > 0
@@ -554,7 +552,7 @@ const OrderBlotterPage: React.FC = () => {
             : '0 orders'}
         </span>
         <div style={s.pgControls}>
-          <span style={{ fontSize: '12px', color: '#6b7280', marginRight: '2px' }}>Rows:</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginRight: '2px' }}>Rows:</span>
           <select
             style={{ ...s.select, padding: '4px 8px', fontSize: '12px' }}
             value={pageSize}
@@ -562,9 +560,9 @@ const OrderBlotterPage: React.FC = () => {
           >
             {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
-          <button style={s.pgBtn(page <= 1)}        disabled={page <= 1}        onClick={() => setPage(1)}>«</button>
-          <button style={s.pgBtn(page <= 1)}        disabled={page <= 1}        onClick={() => setPage(p => p - 1)}>‹</button>
-          <span style={{ padding: '5px 10px', fontSize: '12px', color: '#374151', fontWeight: 600 }}>
+          <button style={s.pgBtn(page <= 1)}          disabled={page <= 1}          onClick={() => setPage(1)}>«</button>
+          <button style={s.pgBtn(page <= 1)}          disabled={page <= 1}          onClick={() => setPage(p => p - 1)}>‹</button>
+          <span style={{ padding: '5px 10px', fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 600 }}>
             {page} / {totalPages}
           </span>
           <button style={s.pgBtn(page >= totalPages)} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
@@ -572,21 +570,20 @@ const OrderBlotterPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Drawer backdrop ── */}
+      {/* Drawer backdrop */}
       <div style={s.overlay(drawerOpen)} onClick={closeDrawer} />
 
-      {/* ── Order Detail Drawer ── */}
-      <div style={s.drawer(drawerOpen)}>
+      {/* Order Detail Drawer */}
+      <div style={{ ...s.drawer(drawerOpen), borderTop: drawerOpen && selectedOrder ? `3px solid ${drawerAccent}` : 'none' }}>
         {selectedOrder && (
           <>
-            {/* Drawer header */}
             <div style={s.dHeader}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '15px', color: '#1a2236' }}>
+                <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-text-primary)' }}>
                   {selectedOrder.symbol} · <SideBadge side={selectedOrder.side} />
                   {' '}{selectedOrder.orderType}
                 </div>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', fontFamily: 'monospace' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px', fontFamily: 'monospace' }}>
                   {selectedOrder.id}
                 </div>
               </div>
@@ -595,7 +592,7 @@ const OrderBlotterPage: React.FC = () => {
 
             <div style={s.dBody}>
 
-              {/* ── Order Details ── */}
+              {/* Order Details */}
               <div style={s.dSection}>
                 <div style={s.dSTitle}>Order Details</div>
                 <div style={s.kvGrid}>
@@ -622,22 +619,24 @@ const OrderBlotterPage: React.FC = () => {
               </div>
 
               {drawerLoading ? (
-                <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', padding: '24px' }}>
-                  Loading fills and audit trail…
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0' }}>
+                  <div className="skeleton" style={{ height: '20px', width: '100%' }} />
+                  <div className="skeleton" style={{ height: '20px', width: '75%' }} />
+                  <div className="skeleton" style={{ height: '20px', width: '85%' }} />
                 </div>
               ) : (
                 <>
-                  {/* ── Fills ── */}
+                  {/* Fills */}
                   <div style={s.dSection}>
                     <div style={s.dSTitle}>Fills ({drawerFills.length})</div>
                     {drawerFills.length === 0 ? (
-                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>No fills recorded.</div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>No fills recorded.</div>
                     ) : (
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                         <thead>
                           <tr>
                             {['Qty', 'Price', 'Value', 'Type', 'Venue', 'Time'].map(h => (
-                              <th key={h} style={{ padding: '6px 8px', textAlign: 'left' as const, fontSize: '10px', fontWeight: 700, color: '#6b7280', borderBottom: '1px solid #f0f0f0', textTransform: 'uppercase' as const }}>
+                              <th key={h} style={{ padding: '6px 8px', textAlign: 'left' as const, fontSize: '10px', fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', textTransform: 'uppercase' as const }}>
                                 {h}
                               </th>
                             ))}
@@ -646,20 +645,20 @@ const OrderBlotterPage: React.FC = () => {
                         <tbody>
                           {drawerFills.map(f => (
                             <tr key={f.executionId}>
-                              <td style={{ padding: '6px 8px', borderBottom: '1px solid #f8f8f8' }}>{f.executedQty.toLocaleString()}</td>
-                              <td style={{ padding: '6px 8px', borderBottom: '1px solid #f8f8f8' }}>{fmtUsd(f.executedPrice)}</td>
-                              <td style={{ padding: '6px 8px', borderBottom: '1px solid #f8f8f8' }}>{fmtUsd(f.fillValue)}</td>
-                              <td style={{ padding: '6px 8px', borderBottom: '1px solid #f8f8f8' }}>
+                              <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-light)' }}>{f.executedQty.toLocaleString()}</td>
+                              <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-light)' }}>{fmtUsd(f.executedPrice)}</td>
+                              <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-light)' }}>{fmtUsd(f.fillValue)}</td>
+                              <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-light)' }}>
                                 <span style={{
-                                  padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: 700,
-                                  background: f.fillType === 'FULL' ? '#d1fae5' : '#fed7aa',
-                                  color:      f.fillType === 'FULL' ? '#059669' : '#ea580c',
+                                  padding: '1px 5px', borderRadius: 'var(--radius-sm)', fontSize: '10px', fontWeight: 700,
+                                  background: f.fillType === 'FULL' ? 'var(--color-success-bg)' : '#fed7aa',
+                                  color:      f.fillType === 'FULL' ? 'var(--color-success)'    : '#ea580c',
                                 }}>
                                   {f.fillType}
                                 </span>
                               </td>
-                              <td style={{ padding: '6px 8px', borderBottom: '1px solid #f8f8f8', color: '#9ca3af' }}>{f.executionVenue}</td>
-                              <td style={{ padding: '6px 8px', borderBottom: '1px solid #f8f8f8', color: '#9ca3af', fontSize: '11px' }}>
+                              <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-light)', color: 'var(--color-text-muted)' }}>{f.executionVenue}</td>
+                              <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-light)', color: 'var(--color-text-muted)', fontSize: '11px' }}>
                                 {fmtDateTime(f.executedAt)}
                               </td>
                             </tr>
@@ -669,25 +668,29 @@ const OrderBlotterPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* ── State Transition Timeline ── */}
+                  {/* State Transition Timeline */}
                   <div style={s.dSection}>
                     <div style={s.dSTitle}>State Timeline ({drawerAudit.length})</div>
                     {drawerAudit.length === 0 ? (
-                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>No audit records found.</div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>No audit records found.</div>
                     ) : (
                       drawerAudit.map((rec, i) => (
                         <div key={rec.id} style={{ display: 'flex', gap: '12px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#6366f1', marginTop: '2px' }} />
+                            <div style={{
+                              width: '10px', height: '10px', borderRadius: '50%',
+                              background: stateTimelineDotColor(rec.newState),
+                              marginTop: '2px',
+                            }} />
                             {i < drawerAudit.length - 1 && (
-                              <div style={{ width: '1px', flex: 1, background: '#e5e7eb', minHeight: '18px' }} />
+                              <div style={{ width: '1px', flex: 1, background: 'var(--color-border)', minHeight: '18px' }} />
                             )}
                           </div>
                           <div style={{ flex: 1, paddingBottom: '14px' }}>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a2236' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                               {rec.previousState ? `${rec.previousState} → ${rec.newState}` : rec.newState}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                               {rec.actorType === 'USER'
                                 ? `User: ${rec.actorId ?? 'unknown'}`
                                 : `System: ${rec.actorId ?? 'OMS'}`}
@@ -695,9 +698,9 @@ const OrderBlotterPage: React.FC = () => {
                             </div>
                             {rec.metadata && (
                               <div style={{
-                                fontSize: '11px', color: '#6b7280', marginTop: '4px',
-                                fontFamily: 'monospace', background: '#f9fafb',
-                                padding: '4px 6px', borderRadius: '4px',
+                                fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px',
+                                fontFamily: 'monospace', background: 'var(--color-bg)',
+                                padding: '4px 6px', borderRadius: 'var(--radius-sm)',
                               }}>
                                 {rec.metadata}
                               </div>

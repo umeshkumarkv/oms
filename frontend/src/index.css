@@ -1,0 +1,145 @@
+/* ── Design Tokens ──────────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-primary:        #6366f1;
+  --color-primary-dark:   #4f46e5;
+  --color-primary-light:  #e0e7ff;
+
+  /* Surface */
+  --color-surface:        #ffffff;
+  --color-bg:             #f8fafc;
+  --color-nav:            #0f172a;
+
+  /* Semantic — trading */
+  --color-buy:            #1d4ed8;
+  --color-buy-bg:         #dbeafe;
+  --color-sell:           #be185d;
+  --color-sell-bg:        #fce7f3;
+  --color-success:        #059669;
+  --color-success-bg:     #d1fae5;
+  --color-warning:        #d97706;
+  --color-warning-bg:     #fef3c7;
+  --color-error:          #dc2626;
+  --color-error-bg:       #fee2e2;
+
+  /* Text */
+  --color-text-primary:   #0f172a;
+  --color-text-secondary: #64748b;
+  --color-text-muted:     #94a3b8;
+
+  /* Border */
+  --color-border:         #e2e8f0;
+  --color-border-light:   #f1f5f9;
+
+  /* Radius */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-pill: 999px;
+
+  /* Shadow */
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Shimmer Skeleton ───────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Market status pulse dot ────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* ── Card hover lift ────────────────────────────────────────────────────────── */
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: default;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Nav link with active bottom-border indicator ───────────────────────────── */
+.nav-link {
+  position: relative;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  transition: color 0.15s ease, background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  height: 52px;
+}
+
+.nav-link:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nav-link.active {
+  color: #ffffff;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+}
+
+/* ── Login input focus ring ─────────────────────────────────────────────────── */
+.login-input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-color: var(--color-primary) !important;
+}
+
+/* ── Responsive: hide left panel on small screens ───────────────────────────── */
+@media (max-width: 699px) {
+  .login-left-panel {
+    display: none !important;
+  }
+}
