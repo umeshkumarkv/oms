@@ -44,8 +44,6 @@ const s = {
   title:         { margin: 0, fontSize: '20px', fontWeight: 700, color: '#1a2236' } as React.CSSProperties,
   headerRight:   { display: 'flex', alignItems: 'center', gap: '12px' } as React.CSSProperties,
   refreshNote:   { fontSize: '11px', color: '#9ca3af' } as React.CSSProperties,
-  mockBanner:    { padding: '8px 16px', background: '#fef9c3', color: '#92400e', borderRadius: '6px', marginBottom: '16px', fontSize: '12px' } as React.CSSProperties,
-
   // Market status pill
   pill: (open: boolean) => ({
     padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700,
@@ -122,7 +120,6 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
 
   const [loading, setLoading]           = useState(true)
-  const [usingMock, setUsingMock]       = useState(false)
   const [metrics, setMetrics]           = useState<Metrics | null>(null)
   const [marketHours, setMarketHours]   = useState<MarketHours | null>(null)
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
@@ -131,44 +128,36 @@ const DashboardPage: React.FC = () => {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const loadDataWithMockDetection = useCallback(async (showLoading = true) => {
+  const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
-    let backendLive = true
     try {
-      // Quick probe: if this throws it means backend is offline
-      await fetch('/api/v1/market/hours', { method: 'HEAD', signal: AbortSignal.timeout(2000) })
-    } catch {
-      backendLive = false
+      const [openPage, filledPage, expiredPage, gtcPage, hours] = await Promise.all([
+        getOrders({ status: 'OPEN' }),
+        getOrders({ status: 'FILLED' }),
+        getOrders({ status: 'EXPIRED' }),
+        getOrders({ tif: 'GTC', status: 'OPEN' }),
+        getMarketHours(),
+      ])
+      const gtcExpiringSoon = (gtcPage.orders ?? []).filter(isExpiringSoon)
+      setMetrics({
+        openCount:       openPage.totalCount,
+        filledCount:     filledPage.totalCount,
+        expiredCount:    expiredPage.totalCount,
+        gtcCount:        gtcPage.totalCount,
+        gtcExpiringSoon,
+      })
+      setMarketHours(hours)
+    } finally {
+      setLoading(false)
+      setLastRefreshed(new Date())
     }
-
-    const [openPage, filledPage, expiredPage, gtcPage, hours] = await Promise.all([
-      getOrders({ status: 'OPEN' }),
-      getOrders({ status: 'FILLED' }),
-      getOrders({ status: 'EXPIRED' }),
-      getOrders({ tif: 'GTC', status: 'OPEN' }),
-      getMarketHours(),
-    ])
-
-    const gtcExpiringSoon = (gtcPage.orders ?? []).filter(isExpiringSoon)
-
-    setMetrics({
-      openCount:       openPage.totalCount,
-      filledCount:     filledPage.totalCount,
-      expiredCount:    expiredPage.totalCount,
-      gtcCount:        gtcPage.totalCount,
-      gtcExpiringSoon,
-    })
-    setMarketHours(hours)
-    setUsingMock(!backendLive)
-    setLoading(false)
-    setLastRefreshed(new Date())
   }, [])
 
   useEffect(() => {
-    loadDataWithMockDetection(true)
-    intervalRef.current = setInterval(() => loadDataWithMockDetection(false), REFRESH_MS)
+    loadData(true)
+    intervalRef.current = setInterval(() => loadData(false), REFRESH_MS)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [loadDataWithMockDetection])
+  }, [loadData])
 
   const open = marketHours?.marketOpen ?? false
 
@@ -189,13 +178,6 @@ const DashboardPage: React.FC = () => {
           </span>
         </div>
       </div>
-
-      {/* Mock data banner */}
-      {usingMock && (
-        <div style={s.mockBanner}>
-          Demo mode — showing seed data. Start docker-compose to load live data.
-        </div>
-      )}
 
       {/* ── Metric Cards ── */}
       <div style={s.cards}>

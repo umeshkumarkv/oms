@@ -1,20 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getHolidays, getInstrument, getInstruments } from '../api/marketApi'
-import { getPortfolio } from '../api/clientApi'
+import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
 import { Holiday, Instrument } from '../types/market.types'
-import { Portfolio } from '../types/client.types'
+import { Client, Portfolio } from '../types/client.types'
 import { OrderSide, OrderType, TimeInForce } from '../types/order.types'
-
-// ── Seed clients (POC — no GET /clients list endpoint yet) ───────────────────
-const SEED_CLIENTS = [
-  { id: 'a1000000-0000-0000-0000-000000000001', name: 'John Smith' },
-  { id: 'a2000000-0000-0000-0000-000000000002', name: 'Sarah Johnson' },
-  { id: 'a3000000-0000-0000-0000-000000000003', name: 'Mike Davis' },
-  { id: 'a4000000-0000-0000-0000-000000000004', name: 'Emily Chen' },
-  { id: 'a5000000-0000-0000-0000-000000000005', name: 'Robert Wilson' },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: string | number): string => {
@@ -107,8 +98,11 @@ const OrderEntryPage: React.FC = () => {
   const navigate      = useNavigate()
   const [params]      = useSearchParams()
 
+  // Clients for dropdown
+  const [clients, setClients] = useState<Client[]>([])
+
   // Form state
-  const [clientId,    setClientId]    = useState(SEED_CLIENTS[0].id)
+  const [clientId,    setClientId]    = useState('')
   const [symbol,      setSymbol]      = useState(params.get('symbol') ?? '')
   const [symbolInput, setSymbolInput] = useState(params.get('symbol') ?? '')
   const [side,        setSide]        = useState<OrderSide>('BUY')
@@ -135,10 +129,14 @@ const OrderEntryPage: React.FC = () => {
 
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load instruments + holidays on mount
+  // Load instruments, holidays, and clients on mount
   useEffect(() => {
     getInstruments().then(setInstruments)
     getHolidays().then(setHolidays)
+    getClients().then((list) => {
+      setClients(list)
+      if (list.length > 0) setClientId(list[0].clientId)
+    }).catch(() => { /* client dropdown stays empty */ })
   }, [])
 
   useEffect(() => {
@@ -291,7 +289,10 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Client</label>
             <select style={s.select} value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              {SEED_CLIENTS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.length === 0
+                ? <option value="">Loading clients…</option>
+                : clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)
+              }
             </select>
           </div>
 

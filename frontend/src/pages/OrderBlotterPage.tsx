@@ -2,36 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getExecutions, GetOrdersParams, getOrders } from '../api/orderApi'
 import { getOrderAudit } from '../api/auditApi'
+import { getClients } from '../api/clientApi'
 import { AuditRecord } from '../types/audit.types'
+import { Client } from '../types/client.types'
 import { Execution, OrderStatus, OrderSummary } from '../types/order.types'
-
-// ── Seed clients (POC — no GET /clients list yet) ────────────────────────────
-const SEED_CLIENTS = [
-  { id: '',                                        name: 'All Clients' },
-  { id: 'a1000000-0000-0000-0000-000000000001', name: 'John Smith' },
-  { id: 'a2000000-0000-0000-0000-000000000002', name: 'Sarah Johnson' },
-  { id: 'a3000000-0000-0000-0000-000000000003', name: 'Mike Davis' },
-  { id: 'a4000000-0000-0000-0000-000000000004', name: 'Emily Chen' },
-  { id: 'a5000000-0000-0000-0000-000000000005', name: 'Robert Wilson' },
-]
-
-const CLIENT_NAMES: Record<string, string> = {
-  'a1000000-0000-0000-0000-000000000001': 'John Smith',
-  'a2000000-0000-0000-0000-000000000002': 'Sarah Johnson',
-  'a3000000-0000-0000-0000-000000000003': 'Mike Davis',
-  'a4000000-0000-0000-0000-000000000004': 'Emily Chen',
-  'a5000000-0000-0000-0000-000000000005': 'Robert Wilson',
-}
-
-// Mock current prices for indicative P&L
-// TODO: SCRUM-25 — replace with live prices from WebSocket market data context
-const MOCK_PRICES: Record<string, number> = {
-  AAPL: 178.35, MSFT: 415.00, GOOGL: 172.25, TSLA: 245.70,
-  NVDA: 870.00, META: 504.85, AMD: 155.25,   NFLX: 628.70,
-}
-
-// TODO: SCRUM-16 — replace with real user from auth context
-const CURRENT_USER = { name: 'trader.john', role: 'TRADER' }
 
 const ALL_STATUSES: OrderStatus[] = [
   'NEW', 'VALIDATED', 'RISK_CHECK_PASSED', 'RISK_REJECTED',
@@ -80,7 +54,7 @@ const s = {
   } as React.CSSProperties),
 
   tableCard:  { background: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' as const } as React.CSSProperties,
-  table:      { width: '100%', borderCollapse: 'collapse' as const, fontSize: '13px', minWidth: '1200px' } as React.CSSProperties,
+  table:      { width: '100%', borderCollapse: 'collapse' as const, fontSize: '13px', minWidth: '1100px' } as React.CSSProperties,
   th:         {
     padding: '10px 12px', textAlign: 'left' as const, fontSize: '11px',
     fontWeight: 700, color: '#6b7280', borderBottom: '1px solid #f0f0f0',
@@ -280,6 +254,10 @@ const OrderBlotterPage: React.FC = () => {
   const [loading,     setLoading]     = useState(true)
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set())
 
+  // Clients for filter dropdown
+  const [clients, setClients] = useState<Client[]>([])
+  const clientNameMap = new Map(clients.map(c => [c.clientId, c.name]))
+
   // Filters
   const [searchText,     setSearchText]     = useState('')
   const [filterClientId, setFilterClientId] = useState('')
@@ -301,8 +279,6 @@ const OrderBlotterPage: React.FC = () => {
   const [drawerLoading, setDrawerLoading] = useState(false)
 
   // WebSocket stub — always disconnected until SCRUM-25 is implemented
-  // TODO: SCRUM-25 — connect to ws://localhost:8080/ws/v1 and subscribe to
-  //                  ORDER_STATUS_CHANGED and FILL_RECEIVED events; set wsConnected=true
   const wsConnected = false
 
   // ── Flash animation helper ───────────────────────────────────────────────
@@ -311,36 +287,35 @@ const OrderBlotterPage: React.FC = () => {
     setTimeout(() => setFlashingIds(prev => { const n = new Set(prev); n.delete(orderId); return n }), 300)
   }, [])
 
+  // keep flashRow stable in deps without lint warning
+  void flashRow
+
+  // ── Load clients (for filter dropdown) ───────────────────────────────────
+  useEffect(() => {
+    getClients().then(setClients).catch(() => { /* filter shows IDs if clients fail */ })
+  }, [])
+
   // ── Load orders ──────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
     setLoading(true)
     const params: GetOrdersParams = {}
     if (filterClientId) params.clientId = filterClientId
-    // TODO: SCRUM-44 — replace stub fallback in getOrders with real GET /api/v1/orders
-    const result = await getOrders(params)
-    setOrders(result.orders)
-    setLoading(false)
+    try {
+      const result = await getOrders(params)
+      setOrders(result.orders)
+    } finally {
+      setLoading(false)
+    }
   }, [filterClientId])
 
   useEffect(() => { loadOrders() }, [loadOrders])
 
-  // Auto-refresh every 15s when WebSocket is disconnected (stub fallback)
+  // Auto-refresh every 15s when WebSocket is disconnected
   useEffect(() => {
     if (wsConnected) return
     const id = setInterval(loadOrders, 15_000)
     return () => clearInterval(id)
   }, [wsConnected, loadOrders])
-
-  // Demo flash animation: simulate a WebSocket ORDER_STATUS_CHANGED event after 6s
-  // TODO: SCRUM-25 — remove this demo timer once real WebSocket events arrive
-  useEffect(() => {
-    if (orders.length === 0) return
-    const id = setTimeout(() => {
-      const target = orders.find(o => o.status === 'SENT_TO_EXECUTION' || o.status === 'VALIDATED')
-      if (target) flashRow(target.id)
-    }, 6000)
-    return () => clearTimeout(id)
-  }, [orders, flashRow])
 
   // ── Open drawer ──────────────────────────────────────────────────────────
   const openDrawer = useCallback(async (order: OrderSummary) => {
@@ -349,15 +324,16 @@ const OrderBlotterPage: React.FC = () => {
     setDrawerFills([])
     setDrawerAudit([])
     setDrawerLoading(true)
-    // TODO: SCRUM-48 — replace stub fallback in getExecutions with real GET /api/v1/executions/{orderId}
-    // TODO: SCRUM-49 — replace stub fallback in getOrderAudit with real GET /api/v1/audit/orders/{id}
-    const [fills, audit] = await Promise.all([
-      getExecutions(order.id),
-      getOrderAudit(order.id),
-    ])
-    setDrawerFills(fills)
-    setDrawerAudit(audit)
-    setDrawerLoading(false)
+    try {
+      const [fills, audit] = await Promise.all([
+        getExecutions(order.id),
+        getOrderAudit(order.id),
+      ])
+      setDrawerFills(fills)
+      setDrawerAudit(audit)
+    } finally {
+      setDrawerLoading(false)
+    }
   }, [])
 
   const closeDrawer = () => { setDrawerOpen(false); setSelectedOrder(null) }
@@ -385,23 +361,11 @@ const OrderBlotterPage: React.FC = () => {
   // Reset to page 1 on filter change
   useEffect(() => { setPage(1) }, [searchText, filterStatuses, filterTif, filterSide, filterDateFrom, filterDateTo])
 
-  // ── Indicative P&L ───────────────────────────────────────────────────────
-  const calcPnl = (order: OrderSummary): number | null => {
-    if (!order.filledQuantity || !order.avgFillPrice) return null
-    const currentPrice = MOCK_PRICES[order.symbol]
-    if (currentPrice == null) return null
-    const avg = parseFloat(order.avgFillPrice)
-    if (isNaN(avg)) return null
-    const raw = order.filledQuantity * (currentPrice - avg)
-    // For SELL: P&L is inverted (we sold at avg, current price is opportunity cost)
-    return order.side === 'SELL' ? -raw : raw
-  }
-
   // ── Export CSV ───────────────────────────────────────────────────────────
   const handleExportCsv = () => {
     const headers = ['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit Price', 'Status', 'Filled Qty', 'Avg Fill Price', 'TIF', 'Created At']
     const rows = filteredOrders.map(o => [
-      o.id, o.clientOrderId, CLIENT_NAMES[o.clientId] ?? o.clientId,
+      o.id, o.clientOrderId, clientNameMap.get(o.clientId) ?? o.clientId,
       o.symbol, o.side, o.orderType, o.quantity,
       o.limitPrice ?? '', o.status,
       o.filledQuantity ?? '', o.avgFillPrice ?? '',
@@ -438,12 +402,9 @@ const OrderBlotterPage: React.FC = () => {
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsConnected ? '#10b981' : '#9ca3af', display: 'inline-block' }} />
             {wsConnected ? 'Live' : 'Polling'}
           </span>
-          {/* New Order — TRADER only (TODO: SCRUM-16 hide for VIEWER role) */}
-          {CURRENT_USER.role === 'TRADER' && (
-            <button style={s.btn('primary')} onClick={() => navigate('/orders/new')}>
-              + New Order
-            </button>
-          )}
+          <button style={s.btn('primary')} onClick={() => navigate('/orders/new')}>
+            + New Order
+          </button>
         </div>
       </div>
 
@@ -459,7 +420,8 @@ const OrderBlotterPage: React.FC = () => {
 
         {/* Client dropdown */}
         <select style={s.select} value={filterClientId} onChange={e => setFilterClientId(e.target.value)}>
-          {SEED_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="">All Clients</option>
+          {clients.map(c => <option key={c.clientId} value={c.clientId}>{c.name}</option>)}
         </select>
 
         {/* Status multi-select */}
@@ -505,19 +467,18 @@ const OrderBlotterPage: React.FC = () => {
         <table style={s.table}>
           <thead>
             <tr>
-              {['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit', 'Status', 'Filled', 'Avg Fill', 'P&L', 'TIF', 'Created'].map(h => (
+              {['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit', 'Status', 'Filled', 'Avg Fill', 'TIF', 'Created'].map(h => (
                 <th key={h} style={s.th}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={14} style={s.empty}>Loading orders…</td></tr>
+              <tr><td colSpan={13} style={s.empty}>Loading orders…</td></tr>
             ) : pagedOrders.length === 0 ? (
-              <tr><td colSpan={14} style={s.empty}>No orders match the current filters.</td></tr>
+              <tr><td colSpan={13} style={s.empty}>No orders match the current filters.</td></tr>
             ) : (
               pagedOrders.map(order => {
-                const pnl        = calcPnl(order)
                 const isFlashing = flashingIds.has(order.id)
                 const isSelected = selectedOrder?.id === order.id
                 return (
@@ -541,7 +502,9 @@ const OrderBlotterPage: React.FC = () => {
                       <span style={{ fontSize: '12px', color: '#374151' }}>{order.clientOrderId}</span>
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '12px', color: '#6b7280' }}>{CLIENT_NAMES[order.clientId] ?? '—'}</span>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {clientNameMap.get(order.clientId) ?? order.clientId.slice(-8)}
+                      </span>
                     </td>
                     <td style={s.td}>
                       <span style={{ fontWeight: 700, color: '#1a2236' }}>{order.symbol}</span>
@@ -565,13 +528,6 @@ const OrderBlotterPage: React.FC = () => {
                     <td style={s.tdR}>
                       {order.avgFillPrice
                         ? fmtUsd(order.avgFillPrice)
-                        : <span style={{ color: '#9ca3af' }}>—</span>}
-                    </td>
-                    <td style={s.tdR}>
-                      {pnl != null
-                        ? <span style={{ fontWeight: 600, color: pnl >= 0 ? '#059669' : '#dc2626' }}>
-                            {pnl >= 0 ? '+' : ''}{fmtUsd(pnl)}
-                          </span>
                         : <span style={{ color: '#9ca3af' }}>—</span>}
                     </td>
                     <td style={s.td}>
@@ -663,27 +619,6 @@ const OrderBlotterPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
-
-                {/* Indicative P&L banner */}
-                {(() => {
-                  const pnl = calcPnl(selectedOrder)
-                  if (pnl == null) return null
-                  const positive = pnl >= 0
-                  return (
-                    <div style={{
-                      marginTop: '10px', padding: '10px 14px', borderRadius: '6px',
-                      background: positive ? '#d1fae5' : '#fee2e2',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: positive ? '#059669' : '#dc2626' }}>
-                        Indicative P&L
-                      </span>
-                      <span style={{ fontSize: '15px', fontWeight: 700, color: positive ? '#059669' : '#dc2626' }}>
-                        {positive ? '+' : ''}{fmtUsd(pnl)}
-                      </span>
-                    </div>
-                  )
-                })()}
               </div>
 
               {drawerLoading ? (
@@ -694,10 +629,7 @@ const OrderBlotterPage: React.FC = () => {
                 <>
                   {/* ── Fills ── */}
                   <div style={s.dSection}>
-                    <div style={s.dSTitle}>
-                      Fills ({drawerFills.length})
-                      {/* TODO: SCRUM-48 — replace stub with GET /api/v1/executions/{orderId} */}
-                    </div>
+                    <div style={s.dSTitle}>Fills ({drawerFills.length})</div>
                     {drawerFills.length === 0 ? (
                       <div style={{ fontSize: '12px', color: '#9ca3af' }}>No fills recorded.</div>
                     ) : (
@@ -739,23 +671,18 @@ const OrderBlotterPage: React.FC = () => {
 
                   {/* ── State Transition Timeline ── */}
                   <div style={s.dSection}>
-                    <div style={s.dSTitle}>
-                      State Timeline ({drawerAudit.length})
-                      {/* TODO: SCRUM-49 — replace stub with GET /api/v1/audit/orders/{id} */}
-                    </div>
+                    <div style={s.dSTitle}>State Timeline ({drawerAudit.length})</div>
                     {drawerAudit.length === 0 ? (
                       <div style={{ fontSize: '12px', color: '#9ca3af' }}>No audit records found.</div>
                     ) : (
                       drawerAudit.map((rec, i) => (
                         <div key={rec.id} style={{ display: 'flex', gap: '12px' }}>
-                          {/* Connector */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#6366f1', marginTop: '2px' }} />
                             {i < drawerAudit.length - 1 && (
                               <div style={{ width: '1px', flex: 1, background: '#e5e7eb', minHeight: '18px' }} />
                             )}
                           </div>
-                          {/* Content */}
                           <div style={{ flex: 1, paddingBottom: '14px' }}>
                             <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a2236' }}>
                               {rec.previousState ? `${rec.previousState} → ${rec.newState}` : rec.newState}

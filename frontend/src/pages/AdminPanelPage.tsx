@@ -1,19 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getRiskRuleAudit, getRiskRules, patchRiskRule, resetSystem, triggerScenario } from '../api/riskApi'
+import { getCurrentUser } from '../api/authApi'
 import { RiskRule, RiskRuleAuditRecord } from '../types/risk.types'
-
-// TODO: SCRUM-16 — replace with real user from AuthContext
-// Set to ADMIN so the panel is visible in stub mode
-const CURRENT_USER = { name: 'admin01', role: 'ADMIN' }
-
-// ── Seed users (static for POC — no user management API in Iteration 1) ──────
-const SEED_USERS = [
-  { username: 'trader01', fullName: 'John Smith',     role: 'TRADER', status: 'ACTIVE', lastLogin: '2026-04-27T09:31:00Z' },
-  { username: 'trader02', fullName: 'Sarah Johnson',  role: 'TRADER', status: 'ACTIVE', lastLogin: '2026-04-27T08:15:00Z' },
-  { username: 'viewer01', fullName: 'Mike Davis',     role: 'VIEWER', status: 'ACTIVE', lastLogin: '2026-04-26T14:22:00Z' },
-  { username: 'admin01',  fullName: 'Umesh Kumar KV', role: 'ADMIN',  status: 'ACTIVE', lastLogin: '2026-04-27T09:00:00Z' },
-]
 
 // ── Demo scenarios (must match application.yml in marketdata-service) ─────────
 const DEMO_SCENARIOS = [
@@ -123,20 +112,6 @@ const CategoryBadge: React.FC<{ cat: string }> = ({ cat }) => (
     {cat === 'FINANCIAL_LIMIT' ? 'Financial' : 'Redundant'}
   </span>
 )
-
-const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
-  const map: Record<string, { bg: string; color: string }> = {
-    TRADER: { bg: '#dbeafe', color: '#1d4ed8' },
-    VIEWER: { bg: '#f3f4f6', color: '#6b7280' },
-    ADMIN:  { bg: '#fef3c7', color: '#d97706' },
-  }
-  const cfg = map[role] ?? { bg: '#f3f4f6', color: '#6b7280' }
-  return (
-    <span style={{ display: 'inline-block', padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, ...cfg }}>
-      {role}
-    </span>
-  )
-}
 
 // ── Confirm modal used for toggle changes ──────────────────────────────────────
 interface ToggleModalProps {
@@ -271,11 +246,12 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ title, message, confirmLabe
 // ── Main Component ─────────────────────────────────────────────────────────────
 const AdminPanelPage: React.FC = () => {
   const navigate = useNavigate()
+  const currentUser = getCurrentUser()
 
-  // Role guard — TODO: SCRUM-16 replace with real AuthContext
+  // Role guard
   useEffect(() => {
-    if (CURRENT_USER.role !== 'ADMIN') navigate('/dashboard', { replace: true })
-  }, [navigate])
+    if (currentUser?.role !== 'ADMIN') navigate('/dashboard', { replace: true })
+  }, [navigate, currentUser?.role])
 
   // Risk rules state
   const [rules,        setRules]        = useState<RiskRule[]>([])
@@ -415,7 +391,7 @@ const AdminPanelPage: React.FC = () => {
     new Date(iso).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (CURRENT_USER.role !== 'ADMIN') return null
+  if (currentUser?.role !== 'ADMIN') return null
 
   return (
     <div style={s.page}>
@@ -468,7 +444,7 @@ const AdminPanelPage: React.FC = () => {
           padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 700,
           background: '#fef3c7', color: '#d97706', border: '1px solid #fcd34d',
         }}>
-          ADMIN — {CURRENT_USER.name}
+          ADMIN — {currentUser?.username ?? 'admin'}
         </span>
       </div>
 
@@ -597,41 +573,9 @@ const AdminPanelPage: React.FC = () => {
                 + Create User
               </button>
             </h2>
-            <table style={s.table}>
-              <thead>
-                <tr>
-                  {['Username', 'Display Name', 'Role', 'Last Login', 'Status', ''].map(h => (
-                    <th key={h} style={s.th}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {SEED_USERS.map(u => (
-                  <tr key={u.username}>
-                    <td style={s.td}><span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 600, color: '#1a2236' }}>{u.username}</span></td>
-                    <td style={s.td}><span style={{ fontSize: '12px', color: '#374151' }}>{u.fullName}</span></td>
-                    <td style={s.td}><RoleBadge role={u.role} /></td>
-                    <td style={s.td}><span style={{ fontSize: '11px', color: '#9ca3af' }}>{fmtDate(u.lastLogin)}</span></td>
-                    <td style={s.td}>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: u.status === 'ACTIVE' ? '#059669' : '#9ca3af' }}>
-                        {u.status}
-                      </span>
-                    </td>
-                    <td style={s.td}>
-                      {/* TODO: SCRUM-16 — wire toggle to real PATCH /api/v1/auth/users/{username}/status */}
-                      <button
-                        style={{ ...s.btn('ghost'), fontSize: '11px', padding: '3px 8px', border: '1px solid #e5e7eb' }}
-                        disabled={u.username === CURRENT_USER.name}
-                        title={u.username === CURRENT_USER.name ? 'Cannot deactivate your own account' : undefined}
-                        onClick={() => showToast('User status toggle not available — Iteration 1', 'error')}
-                      >
-                        {u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ color: '#9ca3af', fontSize: '13px', padding: '12px 0' }}>
+              User management API not available in this iteration.
+            </div>
           </div>
 
           {/* Demo Controls Card */}
