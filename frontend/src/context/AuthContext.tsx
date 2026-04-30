@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { setApiToken } from '../api/apiClient'
+import { setApiToken, setCurrentUser } from '../api/apiClient'
 import { marketDataWs } from '../services/websocketService'
 
 export interface AuthUser {
@@ -55,12 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback((user: AuthUser) => {
     setApiToken(user.token)
+    setCurrentUser(user)
     marketDataWs.setToken(user.token)
     dispatch({ type: 'LOGIN', payload: user })
   }, [])
 
   const logout = useCallback(() => {
     setApiToken(null)
+    setCurrentUser(null)
     marketDataWs.setToken(null)
     dispatch({ type: 'LOGOUT' })
     navigate('/')
@@ -74,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const handler = () => {
       setApiToken(null)
+      setCurrentUser(null)
       marketDataWs.setToken(null)
       dispatch({ type: 'SESSION_EXPIRED' })
       navigate('/', { state: { sessionExpired: true } })
