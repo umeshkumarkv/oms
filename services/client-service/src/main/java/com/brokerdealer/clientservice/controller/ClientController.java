@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,6 +23,13 @@ import java.util.UUID;
 public class ClientController {
 
     private final ClientService clientService;
+
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> getAllClients() {
+        log.debug("GET /api/v1/clients");
+        List<ClientProfileResponse> data = clientService.getAllClients();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getClient(@PathVariable UUID id) {
