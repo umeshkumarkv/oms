@@ -7,6 +7,9 @@ import lombok.Value;
 @Builder
 public class InstrumentSummaryResponse {
     String symbol;
+    String bidPrice;
+    String askPrice;
+    String lastPrice;
     Boolean tradable;
     Boolean halted;
 }
