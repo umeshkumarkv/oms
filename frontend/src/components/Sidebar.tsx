@@ -73,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     <aside
       className={`sidebar${collapsed ? ' collapsed' : ''}`}
       style={{
-        background: '#1a2236',
+        background: 'var(--color-nav)',
         height: 'calc(100vh - 52px)',
         position: 'sticky',
         top: '52px',
@@ -83,7 +83,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
         overflowX: 'hidden',
         overflowY: 'auto',
         paddingBottom: '16px',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
+        paddingTop: '6px',
+        borderRight: '1px solid rgba(255,255,255,0.08)',
       }}
     >
       {groups.map((group) => (

@@ -161,7 +161,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #4b5563;
+  color: rgba(255, 255, 255, 0.28);
   padding: 14px 16px 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -183,25 +183,29 @@ body {
   align-items: center;
   gap: 10px;
   padding: 9px 14px;
+  padding-left: 12px;
   border-radius: 6px;
+  border-left: 2px solid transparent;
   text-decoration: none;
-  color: #9ca3af;
+  color: rgba(255, 255, 255, 0.45);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s, justify-content 0.22s, padding 0.22s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, justify-content 0.22s, padding 0.22s;
   cursor: pointer;
   user-select: none;
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  border-left-color: rgba(255, 255, 255, 0.15);
 }
 
 .sidebar-link.active {
-  background: rgba(99, 102, 241, 0.2);
-  color: #818cf8;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border-left-color: var(--color-primary);
 }
 
 .sidebar-label {
@@ -219,5 +223,12 @@ body {
 .sidebar.collapsed .sidebar-link {
   justify-content: center;
   padding: 9px 0;
+  padding-left: 0;
+  border-left-color: transparent;
   gap: 0;
+}
+
+.sidebar.collapsed .sidebar-link.active {
+  border-left-color: transparent;
+  background: rgba(99, 102, 241, 0.18);
 }
