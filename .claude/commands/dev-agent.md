@@ -7,13 +7,23 @@ Implement a JIRA story end-to-end: branch → code → test → commit → PR �
 /dev-agent SCRUM-{n}
 ```
 
-## Phase 0 — Pre-flight
+## Phase 0 — Pre-flight (BMAD Gates — all must pass before any code)
 
 1. Fetch the JIRA story using `getJiraIssue(SCRUM-{n})`
-2. Extract: summary, description, acceptance criteria, tech constraints, blocked-by links
-3. Check every blocked-by ticket status — if any is not Done, STOP and tell the user which blockers are open
+2. Extract: summary, description, acceptance criteria, tech constraints, blocked-by links, labels
+
+### Gate 1 — Definition of Ready
+Check the ticket labels:
+- Must have label `bmad-dor-ready` — if missing, STOP: "Run /ba-agent to complete story decomposition first."
+- Must have label `bmad-arch-approved` — if missing, STOP: "Run /architect-agent SCRUM-{n} to produce the technical design first."
+- Must NOT have label `bmad-arch-blocked` — if present, STOP and show the architect's blocking comment.
+
+### Gate 2 — Blockers
+3. Check every blocked-by ticket status — if any is not Done, STOP and tell the user which blockers are open.
+
+### Gate 3 — JIRA Transition
 4. Transition JIRA: To Do → **In Progress**
-5. Add JIRA comment: "Developer Agent starting work on SCRUM-{n}. Reading CLAUDE.md and planning implementation."
+5. Add JIRA comment: "Developer Agent starting work on SCRUM-{n}. DoR and architect design verified. Reading CLAUDE.md and planning implementation."
 6. Read `/Users/umeshkumarkotaladinnevaradaraj/code/broker-dealer/CLAUDE.md` fully (all 19 sections)
 7. Identify the service from the ticket (client-service, order-service, etc.)
 8. Read `services/{service}/CLAUDE.md` fully

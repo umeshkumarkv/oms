@@ -7,11 +7,21 @@ Validate all acceptance criteria for a JIRA story against the running system and
 /qa-agent SCRUM-{n}
 ```
 
-## Phase 0 — Setup
+## Phase 0 — Setup (BMAD Gate — Code Review must pass before QA runs)
 
 1. Fetch the JIRA story: `getJiraIssue(SCRUM-{n})`
 2. Extract every acceptance criterion line by line from the description
 3. Identify the service and endpoint(s) under test
+
+### Gate — Code Review Approved
+Find the PR for this story:
+```bash
+gh pr list --search "SCRUM-{n}" --json number,title,reviewDecision,headRefName | jq .
+```
+- If `reviewDecision` is NOT `"APPROVED"` — STOP:
+  "PR for SCRUM-{n} has not been approved by Code Review Agent. Run /code-review SCRUM-{n} first."
+- If no PR exists — STOP: "No PR found. Run /dev-agent SCRUM-{n} first."
+
 4. Verify all Docker services are running:
    ```bash
    docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "api-gateway|client-service|order-service|auth-service"

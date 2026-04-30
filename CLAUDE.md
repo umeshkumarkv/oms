@@ -21,8 +21,66 @@ Domain: US Equities only — Stocks
 Scope: Fully mocked simulation — no real exchange connectivity
 Goal: End-to-end order flow — trader submits equity order →
       passes compliance → executes → appears in audit trail
-Methodology: Agentic AI SDLC — Claude Code executes JIRA stories,
-             humans review and govern
+Methodology: BMAD — Breakthrough Method of Agile AI-driven Development
+
+### BMAD Agent Pipeline — Mandatory Order
+
+Every feature follows this pipeline in order. No step may be skipped.
+Gate labels on JIRA tickets enforce the pipeline.
+
+```
+1. PM Agent        /pm-agent "requirement"
+   → Writes PRD, creates Epic, prioritizes backlog
+   → Gate label: bmad-prd-approved on Epic
+
+2. BA Agent        /ba-agent epic:{key}
+   → Decomposes Epic into Stories with full ACs
+   → Runs DoR checklist (8 items), tags story bmad-dor-ready
+   → Gate: all 8 DoR items checked except architect sign-off
+
+3. Architect Agent /architect-agent SCRUM-{n}
+   → Writes per-story technical design doc (endpoint, DB, Kafka, tests)
+   → Verifies full DoR checklist
+   → Gate label: bmad-arch-approved (or bmad-arch-blocked if gaps found)
+
+4. Dev Agent       /dev-agent SCRUM-{n}
+   → Requires: bmad-dor-ready + bmad-arch-approved labels
+   → Implements, tests, commits, raises PR
+   → Gate: mvn test passes, JaCoCo >= 80%, PR raised
+
+5. Code Review     /code-review SCRUM-{n}
+   → 12-category audit against CLAUDE.md standards
+   → Approves or requests changes on GitHub PR
+   → Gate: PR reviewDecision = APPROVED
+
+6. QA Agent        /qa-agent SCRUM-{n}
+   → Requires: PR reviewDecision = APPROVED
+   → Validates all ACs against running system
+   → Gate: all ACs pass, JIRA → In Review
+
+7. SM Agent        /sm-agent  (daily)
+   → Sprint health check, velocity, blocker detection
+   → Enforces DoD gate before closing tickets as Done
+   → Gate: QA passed + PR merged + CI green
+
+8. DevOps Agent    /devops-agent pr:{n}
+   → Monitors CI/CD pipeline, auto-fixes compilation/test failures
+   → Triggered on pipeline failure
+
+9. Doc Agent       /doc-agent SCRUM-{n}  (post-merge)
+   → Updates openapi.yaml and service CLAUDE.md
+   → Raises a docs PR — never commits directly
+```
+
+### BMAD JIRA Labels
+
+| Label                  | Set by           | Meaning                                      |
+|------------------------|------------------|----------------------------------------------|
+| bmad-prd-approved      | PM Agent         | Epic has an approved PRD                     |
+| bmad-dor-ready         | BA Agent         | Story passes 8/9 DoR checks (arch pending)   |
+| bmad-arch-approved     | Architect Agent  | Technical design complete, full DoR passed   |
+| bmad-arch-blocked      | Architect Agent  | Design blocked — ACs or story incomplete     |
+| bmad-code-review-approved | Code Review   | PR approved by code-review agent             |
 
 ---
 

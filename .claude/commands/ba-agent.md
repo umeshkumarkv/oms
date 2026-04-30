@@ -93,7 +93,30 @@ Estimate: 1 (trivial) | 2 (simple DB read) | 3 (service call) | 5 (complex logic
 3. Set blocked-by links using `createIssueLink` where dependencies exist
 4. Assign all tickets to the Principal Architect (accountId: 712020:a0088ae5-186b-4263-bf8d-41ed37df1f95)
 
-## Phase 4 — Report to User
+## Phase 4 — Definition of Ready (DoR) Checklist
+
+For every story created, verify and output a DoR checklist. A story is NOT ready for development
+until ALL items are checked. If any item fails, add a JIRA comment describing what is missing.
+
+```
+DEFINITION OF READY — SCRUM-{n}
+  [x] User story written (As a / I want / So that)
+  [x] Acceptance criteria present and curl-verifiable
+  [x] Single microservice boundary — no cross-service DB access
+  [x] Story points estimated (1/2/3/5/8)
+  [x] Blocked-by links set (or confirmed none)
+  [x] No out-of-scope items per CLAUDE.md Section 18
+  [x] Tech constraints section complete (service, port, branch, PR target)
+  [x] Seed data or test data identified
+  [ ] Architect design doc approved (label: bmad-arch-approved) ← run /architect-agent SCRUM-{n}
+```
+
+The last item (architect approval) is always unchecked at BA stage — it must be completed by the
+Architect Agent before development begins.
+
+Add label `bmad-dor-ready` to each story after all other checks pass.
+
+## Phase 5 — Report to User
 
 ```
 BA Agent — Requirements Decomposition Complete
@@ -102,8 +125,8 @@ EPIC
   {SCRUM-key}: {epic summary}
 
 STORIES CREATED
-  {SCRUM-key}: {story summary} [{points} pts]
-  {SCRUM-key}: {story summary} [{points} pts]
+  {SCRUM-key}: {story summary} [{points} pts] — DoR: {n}/8 checks (arch pending)
+  {SCRUM-key}: {story summary} [{points} pts] — DoR: {n}/8 checks (arch pending)
   ...
 
 BLOCKED-BY LINKS SET
@@ -114,6 +137,9 @@ OUT OF SCOPE (flagged, not ticketed)
 
 AMBIGUITIES (need human decision)
   - {question}
+
+NEXT STEP
+  Run /architect-agent SCRUM-{n} for each story before development begins.
 ```
 
 ## Hard Stops — always pause and ask the user
