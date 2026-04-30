@@ -24,6 +24,11 @@ class MarketDataWebSocketService {
   private marketStatusHandlers: MarketStatusHandler[] = []
   private connectionHandlers: ConnectionHandler[] = []
   private connected = false
+  private authToken: string | null = null
+
+  setToken(token: string | null): void {
+    this.authToken = token
+  }
 
   connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -34,9 +39,8 @@ class MarketDataWebSocketService {
     this.ws = new WebSocket(url)
 
     this.ws.onopen = () => {
-      const token = localStorage.getItem('token')
-      if (token) {
-        this.ws!.send(JSON.stringify({ type: 'AUTH', token: `Bearer ${token}` }))
+      if (this.authToken) {
+        this.ws!.send(JSON.stringify({ type: 'AUTH', token: `Bearer ${this.authToken}` }))
       }
     }
 

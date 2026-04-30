@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 // Compute market status based on current America/New_York time
 const getMarketStatus = (): { open: boolean; label: string } => {
@@ -70,8 +71,8 @@ const NavBar: React.FC = () => {
     return () => clearInterval(id)
   }, [])
 
-  // TODO: replace with real user from auth context — JIRA SCRUM-16
-  const user = { name: 'admin01', role: 'ADMIN' }
+  const { user: authUser, logout } = useAuth()
+  const user = { name: authUser?.displayName ?? '', role: authUser?.role ?? '' }
 
   return (
     <nav style={navStyle}>
@@ -132,7 +133,7 @@ const NavBar: React.FC = () => {
           🔔
         </span>
 
-        {/* User info */}
+        {/* User info + logout */}
         <span style={{ fontSize: '13px', color: '#d1d5db' }}>
           {user.name}{' '}
           <span style={{
@@ -142,6 +143,16 @@ const NavBar: React.FC = () => {
             {user.role}
           </span>
         </span>
+        <button
+          onClick={logout}
+          style={{
+            padding: '5px 12px', borderRadius: '6px',
+            border: '1px solid rgba(255,255,255,0.2)', background: 'transparent',
+            color: '#9ca3af', fontSize: '12px', cursor: 'pointer',
+          }}
+        >
+          Sign out
+        </button>
       </div>
     </nav>
   )
