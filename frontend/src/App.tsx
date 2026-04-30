@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import NavBar from './components/NavBar'
+import Sidebar from './components/Sidebar'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import OrderBlotterPage from './pages/OrderBlotterPage'
@@ -17,13 +18,34 @@ const ProtectedRoute: React.FC = () => {
   return user ? <Outlet /> : <Navigate to="/" replace />
 }
 
-// Layout wrapper: NavBar + page content (authenticated only)
-const AppLayout: React.FC = () => (
-  <div style={{ minHeight: '100vh', background: '#f5f6fa' }}>
-    <NavBar />
-    <Outlet />
-  </div>
-)
+const SIDEBAR_KEY = 'oms-sidebar-collapsed'
+
+// Layout wrapper: NavBar + sidebar + page content (authenticated only)
+const AppLayout: React.FC = () => {
+  const [collapsed, setCollapsed] = useState<boolean>(
+    () => localStorage.getItem(SIDEBAR_KEY) === 'true'
+  )
+
+  const toggleSidebar = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem(SIDEBAR_KEY, String(next))
+      return next
+    })
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f5f6fa', display: 'flex', flexDirection: 'column' }}>
+      <NavBar onBurgerClick={toggleSidebar} sidebarCollapsed={collapsed} />
+      <div style={{ display: 'flex', flex: 1 }}>
+        <Sidebar collapsed={collapsed} />
+        <main style={{ flex: 1, minWidth: 0 }}>
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  )
+}
 
 const AppRoutes: React.FC = () => (
   <Routes>
