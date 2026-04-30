@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { CheckCircle, XCircle } from 'lucide-react'
 import { getHolidays, getInstrument, getInstruments } from '../api/marketApi'
 import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
@@ -22,66 +23,57 @@ const tomorrowStr = (): string => {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = {
-  page:        { fontFamily: 'system-ui, sans-serif', padding: '24px' } as React.CSSProperties,
+  page:        { fontFamily: "'Inter', system-ui, sans-serif", padding: '24px', minHeight: 'calc(100vh - 52px)', background: 'var(--color-bg)' } as React.CSSProperties,
   header:      { marginBottom: '20px' } as React.CSSProperties,
-  title:       { margin: 0, fontSize: '20px', fontWeight: 700, color: '#1a2236' } as React.CSSProperties,
+  title:       { margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
   grid:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' } as React.CSSProperties,
-  card:        { background: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '24px' } as React.CSSProperties,
-  cardTitle:   { margin: '0 0 20px', fontSize: '15px', fontWeight: 600, color: '#1a2236', paddingBottom: '12px', borderBottom: '1px solid #f0f0f0' } as React.CSSProperties,
+  card:        { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: '24px' } as React.CSSProperties,
+  cardTitle:   { margin: '0 0 20px', fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', paddingBottom: '12px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
   fieldGroup:  { marginBottom: '16px' } as React.CSSProperties,
-  label:       { display: 'block', fontSize: '12px', fontWeight: 600, color: '#6b7280', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.04em' },
-  input:       { width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none' },
-  inputError:  { width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #ef4444', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none' },
-  select:      { width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px', background: '#fff', boxSizing: 'border-box' as const },
-  errorText:   { fontSize: '12px', color: '#ef4444', marginTop: '4px' } as React.CSSProperties,
+  label:       { display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
+  input:       { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none', transition: 'border-color 0.15s', color: 'var(--color-text-primary)', background: '#fff' },
+  inputError:  { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-error)', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none', color: 'var(--color-text-primary)', background: '#fff' },
+  select:      { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', background: '#fff', boxSizing: 'border-box' as const, color: 'var(--color-text-primary)' },
+  errorText:   { fontSize: '12px', color: 'var(--color-error)', marginTop: '4px' } as React.CSSProperties,
 
   // Toggle group
-  toggleGroup: { display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #d1d5db' } as React.CSSProperties,
+  toggleGroup: { display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1.5px solid var(--color-border)' } as React.CSSProperties,
   toggleBtn:   (active: boolean, color?: string) => ({
     flex: 1, padding: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
-    background: active ? (color ?? '#6366f1') : '#f9fafb',
-    color:      active ? '#fff' : '#6b7280',
+    background: active ? (color ?? 'var(--color-primary)') : '#f9fafb',
+    color:      active ? '#fff' : 'var(--color-text-secondary)',
     transition: 'background 0.15s',
   } as React.CSSProperties),
 
-  // Submit button
-  submitBtn: (loading: boolean) => ({
-    width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
-    background: loading ? '#9ca3af' : '#6366f1', color: '#fff',
-    fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
-    marginTop: '8px', transition: 'background 0.2s',
-  } as React.CSSProperties),
-
   // Right panel sections
-  divider:    { borderTop: '1px solid #f0f0f0', margin: '16px 0' } as React.CSSProperties,
+  divider:    { borderTop: '1px solid var(--color-border-light)', margin: '16px 0' } as React.CSSProperties,
   row:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } as React.CSSProperties,
-  rowLabel:   { fontSize: '13px', color: '#6b7280' } as React.CSSProperties,
-  rowValue:   (bold?: boolean, color?: string) => ({ fontSize: '13px', fontWeight: bold ? 700 : 400, color: color ?? '#1a2236' } as React.CSSProperties),
+  rowLabel:   { fontSize: '13px', color: 'var(--color-text-secondary)' } as React.CSSProperties,
+  rowValue:   (bold?: boolean, color?: string) => ({ fontSize: '13px', fontWeight: bold ? 700 : 400, color: color ?? 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties),
 
   // Quote card
-  quoteSymbol: { fontSize: '22px', fontWeight: 800, color: '#1a2236', marginBottom: '4px' } as React.CSSProperties,
-  quotePrice:  { fontSize: '28px', fontWeight: 700, color: '#6366f1', marginBottom: '12px' } as React.CSSProperties,
+  quoteSymbol: { fontSize: '22px', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '4px' } as React.CSSProperties,
+  quotePrice:  { fontSize: '28px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '12px', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
   quoteMeta:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' } as React.CSSProperties,
-  quoteItem:   { background: '#f9fafb', borderRadius: '6px', padding: '8px 10px' } as React.CSSProperties,
-  quoteItemLabel: { fontSize: '10px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const } as React.CSSProperties,
-  quoteItemVal:   { fontSize: '14px', fontWeight: 600, color: '#374151', marginTop: '2px' } as React.CSSProperties,
-  haltedBadge: { display: 'inline-block', padding: '2px 8px', background: '#fee2e2', color: '#b91c1c', borderRadius: '4px', fontSize: '11px', fontWeight: 700, marginLeft: '8px' } as React.CSSProperties,
+  quoteItem:   { background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '8px 10px' } as React.CSSProperties,
+  quoteItemLabel: { fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const } as React.CSSProperties,
+  quoteItemVal:   { fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginTop: '2px', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
+  haltedBadge: { display: 'inline-block', padding: '2px 8px', background: 'var(--color-error-bg)', color: 'var(--color-error)', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 700, marginLeft: '8px' } as React.CSSProperties,
 
   // Validation check
   checkRow:   { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '12px' } as React.CSSProperties,
-  checkDot:   (pass: boolean) => ({ fontSize: '14px', flexShrink: 0, color: pass ? '#10b981' : '#ef4444' } as React.CSSProperties),
-  checkText:  (pass: boolean) => ({ color: pass ? '#374151' : '#9ca3af' } as React.CSSProperties),
+  checkText:  (pass: boolean) => ({ color: pass ? 'var(--color-text-primary)' : 'var(--color-text-muted)' } as React.CSSProperties),
 
   // Toast
-  toast:      { position: 'fixed' as const, top: '20px', right: '20px', background: '#1a2236', color: '#fff', padding: '14px 20px', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 9999, fontSize: '14px', fontWeight: 500 },
+  toast: { position: 'fixed' as const, top: '20px', right: '20px', background: 'var(--color-nav)', color: '#fff', padding: '14px 20px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 9999, fontSize: '14px', fontWeight: 500 },
 
   // Error banner / modal
-  errorBanner: { padding: '12px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#b91c1c', fontSize: '13px', marginBottom: '16px' } as React.CSSProperties,
-  modalOverlay:{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998 },
-  modal:       { background: '#fff', borderRadius: '12px', padding: '28px', maxWidth: '420px', width: '90%', boxShadow: '0 8px 40px rgba(0,0,0,0.2)' } as React.CSSProperties,
-  modalTitle:  { margin: '0 0 12px', fontSize: '17px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
-  modalBody:   { fontSize: '13px', color: '#374151', marginBottom: '20px', lineHeight: 1.6 } as React.CSSProperties,
-  modalClose:  { padding: '8px 20px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 } as React.CSSProperties,
+  errorBanner:  { padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', color: '#b91c1c', fontSize: '13px', marginBottom: '16px' } as React.CSSProperties,
+  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998 },
+  modal:        { background: '#fff', borderRadius: 'var(--radius-xl)', padding: '28px', maxWidth: '420px', width: '90%', boxShadow: 'var(--shadow-lg)' } as React.CSSProperties,
+  modalTitle:   { margin: '0 0 12px', fontSize: '17px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
+  modalBody:    { fontSize: '13px', color: 'var(--color-text-primary)', marginBottom: '20px', lineHeight: 1.6 } as React.CSSProperties,
+  modalClose:   { padding: '8px 20px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600 } as React.CSSProperties,
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -98,10 +90,7 @@ const OrderEntryPage: React.FC = () => {
   const navigate      = useNavigate()
   const [params]      = useSearchParams()
 
-  // Clients for dropdown
-  const [clients, setClients] = useState<Client[]>([])
-
-  // Form state
+  const [clients,     setClients]     = useState<Client[]>([])
   const [clientId,    setClientId]    = useState('')
   const [symbol,      setSymbol]      = useState(params.get('symbol') ?? '')
   const [symbolInput, setSymbolInput] = useState(params.get('symbol') ?? '')
@@ -112,14 +101,12 @@ const OrderEntryPage: React.FC = () => {
   const [tif,         setTif]         = useState<TimeInForce>('DAY')
   const [expiryDate,  setExpiryDate]  = useState('')
 
-  // Remote data
   const [instruments,  setInstruments]  = useState<Instrument[]>([])
   const [quote,        setQuote]        = useState<Instrument | null>(null)
   const [portfolio,    setPortfolio]    = useState<Portfolio | null>(null)
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [holidays,     setHolidays]     = useState<Holiday[]>([])
 
-  // Submission state
   const [submitting,   setSubmitting]   = useState(false)
   const [submitError,  setSubmitError]  = useState<SubmitError | null>(null)
   const [showToast,    setShowToast]    = useState(false)
@@ -129,21 +116,19 @@ const OrderEntryPage: React.FC = () => {
 
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load instruments, holidays, and clients on mount
   useEffect(() => {
     getInstruments().then(setInstruments)
     getHolidays().then(setHolidays)
     getClients().then((list) => {
       setClients(list)
       if (list.length > 0) setClientId(list[0].clientId)
-    }).catch(() => { /* client dropdown stays empty */ })
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
     getPortfolio(clientId).then(setPortfolio).catch(() => setPortfolio(null))
   }, [clientId])
 
-  // Load quote when symbol changes (debounced)
   useEffect(() => {
     if (symbolDebounce.current) clearTimeout(symbolDebounce.current)
     if (!symbol) { setQuote(null); return }
@@ -151,7 +136,6 @@ const OrderEntryPage: React.FC = () => {
       setQuoteLoading(true)
       const q = await getInstrument(symbol)
       setQuote(q)
-      // Pre-fill limit price with ask (BUY) or bid (SELL)
       if (q && !limitPrice) {
         setLimitPrice(side === 'BUY' ? q.askPrice : q.bidPrice)
       }
@@ -159,17 +143,14 @@ const OrderEntryPage: React.FC = () => {
     }, 400)
   }, [symbol]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update limit price pre-fill when side or quote changes
   useEffect(() => {
     if (quote) setLimitPrice(side === 'BUY' ? quote.askPrice : quote.bidPrice)
   }, [side, quote])
 
-  // ── Filtered symbol suggestions ──────────────────────────────────────────
   const suggestions = symbolInput.length >= 1
     ? instruments.filter((i) => i.symbol.startsWith(symbolInput.toUpperCase())).slice(0, 6)
     : []
 
-  // ── Computed values ──────────────────────────────────────────────────────
   const qty        = parseInt(quantity, 10)
   const price      = orderType === 'LIMIT' ? parseFloat(limitPrice) : parseFloat(quote?.lastPrice ?? '0')
   const orderValue = !isNaN(qty) && !isNaN(price) ? qty * price : 0
@@ -177,21 +158,16 @@ const OrderEntryPage: React.FC = () => {
   const cashBalance   = portfolio ? parseFloat(portfolio.cashBalance) : 0
   const postOrderCash = side === 'BUY' ? cashBalance - orderValue : cashBalance + orderValue
   const bpUsedPct  = buyingPower > 0 ? Math.min((orderValue / buyingPower) * 100, 100) : 0
+  const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
+  const heldQty    = holding ? holding.quantity : 0
 
-  // Holding quantity for SELL check
-  const holding = portfolio?.holdings.find((h) => h.symbol === symbol)
-  const heldQty = holding ? holding.quantity : 0
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const isWeekendOrHoliday = (dateStr: string): boolean => {
     if (!dateStr) return false
-    // Parse as noon local to avoid timezone midnight-rollback
     const d = new Date(dateStr + 'T12:00:00')
     if (d.getDay() === 0 || d.getDay() === 6) return true
     return holidays.some((h) => h.holidayDate === dateStr)
   }
 
-  // ── Level 1 validation ───────────────────────────────────────────────────
   const checks = {
     symbol:     symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
     quantity:   !isNaN(qty) && qty > 0,
@@ -202,7 +178,6 @@ const OrderEntryPage: React.FC = () => {
 
   const allChecksPass = Object.values(checks).every(Boolean)
 
-  // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setFieldErrors({})
     setSubmitError(null)
@@ -219,7 +194,7 @@ const OrderEntryPage: React.FC = () => {
         quantity: qty,
         limitPrice: orderType === 'LIMIT' ? limitPrice : undefined,
         tif,
-        expiryDate:  tif === 'GTC' && expiryDate ? expiryDate : undefined,
+        expiryDate: tif === 'GTC' && expiryDate ? expiryDate : undefined,
       })
       setToastMsg(`Order ${res.orderId} submitted successfully`)
       setShowToast(true)
@@ -244,6 +219,14 @@ const OrderEntryPage: React.FC = () => {
       setSubmitting(false)
     }
   }
+
+  // Side-aware accent color
+  const sideAccent = side === 'BUY' ? 'var(--color-buy)' : 'var(--color-sell)'
+  const submitBg   = submitting || !allChecksPass
+    ? '#9ca3af'
+    : side === 'BUY'
+      ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
+      : 'linear-gradient(135deg, #db2777, #be185d)'
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -277,7 +260,6 @@ const OrderEntryPage: React.FC = () => {
         <div style={s.card}>
           <h2 style={s.cardTitle}>Order Details</h2>
 
-          {/* Error banner */}
           {submitError && submitError.type === 'MARKET_CLOSED' && (
             <div style={s.errorBanner}>Market is currently closed. {submitError.message}</div>
           )}
@@ -311,7 +293,12 @@ const OrderEntryPage: React.FC = () => {
               autoComplete="off"
             />
             {suggestions.length > 0 && symbolInput && symbolInput !== symbol && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100 }}>
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0,
+                background: '#fff', border: '1.5px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)',
+                zIndex: 100,
+              }}>
                 {suggestions.map((i) => (
                   <div
                     key={i.symbol}
@@ -319,12 +306,14 @@ const OrderEntryPage: React.FC = () => {
                     onMouseDown={() => { setSymbol(i.symbol); setSymbolInput(i.symbol) }}
                   >
                     <span style={{ fontWeight: 600 }}>{i.symbol}</span>
-                    <span style={{ color: '#6b7280' }}>{i.halted ? '⛔ HALTED' : `$${i.lastPrice}`}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {i.halted ? '⛔ HALTED' : `$${i.lastPrice}`}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
-            {quoteLoading && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Fetching quote…</div>}
+            {quoteLoading && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Fetching quote…</div>}
             {fieldErrors.symbol && <div style={s.errorText}>{fieldErrors.symbol}</div>}
           </div>
 
@@ -359,7 +348,7 @@ const OrderEntryPage: React.FC = () => {
             {fieldErrors.quantity && <div style={s.errorText}>{fieldErrors.quantity}</div>}
           </div>
 
-          {/* Limit Price — LIMIT only */}
+          {/* Limit Price */}
           {orderType === 'LIMIT' && (
             <div style={s.fieldGroup}>
               <label style={s.label}>Limit Price ($)</label>
@@ -383,7 +372,7 @@ const OrderEntryPage: React.FC = () => {
             </div>
           </div>
 
-          {/* GTD Date — GTC only */}
+          {/* Expiry Date */}
           {tif === 'GTC' && (
             <div style={s.fieldGroup}>
               <label style={s.label}>Expiry Date</label>
@@ -409,7 +398,18 @@ const OrderEntryPage: React.FC = () => {
           )}
 
           {/* Submit */}
-          <button style={s.submitBtn(submitting || !allChecksPass)} onClick={handleSubmit} disabled={submitting || !allChecksPass}>
+          <button
+            style={{
+              width: '100%', padding: '12px',
+              borderRadius: 'var(--radius-md)', border: 'none',
+              background: submitBg, color: '#fff',
+              fontSize: '15px', fontWeight: 700,
+              cursor: submitting || !allChecksPass ? 'not-allowed' : 'pointer',
+              marginTop: '8px', transition: 'opacity 0.2s',
+            }}
+            onClick={handleSubmit}
+            disabled={submitting || !allChecksPass}
+          >
             {submitting ? 'Submitting…' : 'Submit Order'}
           </button>
         </div>
@@ -417,13 +417,13 @@ const OrderEntryPage: React.FC = () => {
         {/* ── Right: Preview + Validation + Quote ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Order Preview */}
-          <div style={s.card}>
+          {/* Order Preview — side-accented top border */}
+          <div style={{ ...s.card, borderTop: `3px solid ${sideAccent}`, paddingTop: '21px' }}>
             <h2 style={s.cardTitle}>Order Preview</h2>
 
             <div style={s.row}>
-              <span style={s.rowLabel}>Estimated Value</span>
-              <span style={s.rowValue(true)}>{orderValue > 0 ? fmt(orderValue) : '—'}</span>
+              <span style={{ ...s.rowLabel, color: sideAccent, fontWeight: 600 }}>Estimated Value</span>
+              <span style={{ ...s.rowValue(true), color: sideAccent }}>{orderValue > 0 ? fmt(orderValue) : '—'}</span>
             </div>
             <div style={s.row}>
               <span style={s.rowLabel}>Cash Balance</span>
@@ -435,7 +435,7 @@ const OrderEntryPage: React.FC = () => {
             </div>
             <div style={s.row}>
               <span style={s.rowLabel}>Buying Power</span>
-              <span style={s.rowValue(true, '#059669')}>{portfolio ? fmt(portfolio.buyingPower) : '—'}</span>
+              <span style={s.rowValue(true, 'var(--color-success)')}>{portfolio ? fmt(portfolio.buyingPower) : '—'}</span>
             </div>
 
             {orderValue > 0 && (
@@ -443,12 +443,12 @@ const OrderEntryPage: React.FC = () => {
                 <div style={s.divider} />
                 <div style={s.row}>
                   <span style={s.rowLabel}>Post-order Cash</span>
-                  <span style={s.rowValue(true, postOrderCash < 0 ? '#ef4444' : '#1a2236')}>{fmt(postOrderCash)}</span>
+                  <span style={s.rowValue(true, postOrderCash < 0 ? 'var(--color-error)' : 'var(--color-text-primary)')}>{fmt(postOrderCash)}</span>
                 </div>
                 {side === 'BUY' && (
                   <div style={s.row}>
                     <span style={s.rowLabel}>Buying Power Used</span>
-                    <span style={s.rowValue(false, bpUsedPct > 80 ? '#d97706' : '#374151')}>{bpUsedPct.toFixed(1)}%</span>
+                    <span style={s.rowValue(false, bpUsedPct > 80 ? 'var(--color-warning)' : 'var(--color-text-secondary)')}>{bpUsedPct.toFixed(1)}%</span>
                   </div>
                 )}
                 {side === 'SELL' && (
@@ -461,18 +461,21 @@ const OrderEntryPage: React.FC = () => {
             )}
           </div>
 
-          {/* Level 1 Validation */}
+          {/* Validation */}
           <div style={s.card}>
             <h2 style={s.cardTitle}>Validation</h2>
             {[
-              { label: 'Symbol entered',                pass: checks.symbol },
-              { label: 'Quantity > 0',                  pass: checks.quantity },
-              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed', pass: checks.limitPrice },
-              { label: tif === 'GTC' ? 'Expiry date is a future trading day' : 'DAY order — no expiry needed', pass: checks.gtdDate },
-              { label: 'Symbol not halted',             pass: checks.notHalted },
+              { label: 'Symbol entered',                                                                                   pass: checks.symbol     },
+              { label: 'Quantity > 0',                                                                                     pass: checks.quantity   },
+              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                      pass: checks.limitPrice },
+              { label: tif === 'GTC'   ? 'Expiry date is a future trading day' : 'DAY order — no expiry needed',          pass: checks.gtdDate    },
+              { label: 'Symbol not halted',                                                                                pass: checks.notHalted  },
             ].map(({ label, pass }) => (
               <div key={label} style={s.checkRow}>
-                <span style={s.checkDot(pass)}>{pass ? '✓' : '✗'}</span>
+                {pass
+                  ? <CheckCircle size={14} strokeWidth={2} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
+                  : <XCircle    size={14} strokeWidth={2} style={{ color: 'var(--color-error)',   flexShrink: 0 }} />
+                }
                 <span style={s.checkText(pass)}>{label}</span>
               </div>
             ))}
@@ -482,9 +485,14 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.card}>
             <h2 style={s.cardTitle}>Market Quote</h2>
             {!quote && !quoteLoading && (
-              <div style={{ color: '#9ca3af', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
             )}
-            {quoteLoading && <div style={{ color: '#9ca3af', fontSize: '13px' }}>Loading quote…</div>}
+            {quoteLoading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton" style={{ height: '28px', width: '80px' }} />
+                <div className="skeleton" style={{ height: '36px', width: '120px' }} />
+              </div>
+            )}
             {quote && !quoteLoading && (
               <>
                 <div style={s.quoteSymbol}>
@@ -494,8 +502,8 @@ const OrderEntryPage: React.FC = () => {
                 <div style={s.quotePrice}>${quote.lastPrice}</div>
                 <div style={s.quoteMeta}>
                   {[
-                    { label: 'Bid',  value: `$${quote.bidPrice}` },
-                    { label: 'Ask',  value: `$${quote.askPrice}` },
+                    { label: 'Bid',     value: `$${quote.bidPrice}`           },
+                    { label: 'Ask',     value: `$${quote.askPrice}`           },
                     { label: 'Min Qty', value: quote.minQuantity.toLocaleString() },
                     { label: 'Max Qty', value: quote.maxQuantity.toLocaleString() },
                   ].map(({ label, value }) => (
@@ -509,7 +517,7 @@ const OrderEntryPage: React.FC = () => {
             )}
           </div>
 
-        </div>{/* end right col */}
+        </div>
       </div>
     </div>
   )
