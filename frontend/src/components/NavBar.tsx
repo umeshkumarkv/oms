@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { Bell, Plus, TrendingUp } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
+import { Bell, Menu, TrendingUp, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const getMarketStatus = (): { open: boolean; label: string } => {
@@ -17,8 +17,12 @@ const getInitials = (name: string): string => {
   return name.slice(0, 2).toUpperCase() || 'U'
 }
 
-const NavBar: React.FC = () => {
-  const navigate = useNavigate()
+interface NavBarProps {
+  onBurgerClick: () => void
+  sidebarCollapsed: boolean
+}
+
+const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
   const [market, setMarket] = useState(getMarketStatus())
   const { user: authUser, logout } = useAuth()
 
@@ -45,69 +49,62 @@ const NavBar: React.FC = () => {
       zIndex: 100,
     }}>
 
-      {/* Logo */}
-      <NavLink
-        to="/dashboard"
-        style={{
-          display: 'flex', alignItems: 'center', gap: '9px',
-          textDecoration: 'none', color: '#fff', flexShrink: 0,
-        }}
-      >
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: '28px', height: '28px',
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--color-primary)',
-        }}>
-          <TrendingUp size={15} strokeWidth={2.5} />
-        </div>
-        <span style={{ fontWeight: 700, fontSize: '15px', letterSpacing: '-0.01em' }}>
-          Broker OMS
-        </span>
-      </NavLink>
+      {/* Left: burger toggle + logo */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <button
+          onClick={onBurgerClick}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '32px',
+            height: '32px',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: 'rgba(255,255,255,0.07)',
+            color: 'rgba(255,255,255,0.5)',
+            cursor: 'pointer',
+            flexShrink: 0,
+            transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'rgba(255,255,255,0.12)'
+            el.style.color = '#fff'
+          }}
+          onMouseLeave={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'rgba(255,255,255,0.07)'
+            el.style.color = 'rgba(255,255,255,0.5)'
+          }}
+        >
+          {sidebarCollapsed ? <Menu size={16} /> : <X size={16} />}
+        </button>
 
-      {/* Centre navigation links */}
-      <div style={{ display: 'flex', alignItems: 'center', height: '52px' }}>
-        {[
-          { to: '/dashboard', label: 'Dashboard' },
-          { to: '/orders',    label: 'Blotter'    },
-          { to: '/market',    label: 'Market Data' },
-          { to: '/portfolio', label: 'Portfolio'  },
-          ...(role === 'ADMIN' ? [{ to: '/admin', label: 'Admin' }] : []),
-        ].map(({ to, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-          >
-            {label}
-          </NavLink>
-        ))}
+        <NavLink
+          to="/dashboard"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '9px',
+            textDecoration: 'none', color: '#fff', flexShrink: 0,
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '28px', height: '28px',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--color-primary)',
+          }}>
+            <TrendingUp size={15} strokeWidth={2.5} />
+          </div>
+          <span style={{ fontWeight: 700, fontSize: '15px', letterSpacing: '-0.01em' }}>
+            Broker OMS
+          </span>
+        </NavLink>
       </div>
 
       {/* Right section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-
-        {/* New Order CTA */}
-        <button
-          onClick={() => navigate('/orders/new')}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-md)',
-            border: 'none',
-            background: 'var(--color-primary)',
-            color: '#fff',
-            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            transition: 'background 0.15s',
-            flexShrink: 0,
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-primary-dark)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-primary)' }}
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          New Order
-        </button>
 
         {/* Market status pill */}
         <span style={{

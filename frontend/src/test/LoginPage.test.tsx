@@ -40,10 +40,10 @@ describe('LoginPage', () => {
   it('renders demo accounts footer', () => {
     renderLoginPage()
     expect(screen.getByText(/demo accounts/i)).toBeInTheDocument()
-    expect(screen.getByText('trader01')).toBeInTheDocument()
-    expect(screen.getByText('trader02')).toBeInTheDocument()
-    expect(screen.getByText('viewer01')).toBeInTheDocument()
-    expect(screen.getByText('admin01')).toBeInTheDocument()
+    expect(screen.getByText('trader.john')).toBeInTheDocument()
+    expect(screen.getByText('trader.sarah')).toBeInTheDocument()
+    expect(screen.getByText('ops.manager')).toBeInTheDocument()
+    expect(screen.getByText('admin.user')).toBeInTheDocument()
   })
 
   it('sign in button is disabled when fields are empty', () => {
@@ -120,7 +120,7 @@ describe('LoginPage', () => {
 
   it('clicking demo account button fills in username', async () => {
     renderLoginPage()
-    await userEvent.click(screen.getByText('trader01'))
-    expect(screen.getByLabelText(/username/i)).toHaveValue('trader01')
+    await userEvent.click(screen.getByText('trader.john'))
+    expect(screen.getByLabelText(/username/i)).toHaveValue('trader.john')
   })
 })

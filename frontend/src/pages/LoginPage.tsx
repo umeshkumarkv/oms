@@ -4,7 +4,12 @@ import { CheckCircle, Eye, EyeOff, TrendingUp } from 'lucide-react'
 import { login as apiLogin } from '../api/authApi'
 import { useAuth } from '../context/AuthContext'
 
-const DEMO_ACCOUNTS = ['trader01', 'trader02', 'viewer01', 'admin01']
+const DEMO_ACCOUNTS = [
+  { username: 'trader.john',  role: 'TRADER'     },
+  { username: 'trader.sarah', role: 'TRADER'     },
+  { username: 'ops.manager',  role: 'OPERATIONS' },
+  { username: 'admin.user',   role: 'ADMIN'      },
+]
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -326,12 +331,13 @@ const LoginPage: React.FC = () => {
               Demo accounts
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-              {DEMO_ACCOUNTS.map(a => (
+              {DEMO_ACCOUNTS.map(({ username: u, role }) => (
                 <button
-                  key={a}
+                  key={u}
                   type="button"
-                  onClick={() => setUsername(a)}
+                  onClick={() => setUsername(u)}
                   tabIndex={-1}
+                  title={role}
                   style={{
                     padding: '4px 11px',
                     borderRadius: 'var(--radius-pill)',
@@ -353,7 +359,7 @@ const LoginPage: React.FC = () => {
                     b.style.borderColor = 'var(--color-border)'
                   }}
                 >
-                  {a}
+                  {u}
                 </button>
               ))}
             </div>

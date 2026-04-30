@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { getExecutions, GetOrdersParams, getOrders } from '../api/orderApi'
 import { getOrderAudit } from '../api/auditApi'
 import { getClients } from '../api/clientApi'
@@ -259,8 +258,6 @@ const StatusDropdown: React.FC<StatusDropdownProps> = ({ selected, onToggle, onC
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const OrderBlotterPage: React.FC = () => {
-  const navigate = useNavigate()
-
   const [orders,      setOrders]      = useState<OrderSummary[]>([])
   const [loading,     setLoading]     = useState(true)
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set())
@@ -273,8 +270,6 @@ const OrderBlotterPage: React.FC = () => {
   const [filterStatuses, setFilterStatuses] = useState<OrderStatus[]>([])
   const [filterTif,      setFilterTif]      = useState<'ALL' | 'DAY' | 'GTC'>('ALL')
   const [filterSide,     setFilterSide]     = useState<'ALL' | 'BUY' | 'SELL'>('ALL')
-  const [filterDateFrom, setFilterDateFrom] = useState('')
-  const [filterDateTo,   setFilterDateTo]   = useState('')
 
   const [page,     setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(25)
@@ -347,8 +342,6 @@ const OrderBlotterPage: React.FC = () => {
     if (filterStatuses.length > 0 && !filterStatuses.includes(o.status)) return false
     if (filterTif  !== 'ALL' && o.timeInForce !== filterTif)  return false
     if (filterSide !== 'ALL' && o.side !== filterSide)        return false
-    if (filterDateFrom && new Date(o.createdAt) < new Date(filterDateFrom + 'T00:00:00')) return false
-    if (filterDateTo   && new Date(o.createdAt) > new Date(filterDateTo   + 'T23:59:59')) return false
     return true
   })
 
@@ -356,7 +349,7 @@ const OrderBlotterPage: React.FC = () => {
   const totalPages    = Math.max(1, Math.ceil(totalFiltered / pageSize))
   const pagedOrders   = filteredOrders.slice((page - 1) * pageSize, page * pageSize)
 
-  useEffect(() => { setPage(1) }, [searchText, filterStatuses, filterTif, filterSide, filterDateFrom, filterDateTo])
+  useEffect(() => { setPage(1) }, [searchText, filterStatuses, filterTif, filterSide])
 
   const handleExportCsv = () => {
     const headers = ['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit Price', 'Status', 'Filled Qty', 'Avg Fill Price', 'TIF', 'Created At']
@@ -396,15 +389,10 @@ const OrderBlotterPage: React.FC = () => {
             {' · '}auto-refresh every 15s
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={s.wsPill(wsConnected)}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsConnected ? '#10b981' : '#9ca3af', display: 'inline-block' }} />
-            {wsConnected ? 'Live' : 'Polling'}
-          </span>
-          <button style={s.btn('primary')} onClick={() => navigate('/orders/new')}>
-            + New Order
-          </button>
-        </div>
+        <span style={s.wsPill(wsConnected)}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsConnected ? '#10b981' : '#9ca3af', display: 'inline-block' }} />
+          {wsConnected ? 'Live' : 'Polling'}
+        </span>
       </div>
 
       {/* Filter Toolbar */}
@@ -440,12 +428,6 @@ const OrderBlotterPage: React.FC = () => {
             ))}
           </div>
         </div>
-
-        <input style={{ ...s.input, width: '130px' }} type="date" value={filterDateFrom} title="From date"
-          onChange={e => setFilterDateFrom(e.target.value)} />
-        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>–</span>
-        <input style={{ ...s.input, width: '130px' }} type="date" value={filterDateTo} title="To date"
-          onChange={e => setFilterDateTo(e.target.value)} />
 
         <div style={{ flex: 1 }} />
 
