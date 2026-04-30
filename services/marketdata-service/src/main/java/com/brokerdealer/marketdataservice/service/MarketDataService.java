@@ -1,10 +1,12 @@
 package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
+import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
@@ -41,6 +43,7 @@ public class MarketDataService {
 
     private final InstrumentRepository instrumentRepository;
     private final InstrumentMapper instrumentMapper;
+    private final InstrumentSummaryMapper instrumentSummaryMapper;
     private final MarketHolidayRepository marketHolidayRepository;
     private final MarketHolidayMapper marketHolidayMapper;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -110,11 +113,11 @@ public class MarketDataService {
                 .toList();
     }
 
-    public List<InstrumentResponse> getInstruments() {
+    public List<InstrumentSummaryResponse> getInstruments() {
         log.debug("Fetching all instruments");
-        return instrumentRepository.findAll()
+        return instrumentRepository.findAllByOrderBySymbolAsc()
                 .stream()
-                .map(instrumentMapper::toResponse)
+                .map(instrumentSummaryMapper::toSummary)
                 .toList();
     }
 

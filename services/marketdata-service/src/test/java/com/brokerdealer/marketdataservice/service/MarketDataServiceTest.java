@@ -3,10 +3,12 @@ package com.brokerdealer.marketdataservice.service;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.domain.MarketHoliday;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
+import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
@@ -40,6 +42,9 @@ class MarketDataServiceTest {
 
     @Mock
     private InstrumentMapper instrumentMapper;
+
+    @Mock
+    private InstrumentSummaryMapper instrumentSummaryMapper;
 
     @Mock
     private MarketHolidayRepository marketHolidayRepository;
@@ -303,14 +308,14 @@ class MarketDataServiceTest {
     // --- getInstruments ---
 
     @Test
-    void shouldReturnInstrumentListWithFullPriceData() {
+    void shouldReturnInstrumentSummaryList() {
         Instrument instrument = buildInstrument("AAPL", false);
-        InstrumentResponse response = buildResponse("AAPL", false);
+        InstrumentSummaryResponse summary = buildSummaryResponse("AAPL", false);
 
-        when(instrumentRepository.findAll()).thenReturn(List.of(instrument));
-        when(instrumentMapper.toResponse(instrument)).thenReturn(response);
+        when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(instrument));
+        when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(summary);
 
-        List<InstrumentResponse> result = marketDataService.getInstruments();
+        List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
@@ -319,8 +324,40 @@ class MarketDataServiceTest {
         assertThat(result.get(0).getLastPrice()).isEqualTo("175.00");
         assertThat(result.get(0).getBidPrice()).isEqualTo("174.95");
         assertThat(result.get(0).getAskPrice()).isEqualTo("175.05");
-        assertThat(result.get(0).getMinQuantity()).isEqualTo(1);
-        assertThat(result.get(0).getMaxQuantity()).isEqualTo(10000);
+    }
+
+    @Test
+    void shouldReturnInstrumentsSortedAlphabeticallyBySymbol() {
+        Instrument msft = buildInstrument("MSFT", false);
+        Instrument aapl = buildInstrument("AAPL", false);
+        InstrumentSummaryResponse msftSummary = buildSummaryResponse("MSFT", false);
+        InstrumentSummaryResponse aaplSummary = buildSummaryResponse("AAPL", false);
+
+        // Repository returns pre-sorted list (ORDER BY symbol ASC)
+        when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(aapl, msft));
+        when(instrumentSummaryMapper.toSummary(aapl)).thenReturn(aaplSummary);
+        when(instrumentSummaryMapper.toSummary(msft)).thenReturn(msftSummary);
+
+        List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+        assertThat(result.get(1).getSymbol()).isEqualTo("MSFT");
+    }
+
+    @Test
+    void shouldReturnHaltedTrueForHaltInstrumentInSummaryList() {
+        Instrument haltInstrument = buildInstrument("HALT", true);
+        InstrumentSummaryResponse haltSummary = buildSummaryResponse("HALT", true);
+
+        when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(haltInstrument));
+        when(instrumentSummaryMapper.toSummary(haltInstrument)).thenReturn(haltSummary);
+
+        List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("HALT");
+        assertThat(result.get(0).getHalted()).isTrue();
     }
 
     // --- helpers ---
@@ -350,6 +387,17 @@ class MarketDataServiceTest {
                 .minQuantity(1)
                 .maxQuantity(10000)
                 .dataTimestamp(Instant.now().toString())
+                .build();
+    }
+
+    private InstrumentSummaryResponse buildSummaryResponse(String symbol, boolean halted) {
+        return InstrumentSummaryResponse.builder()
+                .symbol(symbol)
+                .bidPrice("174.95")
+                .askPrice("175.05")
+                .lastPrice("175.00")
+                .tradable(true)
+                .halted(halted)
                 .build();
     }
 }
