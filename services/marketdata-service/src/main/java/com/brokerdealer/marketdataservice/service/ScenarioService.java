@@ -4,6 +4,7 @@ import com.brokerdealer.marketdataservice.config.ScenarioConfig;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.dto.request.ScenarioRequest;
 import com.brokerdealer.marketdataservice.dto.response.ScenarioResponse;
+import com.brokerdealer.marketdataservice.exception.ScenarioAlreadyActiveException;
 import com.brokerdealer.marketdataservice.exception.ScenarioNotFoundException;
 import com.brokerdealer.marketdataservice.exception.SymbolHaltedException;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
@@ -52,6 +53,11 @@ public class ScenarioService {
                 .divide(BigDecimal.valueOf(definition.getTicks()), 4, RoundingMode.HALF_UP);
         BigDecimal incrementPerTick = isPositive ? rawIncrement : rawIncrement.negate();
 
+        if (activeScenarios.containsKey(symbol)) {
+            throw new ScenarioAlreadyActiveException("SCENARIO_ALREADY_ACTIVE",
+                    "A scenario is already active for symbol: " + symbol);
+        }
+
         ScenarioState state = new ScenarioState(scenarioId, symbol, incrementPerTick, definition.getTicks());
         activeScenarios.put(symbol, state);
 
@@ -68,6 +74,11 @@ public class ScenarioService {
 
     public boolean hasActiveScenario(String symbol) {
         return activeScenarios.containsKey(symbol);
+    }
+
+    public void clearAllScenarios() {
+        activeScenarios.clear();
+        log.info("All active scenarios cleared by admin reset");
     }
 
     /**

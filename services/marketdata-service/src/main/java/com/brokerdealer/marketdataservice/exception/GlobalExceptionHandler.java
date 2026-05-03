@@ -28,6 +28,12 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(ScenarioAlreadyActiveException.class)
+    public ResponseEntity<Map<String, Object>> handleScenarioAlreadyActiveException(ScenarioAlreadyActiveException ex) {
+        log.warn("Scenario already active: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(SymbolHaltedException.class)
     public ResponseEntity<Map<String, Object>> handleSymbolHaltedException(SymbolHaltedException ex) {
         log.warn("Symbol halted: code={} message={}", ex.getErrorCode(), ex.getMessage());
