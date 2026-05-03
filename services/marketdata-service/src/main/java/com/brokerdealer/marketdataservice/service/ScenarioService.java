@@ -31,6 +31,12 @@ public class ScenarioService {
         String scenarioId = request.getScenarioId();
         String symbol = request.getSymbol().toUpperCase();
 
+        // Fast in-memory guard before any DB calls
+        if (activeScenarios.containsKey(symbol)) {
+            throw new ScenarioAlreadyActiveException("SCENARIO_ALREADY_ACTIVE",
+                    "A scenario is already active for symbol: " + symbol);
+        }
+
         ScenarioConfig.ScenarioDefinition definition = scenarioConfig.getItems().get(scenarioId);
         if (definition == null) {
             throw new ScenarioNotFoundException("SCENARIO_NOT_FOUND", "Scenario not found: " + scenarioId);
@@ -53,13 +59,12 @@ public class ScenarioService {
                 .divide(BigDecimal.valueOf(definition.getTicks()), 4, RoundingMode.HALF_UP);
         BigDecimal incrementPerTick = isPositive ? rawIncrement : rawIncrement.negate();
 
-        if (activeScenarios.containsKey(symbol)) {
+        ScenarioState state = new ScenarioState(scenarioId, symbol, incrementPerTick, definition.getTicks());
+        // putIfAbsent is atomic — eliminates the TOCTOU race between containsKey and put
+        if (activeScenarios.putIfAbsent(symbol, state) != null) {
             throw new ScenarioAlreadyActiveException("SCENARIO_ALREADY_ACTIVE",
                     "A scenario is already active for symbol: " + symbol);
         }
-
-        ScenarioState state = new ScenarioState(scenarioId, symbol, incrementPerTick, definition.getTicks());
-        activeScenarios.put(symbol, state);
 
         log.info("Scenario started: scenarioId={} symbol={} ticks={} incrementPerTick={}",
                 scenarioId, symbol, definition.getTicks(), incrementPerTick.toPlainString());

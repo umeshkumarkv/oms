@@ -6,6 +6,7 @@ import com.brokerdealer.marketdataservice.dto.response.ScenarioResponse;
 import com.brokerdealer.marketdataservice.exception.AccessForbiddenException;
 import com.brokerdealer.marketdataservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.marketdataservice.exception.ScenarioAlreadyActiveException;
+import com.brokerdealer.marketdataservice.exception.ValidationException;
 import com.brokerdealer.marketdataservice.exception.ScenarioNotFoundException;
 import com.brokerdealer.marketdataservice.exception.SymbolHaltedException;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
@@ -49,7 +50,7 @@ class AdminControllerTest {
             """;
 
     // =========================================================
-    // POST /admin/scenario
+    // POST /api/v1/admin/scenario
     // =========================================================
 
     @Test
@@ -62,8 +63,8 @@ class AdminControllerTest {
                 .build();
         when(scenarioService.startScenario(any())).thenReturn(response);
 
-        mockMvc.perform(post("/admin/scenario")
-                        .header("X-User-Role", "ADMIN")
+        mockMvc.perform(post("/api/v1/admin/scenario")
+                        .header("Authorization", "Bearer valid-admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_SCENARIO_BODY))
                 .andExpect(status().isOk())
@@ -81,7 +82,7 @@ class AdminControllerTest {
                 .thenThrow(new ScenarioAlreadyActiveException("SCENARIO_ALREADY_ACTIVE",
                         "A scenario is already active for symbol: AAPL"));
 
-        mockMvc.perform(post("/admin/scenario")
+        mockMvc.perform(post("/api/v1/admin/scenario")
                         .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_SCENARIO_BODY))
@@ -95,8 +96,8 @@ class AdminControllerTest {
         doThrow(new AccessForbiddenException("FORBIDDEN", "Insufficient role: ADMIN required"))
                 .when(roleGuard).requireRole(any(), eq("ADMIN"));
 
-        mockMvc.perform(post("/admin/scenario")
-                        .header("X-User-Role", "TRADER")
+        mockMvc.perform(post("/api/v1/admin/scenario")
+                        .header("Authorization", "Bearer trader-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_SCENARIO_BODY))
                 .andExpect(status().isForbidden())
@@ -109,7 +110,7 @@ class AdminControllerTest {
         doThrow(new AccessForbiddenException("UNAUTHORIZED", "X-User-Role header is required"))
                 .when(roleGuard).requireRole(any(), eq("ADMIN"));
 
-        mockMvc.perform(post("/admin/scenario")
+        mockMvc.perform(post("/api/v1/admin/scenario")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_SCENARIO_BODY))
                 .andExpect(status().isUnauthorized())
@@ -121,8 +122,8 @@ class AdminControllerTest {
         when(scenarioService.startScenario(any()))
                 .thenThrow(new ScenarioNotFoundException("SCENARIO_NOT_FOUND", "Scenario not found: SCN-UNKNOWN"));
 
-        mockMvc.perform(post("/admin/scenario")
-                        .header("X-User-Role", "ADMIN")
+        mockMvc.perform(post("/api/v1/admin/scenario")
+                        .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"SCN-UNKNOWN","symbol":"AAPL"}
@@ -138,8 +139,8 @@ class AdminControllerTest {
         when(scenarioService.startScenario(any()))
                 .thenThrow(new SymbolNotFoundException("SYMBOL_NOT_FOUND", "Symbol not found: ZZZZ"));
 
-        mockMvc.perform(post("/admin/scenario")
-                        .header("X-User-Role", "ADMIN")
+        mockMvc.perform(post("/api/v1/admin/scenario")
+                        .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"SCN-AAPL-RISE-5PCT","symbol":"ZZZZ"}
@@ -154,8 +155,8 @@ class AdminControllerTest {
                 .thenThrow(new SymbolHaltedException("SYMBOL_HALTED",
                         "Symbol is halted and cannot have a scenario triggered: HALT"));
 
-        mockMvc.perform(post("/admin/scenario")
-                        .header("X-User-Role", "ADMIN")
+        mockMvc.perform(post("/api/v1/admin/scenario")
+                        .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"SCN-AAPL-RISE-5PCT","symbol":"HALT"}
@@ -167,8 +168,8 @@ class AdminControllerTest {
 
     @Test
     void shouldReturn400WhenScenarioRequestBodyIsInvalid() throws Exception {
-        mockMvc.perform(post("/admin/scenario")
-                        .header("X-User-Role", "ADMIN")
+        mockMvc.perform(post("/api/v1/admin/scenario")
+                        .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"","symbol":"AAPL"}
@@ -177,7 +178,7 @@ class AdminControllerTest {
     }
 
     // =========================================================
-    // POST /admin/reset
+    // POST /api/v1/admin/reset
     // =========================================================
 
     @Test
@@ -186,9 +187,9 @@ class AdminControllerTest {
                 .status("RESET_COMPLETE")
                 .timestamp(Instant.now().toString())
                 .build();
-        when(adminResetService.reset()).thenReturn(response);
+        when(adminResetService.reset(true)).thenReturn(response);
 
-        mockMvc.perform(post("/admin/reset")
+        mockMvc.perform(post("/api/v1/admin/reset")
                         .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -203,7 +204,11 @@ class AdminControllerTest {
 
     @Test
     void shouldReturn400WhenConfirmResetIsFalse() throws Exception {
-        mockMvc.perform(post("/admin/reset")
+        doThrow(new ValidationException("RESET_NOT_CONFIRMED",
+                "confirmReset must be true to proceed with market data reset"))
+                .when(adminResetService).reset(false);
+
+        mockMvc.perform(post("/api/v1/admin/reset")
                         .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -215,7 +220,11 @@ class AdminControllerTest {
 
     @Test
     void shouldReturn400WhenConfirmResetIsAbsent() throws Exception {
-        mockMvc.perform(post("/admin/reset")
+        doThrow(new ValidationException("RESET_NOT_CONFIRMED",
+                "confirmReset must be true to proceed with market data reset"))
+                .when(adminResetService).reset(null);
+
+        mockMvc.perform(post("/api/v1/admin/reset")
                         .header("Authorization", "Bearer admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -228,7 +237,7 @@ class AdminControllerTest {
         doThrow(new AccessForbiddenException("FORBIDDEN", "Insufficient role: ADMIN required"))
                 .when(roleGuard).requireRole(any(), eq("ADMIN"));
 
-        mockMvc.perform(post("/admin/reset")
+        mockMvc.perform(post("/api/v1/admin/reset")
                         .header("Authorization", "Bearer trader-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

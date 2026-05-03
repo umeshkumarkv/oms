@@ -2,6 +2,7 @@ package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.dto.response.ResetResponse;
+import com.brokerdealer.marketdataservice.exception.ValidationException;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,10 +36,24 @@ class AdminResetServiceTest {
     private AdminResetService adminResetService;
 
     @Test
+    void shouldThrowValidationExceptionWhenConfirmResetIsFalse() {
+        assertThatThrownBy(() -> adminResetService.reset(false))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("confirmReset");
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenConfirmResetIsNull() {
+        assertThatThrownBy(() -> adminResetService.reset(null))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("confirmReset");
+    }
+
+    @Test
     void shouldReturnResetCompleteStatus() {
         when(instrumentRepository.findAll()).thenReturn(List.of());
 
-        ResetResponse response = adminResetService.reset();
+        ResetResponse response = adminResetService.reset(true);
 
         assertThat(response.getStatus()).isEqualTo("RESET_COMPLETE");
         assertThat(response.getTimestamp()).isNotNull();
@@ -51,7 +67,7 @@ class AdminResetServiceTest {
 
         when(instrumentRepository.findAll()).thenReturn(List.of(aapl));
 
-        adminResetService.reset();
+        adminResetService.reset(true);
 
         assertThat(aapl.getLastPrice()).isEqualByComparingTo(new BigDecimal("175.00"));
         assertThat(aapl.getBidPrice()).isEqualByComparingTo(new BigDecimal("174.95"));
@@ -69,7 +85,7 @@ class AdminResetServiceTest {
 
         when(instrumentRepository.findAll()).thenReturn(List.of(aapl));
 
-        adminResetService.reset();
+        adminResetService.reset(true);
 
         assertThat(aapl.getDayHigh()).isNull();
         assertThat(aapl.getDayLow()).isNull();
@@ -88,7 +104,7 @@ class AdminResetServiceTest {
 
         when(instrumentRepository.findAll()).thenReturn(List.of(aapl, msft));
 
-        adminResetService.reset();
+        adminResetService.reset(true);
 
         verify(redisTemplate).delete("market:price:AAPL");
         verify(redisTemplate).delete("market:price:MSFT");
@@ -98,7 +114,7 @@ class AdminResetServiceTest {
     void shouldClearAllActiveScenarios() {
         when(instrumentRepository.findAll()).thenReturn(List.of());
 
-        adminResetService.reset();
+        adminResetService.reset(true);
 
         verify(scenarioService).clearAllScenarios();
     }
@@ -111,8 +127,9 @@ class AdminResetServiceTest {
 
         when(instrumentRepository.findAll()).thenReturn(List.of(aapl));
 
-        adminResetService.reset();
+        adminResetService.reset(true);
 
+        @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Instrument>> captor = ArgumentCaptor.forClass(List.class);
         verify(instrumentRepository).saveAll(captor.capture());
         assertThat(captor.getValue()).hasSize(1);
@@ -134,9 +151,9 @@ class AdminResetServiceTest {
 
         when(instrumentRepository.findAll()).thenReturn(List.of(noSeed));
 
-        adminResetService.reset();
+        adminResetService.reset(true);
 
-        // price should remain unchanged since seed is null
+        // price remains unchanged — seed not set, no reset applied
         assertThat(noSeed.getLastPrice()).isEqualByComparingTo(new BigDecimal("100.00"));
     }
 

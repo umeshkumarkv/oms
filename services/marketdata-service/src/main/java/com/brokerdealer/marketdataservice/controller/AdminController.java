@@ -5,7 +5,6 @@ import com.brokerdealer.marketdataservice.dto.request.ResetRequest;
 import com.brokerdealer.marketdataservice.dto.request.ScenarioRequest;
 import com.brokerdealer.marketdataservice.dto.response.ResetResponse;
 import com.brokerdealer.marketdataservice.dto.response.ScenarioResponse;
-import com.brokerdealer.marketdataservice.exception.ValidationException;
 import com.brokerdealer.marketdataservice.service.AdminResetService;
 import com.brokerdealer.marketdataservice.service.ScenarioService;
 import jakarta.validation.Valid;
@@ -19,7 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/admin")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 @Slf4j
 public class AdminController {
@@ -43,12 +42,8 @@ public class AdminController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody ResetRequest request) {
         roleGuard.requireRole(authHeader, "ADMIN");
-        if (!Boolean.TRUE.equals(request.getConfirmReset())) {
-            throw new ValidationException("RESET_NOT_CONFIRMED",
-                    "confirmReset must be true to proceed with market data reset");
-        }
         log.info("Admin market data reset initiated");
-        ResetResponse data = adminResetService.reset();
+        ResetResponse data = adminResetService.reset(request.getConfirmReset());
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
