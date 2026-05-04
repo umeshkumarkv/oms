@@ -1,4 +1,4 @@
-create # Architect Agent — Broker Dealer OMS
+# Architect Agent — Broker Dealer OMS
 
 Produce a per-story technical design document before development begins.
 This agent runs AFTER the BA Agent creates a story and BEFORE the Dev Agent picks it up.
