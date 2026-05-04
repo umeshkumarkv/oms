@@ -41,7 +41,7 @@ class AdminControllerTest {
             """;
 
     @Test
-    void shouldReturn200WhenScenarioStartedSuccessfully() throws Exception {
+    void shouldReturn200WhenAdminStartsScenario() throws Exception {
         ScenarioResponse response = ScenarioResponse.builder()
                 .status("SCENARIO_STARTED")
                 .scenarioId("SCN-AAPL-RISE-5PCT")
@@ -51,7 +51,7 @@ class AdminControllerTest {
         when(scenarioService.startScenario(any())).thenReturn(response);
 
         mockMvc.perform(post("/admin/scenario")
-                        .header("Authorization", "Bearer valid-admin-token")
+                        .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
                 .andExpect(status().isOk())
@@ -69,7 +69,7 @@ class AdminControllerTest {
                 .when(roleGuard).requireRole(any(), eq("ADMIN"));
 
         mockMvc.perform(post("/admin/scenario")
-                        .header("Authorization", "Bearer trader-token")
+                        .header("X-User-Role", "TRADER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
                 .andExpect(status().isForbidden())
@@ -78,8 +78,8 @@ class AdminControllerTest {
     }
 
     @Test
-    void shouldReturn401WhenAuthorizationHeaderMissing() throws Exception {
-        doThrow(new AccessForbiddenException("UNAUTHORIZED", "Authorization header missing or invalid"))
+    void shouldReturn401WhenRoleHeaderMissing() throws Exception {
+        doThrow(new AccessForbiddenException("UNAUTHORIZED", "X-User-Role header is required"))
                 .when(roleGuard).requireRole(any(), eq("ADMIN"));
 
         mockMvc.perform(post("/admin/scenario")
@@ -95,7 +95,7 @@ class AdminControllerTest {
                 .thenThrow(new ScenarioNotFoundException("SCENARIO_NOT_FOUND", "Scenario not found: SCN-UNKNOWN"));
 
         mockMvc.perform(post("/admin/scenario")
-                        .header("Authorization", "Bearer admin-token")
+                        .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"SCN-UNKNOWN","symbol":"AAPL"}
@@ -112,7 +112,7 @@ class AdminControllerTest {
                 .thenThrow(new SymbolNotFoundException("SYMBOL_NOT_FOUND", "Symbol not found: ZZZZ"));
 
         mockMvc.perform(post("/admin/scenario")
-                        .header("Authorization", "Bearer admin-token")
+                        .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"SCN-AAPL-RISE-5PCT","symbol":"ZZZZ"}
@@ -128,7 +128,7 @@ class AdminControllerTest {
                         "Symbol is halted and cannot have a scenario triggered: HALT"));
 
         mockMvc.perform(post("/admin/scenario")
-                        .header("Authorization", "Bearer admin-token")
+                        .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"SCN-AAPL-RISE-5PCT","symbol":"HALT"}
@@ -141,7 +141,7 @@ class AdminControllerTest {
     @Test
     void shouldReturn400WhenRequestBodyIsInvalid() throws Exception {
         mockMvc.perform(post("/admin/scenario")
-                        .header("Authorization", "Bearer admin-token")
+                        .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"scenarioId":"","symbol":"AAPL"}

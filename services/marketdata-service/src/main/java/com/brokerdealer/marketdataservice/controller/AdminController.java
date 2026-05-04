@@ -25,9 +25,9 @@ public class AdminController {
 
     @PostMapping("/scenario")
     public ResponseEntity<Map<String, Object>> startScenario(
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String roleHeader,
             @RequestBody @Valid ScenarioRequest request) {
-        roleGuard.requireRole(authHeader, "ADMIN");
+        roleGuard.requireRole(roleHeader, "ADMIN");
         log.info("Admin scenario request: scenarioId={} symbol={}", request.getScenarioId(), request.getSymbol());
         ScenarioResponse data = scenarioService.startScenario(request);
         return ResponseEntity.ok(buildSuccessResponse(data));
