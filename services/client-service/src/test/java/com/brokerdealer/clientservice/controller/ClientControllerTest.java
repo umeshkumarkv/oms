@@ -56,6 +56,7 @@ class ClientControllerTest {
         when(clientService.getClient(CLIENT_001)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/clients/{id}", CLIENT_001)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.clientId").value(CLIENT_001.toString()))
@@ -76,6 +77,7 @@ class ClientControllerTest {
                         "Client not found: " + unknownId));
 
         mockMvc.perform(get("/api/v1/clients/{id}", unknownId)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
@@ -98,6 +100,7 @@ class ClientControllerTest {
         when(clientService.getClient(client003)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/clients/{id}", client003)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tradingEnabled").value(false));
@@ -119,6 +122,7 @@ class ClientControllerTest {
         when(clientService.getClient(client004)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/clients/{id}", client004)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("BLOCKED"));
@@ -140,6 +144,7 @@ class ClientControllerTest {
         when(clientService.getClient(client005)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/clients/{id}", client005)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.kycStatus").value("EXPIRED"));
@@ -165,6 +170,7 @@ class ClientControllerTest {
         when(clientService.getPortfolio(CLIENT_001)).thenReturn(portfolio);
 
         mockMvc.perform(get("/api/v1/clients/{id}/portfolio", CLIENT_001)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cashBalance").value("100000.00"))
@@ -192,6 +198,7 @@ class ClientControllerTest {
         when(clientService.getPortfolio(client005)).thenReturn(portfolio);
 
         mockMvc.perform(get("/api/v1/clients/{id}/portfolio", client005)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.holdings").isArray())
@@ -218,6 +225,7 @@ class ClientControllerTest {
         when(clientService.getPortfolio(CLIENT_001)).thenReturn(portfolio);
 
         mockMvc.perform(get("/api/v1/clients/{id}/portfolio", CLIENT_001)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.holdings[0].symbol").value("AAPL"))
@@ -232,6 +240,7 @@ class ClientControllerTest {
                         "Client not found: " + unknownId));
 
         mockMvc.perform(get("/api/v1/clients/{id}/portfolio", unknownId)
+                        .header("X-User-Role", "TRADER")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
