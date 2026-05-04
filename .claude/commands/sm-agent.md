@@ -72,7 +72,30 @@ Run every check below. A ticket that fails a check is "flagged".
   SM Agent ({date}): This ticket has no acceptance criteria. The BA Agent or architect should add ACs before development begins.
   ```
 
-### Check 6: Sprint Velocity
+### Check 6: Definition of Done (DoD) Gate
+For every ticket in **In Review** status, verify the DoD before it can be marked Done:
+
+```
+DEFINITION OF DONE — SCRUM-{n}
+  [x] All acceptance criteria pass (QA Agent report: PASSED)
+  [x] PR has been code-reviewed and approved (label: bmad-code-review-approved OR PR reviewDecision = APPROVED)
+  [x] mvn test passes (0 failures on CI)
+  [x] JaCoCo >= 80% line coverage
+  [x] PR merged to develop
+  [x] JIRA ticket in In Review (not skipped from In Progress)
+  [x] No open follow-up bugs created by QA Agent
+```
+
+If a ticket in In Review is missing any DoD item:
+- Flag it as NEEDS ATTENTION
+- Add JIRA comment:
+  ```
+  SM Agent ({date}): DoD check failed. Missing: {list items}.
+  Ticket cannot be closed as Done until all DoD items are met.
+  ```
+- Do NOT transition the ticket to Done
+
+### Check 7: Sprint Velocity
 - Current sprint: count Done tickets and sum story points if available
 - Previous sprint: same
 - Calculate: on track / ahead / behind
