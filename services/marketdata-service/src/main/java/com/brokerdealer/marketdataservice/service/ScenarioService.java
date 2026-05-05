@@ -4,6 +4,7 @@ import com.brokerdealer.marketdataservice.config.ScenarioConfig;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.dto.request.ScenarioRequest;
 import com.brokerdealer.marketdataservice.dto.response.ScenarioResponse;
+import com.brokerdealer.marketdataservice.exception.ScenarioAlreadyActiveException;
 import com.brokerdealer.marketdataservice.exception.ScenarioNotFoundException;
 import com.brokerdealer.marketdataservice.exception.SymbolHaltedException;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
@@ -30,6 +31,12 @@ public class ScenarioService {
         String scenarioId = request.getScenarioId();
         String symbol = request.getSymbol().toUpperCase();
 
+        // Fast in-memory guard before any DB calls
+        if (activeScenarios.containsKey(symbol)) {
+            throw new ScenarioAlreadyActiveException("SCENARIO_ALREADY_ACTIVE",
+                    "A scenario is already active for symbol: " + symbol);
+        }
+
         ScenarioConfig.ScenarioDefinition definition = scenarioConfig.getItems().get(scenarioId);
         if (definition == null) {
             throw new ScenarioNotFoundException("SCENARIO_NOT_FOUND", "Scenario not found: " + scenarioId);
@@ -53,7 +60,11 @@ public class ScenarioService {
         BigDecimal incrementPerTick = isPositive ? rawIncrement : rawIncrement.negate();
 
         ScenarioState state = new ScenarioState(scenarioId, symbol, incrementPerTick, definition.getTicks());
-        activeScenarios.put(symbol, state);
+        // putIfAbsent is atomic — eliminates the TOCTOU race between containsKey and put
+        if (activeScenarios.putIfAbsent(symbol, state) != null) {
+            throw new ScenarioAlreadyActiveException("SCENARIO_ALREADY_ACTIVE",
+                    "A scenario is already active for symbol: " + symbol);
+        }
 
         log.info("Scenario started: scenarioId={} symbol={} ticks={} incrementPerTick={}",
                 scenarioId, symbol, definition.getTicks(), incrementPerTick.toPlainString());
@@ -68,6 +79,11 @@ public class ScenarioService {
 
     public boolean hasActiveScenario(String symbol) {
         return activeScenarios.containsKey(symbol);
+    }
+
+    public void clearAllScenarios() {
+        activeScenarios.clear();
+        log.info("All active scenarios cleared by admin reset");
     }
 
     /**

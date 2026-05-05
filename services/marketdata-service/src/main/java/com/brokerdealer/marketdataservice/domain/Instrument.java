@@ -53,4 +53,13 @@ public class Instrument {
 
     @Column(name = "volume")
     private Long volume;
+
+    @Column(name = "seed_last_price", precision = 19, scale = 4)
+    private BigDecimal seedLastPrice;
+
+    @Column(name = "seed_bid_price", precision = 19, scale = 4)
+    private BigDecimal seedBidPrice;
+
+    @Column(name = "seed_ask_price", precision = 19, scale = 4)
+    private BigDecimal seedAskPrice;
 }

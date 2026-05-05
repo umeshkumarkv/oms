@@ -1,8 +1,11 @@
 package com.brokerdealer.marketdataservice.controller;
 
 import com.brokerdealer.marketdataservice.config.RoleGuard;
+import com.brokerdealer.marketdataservice.dto.request.ResetRequest;
 import com.brokerdealer.marketdataservice.dto.request.ScenarioRequest;
+import com.brokerdealer.marketdataservice.dto.response.ResetResponse;
 import com.brokerdealer.marketdataservice.dto.response.ScenarioResponse;
+import com.brokerdealer.marketdataservice.service.AdminResetService;
 import com.brokerdealer.marketdataservice.service.ScenarioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,12 +18,13 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/admin")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 @Slf4j
 public class AdminController {
 
     private final ScenarioService scenarioService;
+    private final AdminResetService adminResetService;
     private final RoleGuard roleGuard;
 
     @PostMapping("/scenario")
@@ -30,6 +34,16 @@ public class AdminController {
         roleGuard.requireRole(roleHeader, "ADMIN");
         log.info("Admin scenario request: scenarioId={} symbol={}", request.getScenarioId(), request.getSymbol());
         ScenarioResponse data = scenarioService.startScenario(request);
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @PostMapping("/reset")
+    public ResponseEntity<Map<String, Object>> reset(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody ResetRequest request) {
+        roleGuard.requireRole(authHeader, "ADMIN");
+        log.info("Admin market data reset initiated");
+        ResetResponse data = adminResetService.reset(request.getConfirmReset());
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 

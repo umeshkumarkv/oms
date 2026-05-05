@@ -4,6 +4,7 @@ import com.brokerdealer.marketdataservice.config.ScenarioConfig;
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.dto.request.ScenarioRequest;
 import com.brokerdealer.marketdataservice.dto.response.ScenarioResponse;
+import com.brokerdealer.marketdataservice.exception.ScenarioAlreadyActiveException;
 import com.brokerdealer.marketdataservice.exception.ScenarioNotFoundException;
 import com.brokerdealer.marketdataservice.exception.SymbolHaltedException;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
@@ -229,10 +230,10 @@ class ScenarioServiceTest {
         assertThat(increment).isNull();
     }
 
-    // --- scenario replacement ---
+    // --- concurrent scenario on same symbol ---
 
     @Test
-    void shouldReplaceExistingScenarioForSameSymbol() {
+    void shouldThrowScenarioAlreadyActiveWhenScenarioExistsForSymbol() {
         when(scenarioConfig.getItems()).thenReturn(items);
         when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(aaplInstrument));
 
@@ -241,18 +242,32 @@ class ScenarioServiceTest {
         rise.setSymbol("AAPL");
         scenarioService.startScenario(rise);
 
-        // Apply a few ticks of the rise scenario
-        scenarioService.applyScenarioTick("AAPL");
-        scenarioService.applyScenarioTick("AAPL");
-
-        // Start a drop scenario — should replace the rise
+        // Starting a second scenario on the same symbol while first is active — must throw 409
         ScenarioRequest drop = new ScenarioRequest();
         drop.setScenarioId("SCN-AAPL-DROP-5PCT");
         drop.setSymbol("AAPL");
-        scenarioService.startScenario(drop);
 
-        BigDecimal increment = scenarioService.applyScenarioTick("AAPL");
-        assertThat(increment).isLessThan(BigDecimal.ZERO); // drop scenario active
+        assertThatThrownBy(() -> scenarioService.startScenario(drop))
+                .isInstanceOf(ScenarioAlreadyActiveException.class)
+                .hasMessageContaining("AAPL");
+    }
+
+    // --- clearAllScenarios ---
+
+    @Test
+    void shouldClearAllScenariosOnReset() {
+        when(scenarioConfig.getItems()).thenReturn(items);
+        when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(aaplInstrument));
+
+        ScenarioRequest req = new ScenarioRequest();
+        req.setScenarioId("SCN-AAPL-RISE-5PCT");
+        req.setSymbol("AAPL");
+        scenarioService.startScenario(req);
+        assertThat(scenarioService.hasActiveScenario("AAPL")).isTrue();
+
+        scenarioService.clearAllScenarios();
+
+        assertThat(scenarioService.hasActiveScenario("AAPL")).isFalse();
     }
 
     // --- concurrent scenarios for different symbols ---
