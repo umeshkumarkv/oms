@@ -8,9 +8,11 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface InstrumentSummaryMapper {
 
-    @Mapping(target = "halted",    source = "tradingHalted")
-    @Mapping(target = "bidPrice",  expression = "java(instrument.getBidPrice()  != null ? instrument.getBidPrice().toPlainString()  : null)")
-    @Mapping(target = "askPrice",  expression = "java(instrument.getAskPrice()  != null ? instrument.getAskPrice().toPlainString()  : null)")
-    @Mapping(target = "lastPrice", expression = "java(instrument.getLastPrice() != null ? instrument.getLastPrice().toPlainString() : null)")
+    @Mapping(target = "halted",        source = "tradingHalted")
+    @Mapping(target = "bidPrice",      expression = "java(instrument.getBidPrice()      != null ? instrument.getBidPrice().toPlainString()      : null)")
+    @Mapping(target = "askPrice",      expression = "java(instrument.getAskPrice()      != null ? instrument.getAskPrice().toPlainString()      : null)")
+    @Mapping(target = "lastPrice",     expression = "java(instrument.getLastPrice()     != null ? instrument.getLastPrice().toPlainString()     : null)")
+    @Mapping(target = "previousClose", expression = "java(instrument.getPreviousClose() != null ? instrument.getPreviousClose().toPlainString() : null)")
+    @Mapping(target = "dataTimestamp", expression = "java(instrument.getDataTimestamp() != null ? instrument.getDataTimestamp().toString()      : null)")
     InstrumentSummaryResponse toSummary(Instrument instrument);
 }

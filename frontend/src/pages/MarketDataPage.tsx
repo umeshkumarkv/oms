@@ -5,7 +5,7 @@ import { Instrument, MarketHours } from '../types/market.types'
 import { marketDataWs, PriceTick } from '../services/websocketService'
 import { getCurrentUser } from '../api/authApi'
 
-const POLL_MS = 10_000
+const POLL_MS = 1_000
 const SPARKLINE_MAX = 20
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -207,9 +207,6 @@ const s = {
 
   skeleton:    { background: 'linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)', backgroundSize: '200% 100%', borderRadius: '4px', height: '13px', animation: 'mkt-skeleton 1.4s ease-in-out infinite' } as React.CSSProperties,
 
-  searchInput: { width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' as const } as React.CSSProperties,
-  searchWrap:  { padding: '10px 16px', borderBottom: '1px solid #f1f5f9' } as React.CSSProperties,
-
   // ── Quote card ────────────────────────────────────────────────────────────
   card:        {
     background: '#fff', borderRadius: '12px',
@@ -283,7 +280,6 @@ const MarketDataPage: React.FC = () => {
   const [detailLoading, setDetailLoading]   = useState(false)
   const [loading, setLoading]               = useState(true)
   const [wsLive, setWsLive]                 = useState(false)
-  const [search, setSearch]                 = useState('')
 
   const instrumentsRef = useRef<LiveInstrument[]>([])
   instrumentsRef.current = instruments
@@ -336,16 +332,20 @@ const MarketDataPage: React.FC = () => {
       if (!prev) return prev
       const updated   = live.find(i => i.symbol === prev.symbol)
       if (!updated) return prev
-      const last      = Number(updated.lastPrice)
-      const prevClose = updated.previousClose ? Number(updated.previousClose) : last
-      const change    = last - prevClose
+      const last          = Number(updated.lastPrice)
+      const resolvedPrev  = updated.previousClose ?? prev.previousClose
+      const prevClose     = resolvedPrev ? Number(resolvedPrev) : last
+      const change        = last - prevClose
       const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
       const priceHistory = [...prev.priceHistory, last].slice(-SPARKLINE_MAX)
       return {
         ...prev,
-        bidPrice: updated.bidPrice, askPrice: updated.askPrice,
-        lastPrice: updated.lastPrice, previousClose: updated.previousClose,
-        dataTimestamp: updated.dataTimestamp, change, changePct, priceHistory,
+        bidPrice:      updated.bidPrice,
+        askPrice:      updated.askPrice,
+        lastPrice:     updated.lastPrice,
+        previousClose: updated.previousClose ?? prev.previousClose,
+        dataTimestamp: updated.dataTimestamp ?? prev.dataTimestamp,
+        change, changePct, priceHistory,
       }
     })
     setMarketHours(hours)
@@ -394,9 +394,6 @@ const MarketDataPage: React.FC = () => {
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const open = marketHours?.marketOpen ?? false
-  const filteredInstruments = search.trim()
-    ? instruments.filter(i => i.symbol.toLowerCase().includes(search.trim().toLowerCase()))
-    : instruments
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -450,14 +447,6 @@ const MarketDataPage: React.FC = () => {
               {!loading && <span style={s.sCount}>{instruments.length}</span>}
             </div>
           </div>
-          <div style={s.searchWrap}>
-            <input
-              style={s.searchInput}
-              placeholder="Search symbols…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
 
           <table style={s.table}>
             <thead>
@@ -468,7 +457,6 @@ const MarketDataPage: React.FC = () => {
                 <th style={s.thRight}>Bid</th>
                 <th style={s.thRight}>Ask</th>
                 <th style={s.thRight}>Spread</th>
-                <th style={s.thRight}>Volume</th>
                 <th style={s.th}>Status</th>
               </tr>
             </thead>
@@ -476,18 +464,17 @@ const MarketDataPage: React.FC = () => {
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 7 }).map((_, j) => (
                         <td key={j} style={s.td}><div style={s.skeleton} /></td>
                       ))}
                     </tr>
                   ))
-                : filteredInstruments.map(inst => {
+                : instruments.map(inst => {
                     const isSelected = selected === inst.symbol
                     return (
                       <tr
                         key={inst.symbol}
                         className={`mkt-row${isSelected ? ' selected' : ''}`}
-                        style={inst.halted ? { opacity: 0.5 } : undefined}
                         onClick={() => handleSelectSymbol(inst.symbol)}
                       >
                         {/* Symbol */}
@@ -523,11 +510,6 @@ const MarketDataPage: React.FC = () => {
                         {/* Spread */}
                         <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
                           {spread(inst.bidPrice, inst.askPrice)}
-                        </td>
-
-                        {/* Volume */}
-                        <td style={s.tdMono}>
-                          {inst.volume != null ? inst.volume.toLocaleString() : '—'}
                         </td>
 
                         {/* Status */}
@@ -645,12 +627,10 @@ const MarketDataPage: React.FC = () => {
                     <div style={s.tsRow}>
                       <span style={s.tsLabel}>Last Updated</span>
                       <span style={s.tsValue}>
-                        {d.dataTimestamp
-                          ? new Date(d.dataTimestamp).toLocaleTimeString('en-US', {
-                              timeZone: 'America/New_York', hour: '2-digit',
-                              minute: '2-digit', second: '2-digit',
-                            }) + ' ET'
-                          : '—'}
+                        {new Date(d.dataTimestamp).toLocaleTimeString('en-US', {
+                          timeZone: 'America/New_York', hour: '2-digit',
+                          minute: '2-digit', second: '2-digit',
+                        })} ET
                       </span>
                     </div>
                   </div>

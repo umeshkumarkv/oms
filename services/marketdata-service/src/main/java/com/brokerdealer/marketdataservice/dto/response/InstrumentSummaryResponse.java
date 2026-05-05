@@ -10,6 +10,8 @@ public class InstrumentSummaryResponse {
     String bidPrice;
     String askPrice;
     String lastPrice;
+    String previousClose;
+    String dataTimestamp;
     Boolean tradable;
     Boolean halted;
 }
