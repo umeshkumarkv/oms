@@ -58,6 +58,9 @@ class MarketDataServiceTest {
     @Mock
     private ValueOperations<String, Object> valueOperations;
 
+    @Mock
+    private PriceHistoryStore priceHistoryStore;
+
     @InjectMocks
     private MarketDataService marketDataService;
 
@@ -70,6 +73,8 @@ class MarketDataServiceTest {
         ReflectionTestUtils.setField(marketDataService, "timezone", "America/New_York");
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(valueOperations.get(anyString())).thenReturn(null); // cache miss by default
+        lenient().when(priceHistoryStore.getPriceHistory(anyString())).thenReturn(List.of());
+        lenient().when(marketHolidayRepository.existsById(any(LocalDate.class))).thenReturn(false);
     }
 
     // --- getInstrument: cache miss ---
@@ -77,10 +82,10 @@ class MarketDataServiceTest {
     @Test
     void shouldReturnInstrumentResponseWhenSymbolIsValid() {
         Instrument instrument = buildInstrument("AAPL", false);
-        InstrumentResponse expected = buildResponse("AAPL", false);
+        InstrumentResponse base = buildBaseResponse("AAPL", false);
 
         when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
-        when(instrumentMapper.toResponse(instrument)).thenReturn(expected);
+        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
 
         InstrumentResponse result = marketDataService.getInstrument("AAPL");
 
@@ -88,16 +93,16 @@ class MarketDataServiceTest {
         assertThat(result.getSymbol()).isEqualTo("AAPL");
         assertThat(result.getHalted()).isFalse();
         assertThat(result.getTradable()).isTrue();
-        verify(valueOperations).set(eq("market:price:AAPL"), eq(expected), any(Duration.class));
+        verify(valueOperations).set(eq("market:price:AAPL"), any(InstrumentResponse.class), any(Duration.class));
     }
 
     @Test
     void shouldReturnHaltedTrueWhenSymbolIsHalted() {
         Instrument instrument = buildInstrument("HALT", true);
-        InstrumentResponse expected = buildResponse("HALT", true);
+        InstrumentResponse base = buildBaseResponse("HALT", true);
 
         when(instrumentRepository.findById("HALT")).thenReturn(Optional.of(instrument));
-        when(instrumentMapper.toResponse(instrument)).thenReturn(expected);
+        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
 
         InstrumentResponse result = marketDataService.getInstrument("HALT");
 
@@ -109,15 +114,15 @@ class MarketDataServiceTest {
     @Test
     void shouldNormaliseSymbolToUppercaseBeforeLookup() {
         Instrument instrument = buildInstrument("AAPL", false);
-        InstrumentResponse expected = buildResponse("AAPL", false);
+        InstrumentResponse base = buildBaseResponse("AAPL", false);
 
         when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
-        when(instrumentMapper.toResponse(instrument)).thenReturn(expected);
+        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
 
         InstrumentResponse result = marketDataService.getInstrument("aapl");
 
         assertThat(result.getSymbol()).isEqualTo("AAPL");
-        verify(valueOperations).set(eq("market:price:AAPL"), eq(expected), any(Duration.class));
+        verify(valueOperations).set(eq("market:price:AAPL"), any(InstrumentResponse.class), any(Duration.class));
     }
 
     @Test
@@ -133,7 +138,7 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnInstrumentFromCacheWhenCacheHit() {
-        InstrumentResponse cached = buildResponse("AAPL", false);
+        InstrumentResponse cached = buildBaseResponse("AAPL", false);
         when(valueOperations.get("market:price:AAPL")).thenReturn(cached);
 
         InstrumentResponse result = marketDataService.getInstrument("AAPL");
@@ -142,11 +147,87 @@ class MarketDataServiceTest {
         verifyNoInteractions(instrumentRepository);
     }
 
+    // --- change / changePct computation ---
+
+    @Test
+    void shouldComputeChangeCorrectly() {
+        BigDecimal change = new BigDecimal(marketDataService.computeChange(
+                new BigDecimal("176.25"), new BigDecimal("175.00")));
+        assertThat(change).isEqualByComparingTo(new BigDecimal("1.25"));
+    }
+
+    @Test
+    void shouldComputeChangePctCorrectly() {
+        // change = 1.25, previousClose = 175 → changePct = (1.25/175)*100 = 0.71%
+        String pct = marketDataService.computeChangePct(
+                new BigDecimal("176.25"), new BigDecimal("175.00"));
+        assertThat(new BigDecimal(pct)).isEqualByComparingTo(new BigDecimal("0.71"));
+    }
+
+    @Test
+    void shouldReturnZeroChangeWhenPreviousCloseIsNull() {
+        assertThat(marketDataService.computeChange(new BigDecimal("175.00"), null)).isEqualTo("0");
+    }
+
+    @Test
+    void shouldReturnZeroChangePctWhenPreviousCloseIsZero() {
+        assertThat(marketDataService.computeChangePct(
+                new BigDecimal("175.00"), BigDecimal.ZERO)).isEqualTo("0");
+    }
+
+    @Test
+    void shouldReturnZeroChangeWhenLastPriceIsNull() {
+        assertThat(marketDataService.computeChange(null, new BigDecimal("175.00"))).isEqualTo("0");
+    }
+
+    @Test
+    void shouldEnrichResponseWithMarketStatusOpenOrClosed() {
+        Instrument instrument = buildInstrument("AAPL", false);
+        InstrumentResponse base = buildBaseResponse("AAPL", false);
+
+        when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
+        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
+
+        InstrumentResponse result = marketDataService.getInstrument("AAPL");
+
+        assertThat(result.getMarketStatus()).isIn("OPEN", "CLOSED");
+    }
+
+    @Test
+    void shouldEnrichResponseWithPriceHistoryFromStore() {
+        Instrument instrument = buildInstrument("AAPL", false);
+        InstrumentResponse base = buildBaseResponse("AAPL", false);
+        List<String> history = List.of("174.00", "174.50", "175.00");
+
+        when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
+        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
+        when(priceHistoryStore.getPriceHistory("AAPL")).thenReturn(history);
+
+        InstrumentResponse result = marketDataService.getInstrument("AAPL");
+
+        assertThat(result.getPriceHistory()).containsExactly("174.00", "174.50", "175.00");
+    }
+
+    @Test
+    void shouldEnrichResponseWithChangeAndChangePct() {
+        Instrument instrument = buildInstrument("AAPL", false);
+        instrument.setLastPrice(new BigDecimal("176.25"));
+        instrument.setPreviousClose(new BigDecimal("175.00"));
+        InstrumentResponse base = buildBaseResponse("AAPL", false);
+
+        when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
+        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
+
+        InstrumentResponse result = marketDataService.getInstrument("AAPL");
+
+        assertThat(new BigDecimal(result.getChange())).isEqualByComparingTo(new BigDecimal("1.25"));
+        assertThat(new BigDecimal(result.getChangePct())).isEqualByComparingTo(new BigDecimal("0.71"));
+    }
+
     // --- isMarketOpen ---
 
     @Test
     void shouldReturnMarketOpenDuringTradingHours() {
-        // Tuesday 10:00 ET — not a holiday
         ZonedDateTime tuesday10am = ZonedDateTime.of(2026, 4, 28, 10, 0, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 28))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(tuesday10am)).isTrue();
@@ -154,7 +235,6 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnMarketOpenAtExactOpenTime() {
-        // Monday 09:30 ET
         ZonedDateTime monday930 = ZonedDateTime.of(2026, 4, 27, 9, 30, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 27))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(monday930)).isTrue();
@@ -162,14 +242,12 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnMarketClosedBeforeOpenTime() {
-        // Wednesday 09:29 ET
         ZonedDateTime wednesday929 = ZonedDateTime.of(2026, 4, 29, 9, 29, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(wednesday929)).isFalse();
     }
 
     @Test
     void shouldReturnMarketClosedAtCloseTime() {
-        // Thursday 16:00 ET — close is exclusive
         ZonedDateTime thursday16 = ZonedDateTime.of(2026, 4, 30, 16, 0, 0, 0, NEW_YORK);
         assertThat(marketDataService.isMarketOpen(thursday16)).isFalse();
     }
@@ -188,7 +266,6 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnMarketClosedOnHoliday() {
-        // Good Friday 2026-04-03 during trading hours
         ZonedDateTime goodFriday = ZonedDateTime.of(2026, 4, 3, 11, 0, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 3))).thenReturn(true);
         assertThat(marketDataService.isMarketOpen(goodFriday)).isFalse();
@@ -212,9 +289,7 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnNextOpenDateSkippingWeekendsWhenMarketClosed() {
-        // Friday 18:00 ET — market closed, next open is Monday 2026-04-27
         ZonedDateTime fridayEvening = ZonedDateTime.of(2026, 4, 24, 18, 0, 0, 0, NEW_YORK);
-        // Saturday 2026-04-25 and Sunday 2026-04-26 are weekends, Monday 2026-04-27 is open
         when(marketHolidayRepository.existsById(any(LocalDate.class))).thenReturn(false);
 
         MarketHoursResponse result = marketDataService.getMarketHoursAt(fridayEvening);
@@ -225,7 +300,6 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnTodayAsNextOpenDateWhenBeforeMarketOpen() {
-        // Tuesday 00:45 ET — market hasn't opened yet today, so nextOpenDate should be today
         ZonedDateTime tuesdayEarlyMorning = ZonedDateTime.of(2026, 4, 28, 0, 45, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 4, 28))).thenReturn(false);
 
@@ -237,9 +311,7 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnNextOpenDateSkippingHolidayWhenMarketClosed() {
-        // Thursday evening before Good Friday 2026-04-03 (holiday) + weekend → next open Mon 2026-04-06
         ZonedDateTime thursdayEvening = ZonedDateTime.of(2026, 4, 2, 18, 0, 0, 0, NEW_YORK);
-        // Only 2026-04-03 is a holiday; all other dates are normal trading days
         when(marketHolidayRepository.existsById(any(LocalDate.class))).thenAnswer(inv -> {
             LocalDate date = inv.getArgument(0);
             return LocalDate.of(2026, 4, 3).equals(date);
@@ -274,14 +346,10 @@ class MarketDataServiceTest {
         assertThat(result.get(0).getHolidayName()).isEqualTo("New Year's Day");
     }
 
-    // --- DST transition — verifies ZoneId.of("America/New_York") not a fixed UTC offset ---
+    // --- DST transition ---
 
     @Test
     void shouldReturnMarketOpenOnFirstTradingDayAfterSpringForward() {
-        // 2026-03-08 (Sunday) is the US spring-forward day — clocks advance 2:00→3:00 AM.
-        // 2026-03-09 (Monday) is the first trading day in EDT (UTC-4).
-        // 09:30 EDT = 13:30 UTC. A hardcoded UTC-5 offset would compute 09:30 EST = 14:30 UTC
-        // and give a different wall-clock answer. ZoneId.of("America/New_York") handles this.
         ZonedDateTime monday930Edt = ZonedDateTime.of(2026, 3, 9, 9, 30, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 3, 9))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(monday930Edt)).isTrue();
@@ -289,9 +357,6 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnMarketOpenOnFirstTradingDayAfterFallBack() {
-        // 2026-11-01 (Sunday) is the US fall-back day — clocks retreat 2:00→1:00 AM.
-        // 2026-11-02 (Monday) is the first trading day back in EST (UTC-5).
-        // 09:30 EST = 14:30 UTC. Proper ZoneId handling required for correct boundary check.
         ZonedDateTime monday930Est = ZonedDateTime.of(2026, 11, 2, 9, 30, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 11, 2))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(monday930Est)).isTrue();
@@ -299,7 +364,6 @@ class MarketDataServiceTest {
 
     @Test
     void shouldReturnMarketClosedAtExactCloseOnDstTransitionDay() {
-        // 2026-03-09 16:00 EDT — close boundary is exclusive regardless of DST offset
         ZonedDateTime closeTimeEdt = ZonedDateTime.of(2026, 3, 9, 16, 0, 0, 0, NEW_YORK);
         when(marketHolidayRepository.existsById(LocalDate.of(2026, 3, 9))).thenReturn(false);
         assertThat(marketDataService.isMarketOpen(closeTimeEdt)).isFalse();
@@ -308,12 +372,37 @@ class MarketDataServiceTest {
     // --- getInstruments ---
 
     @Test
-    void shouldReturnInstrumentSummaryList() {
+    void shouldReturnInstrumentSummaryListWithAllNewFields() {
         Instrument instrument = buildInstrument("AAPL", false);
-        InstrumentSummaryResponse summary = buildSummaryResponse("AAPL", false);
+        instrument.setLastPrice(new BigDecimal("176.25"));
+        instrument.setPreviousClose(new BigDecimal("175.00"));
+        instrument.setDayHigh(new BigDecimal("177.00"));
+        instrument.setDayLow(new BigDecimal("174.50"));
+        instrument.setVolume(100000L);
+        InstrumentSummaryResponse base = buildBaseSummaryResponse("AAPL", false);
+        List<String> history = List.of("175.00", "175.50", "176.25");
 
         when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(instrument));
-        when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(summary);
+        when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(base);
+        when(priceHistoryStore.getPriceHistory("AAPL")).thenReturn(history);
+
+        List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+        assertThat(result.get(0).getMarketStatus()).isIn("OPEN", "CLOSED");
+        assertThat(result.get(0).getPriceHistory()).containsExactly("175.00", "175.50", "176.25");
+        assertThat(new BigDecimal(result.get(0).getChange())).isEqualByComparingTo(new BigDecimal("1.25"));
+        assertThat(new BigDecimal(result.get(0).getChangePct())).isEqualByComparingTo(new BigDecimal("0.71"));
+    }
+
+    @Test
+    void shouldReturnInstrumentSummaryList() {
+        Instrument instrument = buildInstrument("AAPL", false);
+        InstrumentSummaryResponse base = buildBaseSummaryResponse("AAPL", false);
+
+        when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(instrument));
+        when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(base);
 
         List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
 
@@ -330,10 +419,9 @@ class MarketDataServiceTest {
     void shouldReturnInstrumentsSortedAlphabeticallyBySymbol() {
         Instrument msft = buildInstrument("MSFT", false);
         Instrument aapl = buildInstrument("AAPL", false);
-        InstrumentSummaryResponse msftSummary = buildSummaryResponse("MSFT", false);
-        InstrumentSummaryResponse aaplSummary = buildSummaryResponse("AAPL", false);
+        InstrumentSummaryResponse msftSummary = buildBaseSummaryResponse("MSFT", false);
+        InstrumentSummaryResponse aaplSummary = buildBaseSummaryResponse("AAPL", false);
 
-        // Repository returns pre-sorted list (ORDER BY symbol ASC)
         when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(aapl, msft));
         when(instrumentSummaryMapper.toSummary(aapl)).thenReturn(aaplSummary);
         when(instrumentSummaryMapper.toSummary(msft)).thenReturn(msftSummary);
@@ -348,7 +436,7 @@ class MarketDataServiceTest {
     @Test
     void shouldReturnHaltedTrueForHaltInstrumentInSummaryList() {
         Instrument haltInstrument = buildInstrument("HALT", true);
-        InstrumentSummaryResponse haltSummary = buildSummaryResponse("HALT", true);
+        InstrumentSummaryResponse haltSummary = buildBaseSummaryResponse("HALT", true);
 
         when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(haltInstrument));
         when(instrumentSummaryMapper.toSummary(haltInstrument)).thenReturn(haltSummary);
@@ -376,7 +464,7 @@ class MarketDataServiceTest {
                 .build();
     }
 
-    private InstrumentResponse buildResponse(String symbol, boolean halted) {
+    private InstrumentResponse buildBaseResponse(String symbol, boolean halted) {
         return InstrumentResponse.builder()
                 .symbol(symbol)
                 .bidPrice("174.95")
@@ -390,7 +478,7 @@ class MarketDataServiceTest {
                 .build();
     }
 
-    private InstrumentSummaryResponse buildSummaryResponse(String symbol, boolean halted) {
+    private InstrumentSummaryResponse buildBaseSummaryResponse(String symbol, boolean halted) {
         return InstrumentSummaryResponse.builder()
                 .symbol(symbol)
                 .bidPrice("174.95")

@@ -14,8 +14,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +43,9 @@ class PriceTickServiceTest {
     @Mock
     private ScenarioService scenarioService;
 
+    @Mock
+    private PriceHistoryStore priceHistoryStore;
+
     @InjectMocks
     private PriceTickService priceTickService;
 
@@ -52,7 +59,6 @@ class PriceTickServiceTest {
 
         BigDecimal newPrice = instrument.getLastPrice();
         assertThat(newPrice).isGreaterThanOrEqualTo(new BigDecimal("0.01"));
-        // price should be within ±0.5% of 175.00 → range [174.125, 175.875]
         assertThat(newPrice).isGreaterThanOrEqualTo(new BigDecimal("174.00"));
         assertThat(newPrice).isLessThanOrEqualTo(new BigDecimal("176.00"));
     }
@@ -61,7 +67,6 @@ class PriceTickServiceTest {
     void shouldNeverTickBelowMinimumPrice() {
         Instrument instrument = buildInstrument("CHEAP", new BigDecimal("0.01"));
 
-        // run many ticks to ensure price never goes below 0.01
         for (int i = 0; i < 100; i++) {
             priceTickService.tickInstrument(instrument, false);
             assertThat(instrument.getLastPrice())
@@ -106,13 +111,12 @@ class PriceTickServiceTest {
     @Test
     void shouldUpdateDayHighWhenNewPriceExceedsCurrent() {
         Instrument instrument = buildInstrument("AAPL", new BigDecimal("200.00"));
-        instrument.setDayHigh(new BigDecimal("150.00")); // artificially low high
+        instrument.setDayHigh(new BigDecimal("150.00"));
         instrument.setDayLow(new BigDecimal("100.00"));
         instrument.setVolume(1000L);
 
         priceTickService.tickInstrument(instrument, false);
 
-        // new price will be ~200 which is > dayHigh of 150
         assertThat(instrument.getDayHigh()).isGreaterThanOrEqualTo(new BigDecimal("150.00"));
     }
 
@@ -155,19 +159,59 @@ class PriceTickServiceTest {
     }
 
     @Test
+    void shouldAddPriceToHistoryStoreAfterTick() {
+        Instrument instrument = buildInstrument("AAPL", new BigDecimal("175.00"));
+        instrument.setDayHigh(new BigDecimal("180.00"));
+        instrument.setDayLow(new BigDecimal("170.00"));
+        instrument.setVolume(1000L);
+
+        priceTickService.tickInstrument(instrument, false);
+
+        verify(priceHistoryStore).addPrice(eq("AAPL"), any(BigDecimal.class));
+    }
+
+    @Test
+    void shouldBroadcastTickWithAllRequiredFields() throws Exception {
+        Instrument instrument = buildInstrument("AAPL", new BigDecimal("175.00"));
+        instrument.setDayHigh(new BigDecimal("180.00"));
+        instrument.setDayLow(new BigDecimal("170.00"));
+        instrument.setVolume(1000L);
+        instrument.setPreviousClose(new BigDecimal("174.00"));
+        List<String> history = List.of("174.00", "174.50", "175.00");
+
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(priceHistoryStore.getPriceHistory("AAPL")).thenReturn(history);
+
+        priceTickService.tickInstrument(instrument, false);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(objectMapper).writeValueAsString(captor.capture());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) captor.getValue();
+        assertThat(payload).containsKey("change");
+        assertThat(payload).containsKey("changePct");
+        assertThat(payload).containsKey("volume");
+        assertThat(payload).containsKey("dayHigh");
+        assertThat(payload).containsKey("dayLow");
+        assertThat(payload).containsKey("previousClose");
+        assertThat(payload).containsKey("priceHistory");
+        assertThat(payload.get("priceHistory")).isEqualTo(history);
+    }
+
+    @Test
     void shouldApplyScenarioIncrementWhenScenarioIsActive() {
         Instrument instrument = buildInstrument("AAPL", new BigDecimal("175.00"));
         instrument.setDayHigh(new BigDecimal("180.00"));
         instrument.setDayLow(new BigDecimal("170.00"));
         instrument.setVolume(1000L);
-        BigDecimal increment = new BigDecimal("0.8750"); // 5% of 175 / 10 ticks
+        BigDecimal increment = new BigDecimal("0.8750");
 
         when(scenarioService.hasActiveScenario("AAPL")).thenReturn(true);
         when(scenarioService.applyScenarioTick("AAPL")).thenReturn(increment);
 
         priceTickService.tickInstrument(instrument, false);
 
-        // new price should be ~175.875 (175 + 0.875)
         assertThat(instrument.getLastPrice()).isGreaterThan(new BigDecimal("175.00"));
     }
 
@@ -183,7 +227,6 @@ class PriceTickServiceTest {
 
         priceTickService.tickInstrument(instrument, false);
 
-        // random walk was applied — price should still be valid
         assertThat(instrument.getLastPrice()).isGreaterThanOrEqualTo(new BigDecimal("0.01"));
     }
 
@@ -195,6 +238,47 @@ class PriceTickServiceTest {
 
         verifyNoInteractions(instrumentRepository);
         verifyNoInteractions(redisTemplate);
+    }
+
+    // --- PriceHistoryStore unit tests ---
+
+    @Test
+    void shouldStoreUpToTwentyPricesInHistory() {
+        PriceHistoryStore store = new PriceHistoryStore();
+        for (int i = 1; i <= 25; i++) {
+            store.addPrice("AAPL", new BigDecimal(String.valueOf(i)));
+        }
+        List<String> history = store.getPriceHistory("AAPL");
+        assertThat(history).hasSize(PriceHistoryStore.MAX_HISTORY);
+        // oldest entries (1-5) should be evicted, last 20 should be 6-25
+        assertThat(history.get(0)).isEqualTo("6");
+        assertThat(history.get(history.size() - 1)).isEqualTo("25");
+    }
+
+    @Test
+    void shouldReturnEmptyListForSymbolWithNoHistory() {
+        PriceHistoryStore store = new PriceHistoryStore();
+        assertThat(store.getPriceHistory("UNKNOWN")).isEmpty();
+    }
+
+    @Test
+    void shouldReturnPricesInChronologicalOrder() {
+        PriceHistoryStore store = new PriceHistoryStore();
+        store.addPrice("AAPL", new BigDecimal("174.00"));
+        store.addPrice("AAPL", new BigDecimal("174.50"));
+        store.addPrice("AAPL", new BigDecimal("175.00"));
+
+        List<String> history = store.getPriceHistory("AAPL");
+
+        assertThat(history).containsExactly("174.00", "174.50", "175.00");
+    }
+
+    @Test
+    void shouldResetHistoryForSymbol() {
+        PriceHistoryStore store = new PriceHistoryStore();
+        store.addPrice("AAPL", new BigDecimal("175.00"));
+        store.reset("AAPL");
+        assertThat(store.getPriceHistory("AAPL")).isEmpty();
     }
 
     // --- helpers ---

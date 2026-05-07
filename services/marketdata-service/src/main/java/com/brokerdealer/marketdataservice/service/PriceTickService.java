@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -28,6 +29,7 @@ public class PriceTickService {
 
     private static final BigDecimal MIN_PRICE = new BigDecimal("0.01");
     private static final BigDecimal TWO = new BigDecimal("2");
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final String CACHE_KEY_PREFIX = "market:price:";
 
     private final InstrumentRepository instrumentRepository;
@@ -36,6 +38,7 @@ public class PriceTickService {
     private final MarketDataWebSocketHandler webSocketHandler;
     private final ObjectMapper objectMapper;
     private final ScenarioService scenarioService;
+    private final PriceHistoryStore priceHistoryStore;
 
     @Value("${market.simulation.bypass-market-hours:false}")
     private boolean bypassMarketHours;
@@ -72,7 +75,6 @@ public class PriceTickService {
         if (scenarioService.hasActiveScenario(instrument.getSymbol())) {
             BigDecimal increment = scenarioService.applyScenarioTick(instrument.getSymbol());
             if (increment == null) {
-                // scenario just completed on this call — fall through to random walk for this tick
                 newPrice = computeRandomWalkPrice(currentPrice);
             } else {
                 newPrice = currentPrice.add(increment).setScale(4, RoundingMode.HALF_UP);
@@ -111,6 +113,9 @@ public class PriceTickService {
         long volumeDelta = 500L + ThreadLocalRandom.current().nextLong(4501L);
         instrument.setVolume((instrument.getVolume() == null ? 0L : instrument.getVolume()) + volumeDelta);
 
+        // track price history (last 20 ticks)
+        priceHistoryStore.addPrice(instrument.getSymbol(), newPrice);
+
         instrumentRepository.save(instrument);
 
         // invalidate Redis cache so next read fetches fresh data
@@ -130,18 +135,37 @@ public class PriceTickService {
 
     private void broadcastTick(Instrument instrument) {
         try {
-            String previousClose = instrument.getPreviousClose() != null
-                    ? instrument.getPreviousClose().toPlainString()
-                    : instrument.getLastPrice().toPlainString();
-            String json = objectMapper.writeValueAsString(Map.of(
-                    "type", "MARKET_DATA_TICK",
-                    "symbol", instrument.getSymbol(),
-                    "bidPrice", instrument.getBidPrice().toPlainString(),
-                    "askPrice", instrument.getAskPrice().toPlainString(),
-                    "lastPrice", instrument.getLastPrice().toPlainString(),
-                    "previousClose", previousClose,
-                    "dataTimestamp", instrument.getDataTimestamp().toString()
-            ));
+            BigDecimal prevClose = instrument.getPreviousClose() != null
+                    ? instrument.getPreviousClose()
+                    : instrument.getLastPrice();
+            BigDecimal change = instrument.getLastPrice().subtract(prevClose)
+                    .setScale(4, RoundingMode.HALF_UP);
+            BigDecimal changePct = prevClose.compareTo(BigDecimal.ZERO) != 0
+                    ? change.divide(prevClose, 4, RoundingMode.HALF_UP)
+                            .multiply(HUNDRED)
+                            .setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            List<String> priceHistory = priceHistoryStore.getPriceHistory(instrument.getSymbol());
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "MARKET_DATA_TICK");
+            payload.put("symbol", instrument.getSymbol());
+            payload.put("bidPrice", instrument.getBidPrice().toPlainString());
+            payload.put("askPrice", instrument.getAskPrice().toPlainString());
+            payload.put("lastPrice", instrument.getLastPrice().toPlainString());
+            payload.put("change", change.toPlainString());
+            payload.put("changePct", changePct.toPlainString());
+            payload.put("volume", instrument.getVolume());
+            payload.put("dayHigh",
+                    instrument.getDayHigh() != null ? instrument.getDayHigh().toPlainString() : null);
+            payload.put("dayLow",
+                    instrument.getDayLow() != null ? instrument.getDayLow().toPlainString() : null);
+            payload.put("previousClose", prevClose.toPlainString());
+            payload.put("priceHistory", priceHistory);
+            payload.put("dataTimestamp", instrument.getDataTimestamp().toString());
+
+            String json = objectMapper.writeValueAsString(payload);
             webSocketHandler.broadcast(json);
         } catch (Exception e) {
             log.warn("Failed to broadcast tick: symbol={} error={}", instrument.getSymbol(), e.getMessage());

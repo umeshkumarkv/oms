@@ -31,12 +31,20 @@ class MarketDataControllerTest {
     private MarketDataService marketDataService;
 
     @Test
-    void shouldReturn200WithInstrumentDataWhenSymbolIsValid() throws Exception {
+    void shouldReturn200WithAllRequiredFieldsWhenSymbolIsValid() throws Exception {
         InstrumentResponse response = InstrumentResponse.builder()
                 .symbol("AAPL")
                 .bidPrice("174.95")
                 .askPrice("175.05")
                 .lastPrice("175.00")
+                .change("1.25")
+                .changePct("0.71")
+                .volume(4521000L)
+                .dayHigh("176.10")
+                .dayLow("174.80")
+                .previousClose("173.75")
+                .priceHistory(List.of("173.75", "174.00", "175.00"))
+                .marketStatus("OPEN")
                 .tradable(true)
                 .halted(false)
                 .minQuantity(1)
@@ -52,6 +60,15 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data.bidPrice").value("174.95"))
                 .andExpect(jsonPath("$.data.askPrice").value("175.05"))
                 .andExpect(jsonPath("$.data.lastPrice").value("175.00"))
+                .andExpect(jsonPath("$.data.change").value("1.25"))
+                .andExpect(jsonPath("$.data.changePct").value("0.71"))
+                .andExpect(jsonPath("$.data.volume").value(4521000))
+                .andExpect(jsonPath("$.data.dayHigh").value("176.10"))
+                .andExpect(jsonPath("$.data.dayLow").value("174.80"))
+                .andExpect(jsonPath("$.data.previousClose").value("173.75"))
+                .andExpect(jsonPath("$.data.priceHistory").isArray())
+                .andExpect(jsonPath("$.data.priceHistory[0]").value("173.75"))
+                .andExpect(jsonPath("$.data.marketStatus").value("OPEN"))
                 .andExpect(jsonPath("$.data.tradable").value(true))
                 .andExpect(jsonPath("$.data.halted").value(false))
                 .andExpect(jsonPath("$.data.minQuantity").value(1))
@@ -68,6 +85,9 @@ class MarketDataControllerTest {
                 .bidPrice("174.95")
                 .askPrice("175.05")
                 .lastPrice("175.00")
+                .change("0")
+                .changePct("0")
+                .marketStatus("OPEN")
                 .tradable(true)
                 .halted(false)
                 .minQuantity(1)
@@ -89,6 +109,9 @@ class MarketDataControllerTest {
                 .bidPrice("49.90")
                 .askPrice("50.10")
                 .lastPrice("50.00")
+                .change("0")
+                .changePct("0")
+                .marketStatus("OPEN")
                 .tradable(true)
                 .halted(true)
                 .minQuantity(1)
@@ -159,12 +182,19 @@ class MarketDataControllerTest {
     }
 
     @Test
-    void shouldReturn200WithInstrumentSummaryListSortedAlphabetically() throws Exception {
+    void shouldReturn200WithInstrumentSummaryListIncludingNewFields() throws Exception {
         List<InstrumentSummaryResponse> instruments = List.of(
-                InstrumentSummaryResponse.builder().symbol("AAPL").bidPrice("174.95").askPrice("175.05")
-                        .lastPrice("175.00").tradable(true).halted(false).build(),
-                InstrumentSummaryResponse.builder().symbol("HALT").bidPrice("49.90").askPrice("50.10")
-                        .lastPrice("50.00").tradable(true).halted(true).build()
+                InstrumentSummaryResponse.builder()
+                        .symbol("AAPL").bidPrice("174.95").askPrice("175.05")
+                        .lastPrice("175.00").change("1.25").changePct("0.71")
+                        .volume(4521000L).dayHigh("176.10").dayLow("174.80")
+                        .previousClose("173.75").marketStatus("OPEN")
+                        .priceHistory(List.of("173.75", "175.00"))
+                        .tradable(true).halted(false).build(),
+                InstrumentSummaryResponse.builder()
+                        .symbol("HALT").bidPrice("49.90").askPrice("50.10")
+                        .lastPrice("50.00").change("0").changePct("0")
+                        .marketStatus("OPEN").tradable(true).halted(true).build()
         );
 
         when(marketDataService.getInstruments()).thenReturn(instruments);
@@ -174,8 +204,14 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data[0].symbol").value("AAPL"))
                 .andExpect(jsonPath("$.data[0].lastPrice").value("175.00"))
-                .andExpect(jsonPath("$.data[0].bidPrice").value("174.95"))
-                .andExpect(jsonPath("$.data[0].askPrice").value("175.05"))
+                .andExpect(jsonPath("$.data[0].change").value("1.25"))
+                .andExpect(jsonPath("$.data[0].changePct").value("0.71"))
+                .andExpect(jsonPath("$.data[0].volume").value(4521000))
+                .andExpect(jsonPath("$.data[0].dayHigh").value("176.10"))
+                .andExpect(jsonPath("$.data[0].dayLow").value("174.80"))
+                .andExpect(jsonPath("$.data[0].previousClose").value("173.75"))
+                .andExpect(jsonPath("$.data[0].marketStatus").value("OPEN"))
+                .andExpect(jsonPath("$.data[0].priceHistory").isArray())
                 .andExpect(jsonPath("$.data[0].tradable").value(true))
                 .andExpect(jsonPath("$.data[0].halted").value(false))
                 .andExpect(jsonPath("$.data[1].symbol").value("HALT"))

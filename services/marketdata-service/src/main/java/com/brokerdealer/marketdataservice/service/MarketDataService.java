@@ -16,6 +16,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -40,6 +42,7 @@ public class MarketDataService {
 
     private static final String CACHE_KEY_PREFIX = "market:price:";
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final InstrumentRepository instrumentRepository;
     private final InstrumentMapper instrumentMapper;
@@ -47,6 +50,7 @@ public class MarketDataService {
     private final MarketHolidayRepository marketHolidayRepository;
     private final MarketHolidayMapper marketHolidayMapper;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final PriceHistoryStore priceHistoryStore;
 
     public InstrumentResponse getInstrument(String symbol) {
         String normalised = symbol.toUpperCase();
@@ -60,7 +64,13 @@ public class MarketDataService {
         }
 
         InstrumentResponse response = instrumentRepository.findById(normalised)
-                .map(instrumentMapper::toResponse)
+                .map(instrument -> {
+                    InstrumentResponse base = instrumentMapper.toResponse(instrument);
+                    return enrichInstrumentResponse(base,
+                            instrument.getLastPrice(),
+                            instrument.getPreviousClose(),
+                            normalised);
+                })
                 .orElseThrow(() -> new SymbolNotFoundException("SYMBOL_NOT_FOUND",
                         "Symbol not found: " + normalised));
 
@@ -78,8 +88,6 @@ public class MarketDataService {
         boolean open = isMarketOpen(now);
         String nextOpenDate = null;
         if (!open) {
-            // If before market open, today may still open — search from today.
-            // If at/after close (or weekend/holiday), today is done — search from tomorrow.
             LocalDate startCandidate = now.toLocalTime().isBefore(LocalTime.parse(openTime))
                     ? now.toLocalDate()
                     : now.toLocalDate().plusDays(1);
@@ -115,9 +123,17 @@ public class MarketDataService {
 
     public List<InstrumentSummaryResponse> getInstruments() {
         log.debug("Fetching all instruments");
+        String status = isMarketOpen(ZonedDateTime.now(ZoneId.of(timezone))) ? "OPEN" : "CLOSED";
         return instrumentRepository.findAllByOrderBySymbolAsc()
                 .stream()
-                .map(instrumentSummaryMapper::toSummary)
+                .map(instrument -> {
+                    InstrumentSummaryResponse base = instrumentSummaryMapper.toSummary(instrument);
+                    return enrichSummaryResponse(base,
+                            instrument.getLastPrice(),
+                            instrument.getPreviousClose(),
+                            instrument.getSymbol(),
+                            status);
+                })
                 .toList();
     }
 
@@ -133,5 +149,47 @@ public class MarketDataService {
         LocalTime open  = LocalTime.parse(openTime);
         LocalTime close = LocalTime.parse(closeTime);
         return !time.isBefore(open) && time.isBefore(close);
+    }
+
+    // --- private enrichment helpers ---
+
+    private InstrumentResponse enrichInstrumentResponse(InstrumentResponse base,
+            BigDecimal lastPrice, BigDecimal previousClose, String symbol) {
+        String status = isMarketOpen(ZonedDateTime.now(ZoneId.of(timezone))) ? "OPEN" : "CLOSED";
+        return base.toBuilder()
+                .change(computeChange(lastPrice, previousClose))
+                .changePct(computeChangePct(lastPrice, previousClose))
+                .priceHistory(priceHistoryStore.getPriceHistory(symbol))
+                .marketStatus(status)
+                .build();
+    }
+
+    private InstrumentSummaryResponse enrichSummaryResponse(InstrumentSummaryResponse base,
+            BigDecimal lastPrice, BigDecimal previousClose, String symbol, String marketStatus) {
+        return base.toBuilder()
+                .change(computeChange(lastPrice, previousClose))
+                .changePct(computeChangePct(lastPrice, previousClose))
+                .priceHistory(priceHistoryStore.getPriceHistory(symbol))
+                .marketStatus(marketStatus)
+                .build();
+    }
+
+    String computeChange(BigDecimal lastPrice, BigDecimal previousClose) {
+        if (lastPrice == null || previousClose == null) {
+            return "0";
+        }
+        return lastPrice.subtract(previousClose).setScale(4, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    String computeChangePct(BigDecimal lastPrice, BigDecimal previousClose) {
+        if (lastPrice == null || previousClose == null
+                || previousClose.compareTo(BigDecimal.ZERO) == 0) {
+            return "0";
+        }
+        return lastPrice.subtract(previousClose)
+                .divide(previousClose, 4, RoundingMode.HALF_UP)
+                .multiply(HUNDRED)
+                .setScale(2, RoundingMode.HALF_UP)
+                .toPlainString();
     }
 }
