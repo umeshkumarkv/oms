@@ -3,6 +3,7 @@ package com.brokerdealer.orderservice.service;
 import com.brokerdealer.orderservice.domain.Order;
 import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
+import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
 import com.brokerdealer.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,13 @@ import java.util.UUID;
 @Slf4j
 public class OrderStateMachineService {
 
-    private static final Set<OrderStatus> TERMINAL_STATES = Set.of(
+    /**
+     * States that are terminal or already past the risk evaluation phase.
+     * Used ONLY as an idempotency guard in risk.evaluation.result consumers.
+     * SENT_TO_EXECUTION is NOT a true terminal state per the order lifecycle —
+     * do NOT reuse this set in consumeExecutionCompleted (SCRUM-48).
+     */
+    private static final Set<OrderStatus> IDEMPOTENT_SKIP_STATES_FOR_RISK_RESULT = Set.of(
             OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED,
             OrderStatus.EXPIRED, OrderStatus.RISK_REJECTED, OrderStatus.SENT_TO_EXECUTION
     );
@@ -36,9 +43,9 @@ public class OrderStateMachineService {
     @Transactional
     public void transitionOnRiskPassed(UUID orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("ORDER_NOT_FOUND: " + orderId));
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        if (TERMINAL_STATES.contains(order.getStatus())) {
+        if (IDEMPOTENT_SKIP_STATES_FOR_RISK_RESULT.contains(order.getStatus())) {
             log.warn("Idempotency guard — order already in terminal/target state: orderId={} status={}",
                     orderId, order.getStatus());
             return;
@@ -62,9 +69,9 @@ public class OrderStateMachineService {
     @Transactional
     public void transitionOnRiskRejected(UUID orderId, String ruleCode, String reason) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("ORDER_NOT_FOUND: " + orderId));
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        if (TERMINAL_STATES.contains(order.getStatus())) {
+        if (IDEMPOTENT_SKIP_STATES_FOR_RISK_RESULT.contains(order.getStatus())) {
             log.warn("Idempotency guard — order already in terminal state: orderId={} status={}",
                     orderId, order.getStatus());
             return;

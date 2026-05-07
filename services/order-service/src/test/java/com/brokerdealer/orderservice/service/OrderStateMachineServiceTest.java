@@ -3,6 +3,7 @@ package com.brokerdealer.orderservice.service;
 import com.brokerdealer.orderservice.domain.Order;
 import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
+import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
 import com.brokerdealer.orderservice.repository.OrderRepository;
 import org.junit.jupiter.api.Test;
@@ -220,8 +221,8 @@ class OrderStateMachineServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderStateMachineService.transitionOnRiskPassed(orderId))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ORDER_NOT_FOUND");
+                .isInstanceOf(OrderNotFoundException.class)
+                .hasMessageContaining("Order not found");
     }
 
     @Test
@@ -229,8 +230,8 @@ class OrderStateMachineServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderStateMachineService.transitionOnRiskRejected(orderId, "RULE", "reason"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ORDER_NOT_FOUND");
+                .isInstanceOf(OrderNotFoundException.class)
+                .hasMessageContaining("Order not found");
     }
 
     @Test
