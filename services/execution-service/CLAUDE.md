@@ -63,7 +63,13 @@ See openapi.yaml for full schema.
 
 ## 8. REST Endpoints Called (Downstream Dependencies)
 
-None — execution-service has no synchronous downstream dependencies.
+| Service            | Method | Path                        | Purpose                                              |
+|--------------------|--------|-----------------------------|------------------------------------------------------|
+| marketdata-service | GET    | /api/v1/market/{symbol}     | Fetch lastPrice for @Scheduled LIMIT order price monitor |
+
+Client: RestTemplate with SimpleClientHttpRequestFactory (no pool).
+Failure handling: log.warn + skip — no Resilience4j (scheduler retries every 2 seconds automatically).
+NOT called for MARKET orders — lastPrice comes from order.execution.requested Kafka payload.
 
 ---
 
@@ -83,7 +89,8 @@ Execution:
 ## 10. What This Service Must NEVER Do
 
 - Never access order_schema, client_schema, market_schema, risk_schema, auth_schema, audit_schema
-- Never call order-service, client-service, marketdata-service, risk-service, auth-service, or audit-service
+- Never call order-service, client-service, risk-service, auth-service, or audit-service
+- May call marketdata-service GET /api/v1/market/{symbol} for LIMIT order price monitoring only (SCRUM-48)
 - Never update portfolios or holdings directly
 - Never execute orders that have not reached SENT_TO_EXECUTION state
 - Never use real exchange prices — mock fills only

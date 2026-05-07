@@ -66,6 +66,10 @@ resilience4j:
       default:
         timeout-duration: 2s
 
+app:
+  marketdata:
+    base-url: ${MARKETDATA_SERVICE_URL:http://localhost:8084}
+
 logging:
   level:
     com.brokerdealer: INFO

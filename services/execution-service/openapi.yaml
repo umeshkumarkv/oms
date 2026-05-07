@@ -67,6 +67,26 @@ components:
           type: integer
         executedPrice:
           type: string
+          description: BigDecimal as string
+          example: "175.50"
+        fillType:
+          type: string
+          enum: [FULL, PARTIAL]
+          example: FULL
+        fillValue:
+          type: string
+          description: BigDecimal as string — executedQty × executedPrice
+          example: "17550.00"
+        remainingQuantity:
+          type: integer
+          example: 0
+        marketPriceAtFill:
+          type: string
+          description: BigDecimal as string — market price at time of fill
+          example: "175.50"
+        executionVenue:
+          type: string
+          example: MOCK_ECN
         executedAt:
           type: string
           format: date-time
