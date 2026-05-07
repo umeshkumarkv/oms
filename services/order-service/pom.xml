@@ -92,6 +92,33 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <!-- Main application class -->
+            <exclude>com/brokerdealer/orderservice/OrderServiceApplication.class</exclude>
+            <!-- JPA entities and enums — Lombok-generated code dominates -->
+            <exclude>com/brokerdealer/orderservice/domain/**</exclude>
+            <!-- DTOs — pure data holders, no business logic -->
+            <exclude>com/brokerdealer/orderservice/dto/**</exclude>
+            <!-- Spring config — wiring only, no logic -->
+            <exclude>com/brokerdealer/orderservice/config/**</exclude>
+            <!-- Kafka stubs — not implemented in this story (SCRUM-42) -->
+            <exclude>com/brokerdealer/orderservice/kafka/**</exclude>
+            <!-- MapStruct mappers — generated code -->
+            <exclude>com/brokerdealer/orderservice/mapper/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>@{argLine} -Dnet.bytebuddy.experimental=true</argLine>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>
