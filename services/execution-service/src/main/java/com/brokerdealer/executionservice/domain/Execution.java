@@ -23,6 +23,9 @@ public class Execution {
     @Column(name = "order_id", nullable = false)
     private UUID orderId;
 
+    @Column(name = "client_id", nullable = false)
+    private UUID clientId;
+
     @Column(name = "symbol", nullable = false, length = 20)
     private String symbol;
 
@@ -33,8 +36,24 @@ public class Execution {
     @Column(name = "executed_qty", nullable = false)
     private Integer executedQty;
 
-    @Column(name = "executed_price", nullable = false, precision = 18, scale = 4)
+    @Column(name = "executed_price", nullable = false, precision = 19, scale = 4)
     private BigDecimal executedPrice;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fill_type", nullable = false, length = 10)
+    private FillType fillType;
+
+    @Column(name = "fill_value", nullable = false, precision = 19, scale = 4)
+    private BigDecimal fillValue;
+
+    @Column(name = "remaining_quantity", nullable = false)
+    private Integer remainingQuantity;
+
+    @Column(name = "market_price_at_fill", nullable = false, precision = 19, scale = 4)
+    private BigDecimal marketPriceAtFill;
+
+    @Column(name = "execution_venue", nullable = false, length = 50)
+    private String executionVenue;
 
     @Column(name = "executed_at", nullable = false)
     private Instant executedAt;

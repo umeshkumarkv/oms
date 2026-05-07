@@ -30,6 +30,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: com.brokerdealer.*
+        spring.json.value.default.type: com.brokerdealer.executionservice.dto.request.OrderExecutionRequest
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -65,6 +66,10 @@ resilience4j:
     instances:
       default:
         timeout-duration: 2s
+
+app:
+  marketdata:
+    base-url: ${MARKETDATA_SERVICE_URL:http://localhost:8084}
 
 logging:
   level:
