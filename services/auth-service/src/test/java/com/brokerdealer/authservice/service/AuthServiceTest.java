@@ -148,7 +148,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldSetExpiryEightHoursFromNow() {
+    void shouldSetExpiryThirtyMinutesFromNow() {
         LoginRequest request = new LoginRequest();
         request.setUsername("trader.john");
         request.setPassword("Demo@1234");
@@ -162,8 +162,8 @@ class AuthServiceTest {
         Instant after = Instant.now();
 
         Instant expiresAt = Instant.parse(result.getExpiresAt());
-        assertThat(expiresAt).isAfter(before.plusSeconds(8 * 3600 - 5));
-        assertThat(expiresAt).isBefore(after.plusSeconds(8 * 3600 + 5));
+        assertThat(expiresAt).isAfter(before.plusSeconds(30 * 60 - 5));
+        assertThat(expiresAt).isBefore(after.plusSeconds(30 * 60 + 5));
     }
 
     @Test
