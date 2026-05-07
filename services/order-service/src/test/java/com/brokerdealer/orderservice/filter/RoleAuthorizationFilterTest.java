@@ -1,6 +1,9 @@
 package com.brokerdealer.orderservice.filter;
 
 import com.brokerdealer.orderservice.controller.OrderController;
+import com.brokerdealer.orderservice.dto.response.ResponseMeta;
+import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
+import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +12,11 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -69,10 +77,20 @@ class RoleAuthorizationFilterTest {
 
     @Test
     void shouldAllowTraderToSubmitOrder() throws Exception {
+        when(orderService.submitOrder(any(), any())).thenReturn(SubmitOrderResponse.builder()
+                .data(SubmitOrderData.builder().orderId(UUID.randomUUID()).status("NEW").build())
+                .meta(ResponseMeta.builder().timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString()).build())
+                .build());
+
+        String validBody = """
+                {"clientOrderId":"ORD-001","clientId":"a1000000-0000-0000-0000-000000000001",
+                 "symbol":"AAPL","side":"BUY","orderType":"MARKET","timeInForce":"DAY","quantity":10}
+                """;
         mockMvc.perform(post("/api/v1/orders")
                         .header("X-User-Role", "TRADER")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content(validBody))
                 .andExpect(status().isAccepted());
     }
 

@@ -1,7 +1,7 @@
 package com.brokerdealer.orderservice.exception;
 
-public class SymbolHaltedException extends RuntimeException {
-    public SymbolHaltedException(String message) {
-        super(message);
+public class SymbolHaltedException extends SemanticValidationException {
+    public SymbolHaltedException(String symbol) {
+        super("SYMBOL_HALTED", "Trading is halted for symbol: " + symbol);
     }
 }

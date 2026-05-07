@@ -45,7 +45,7 @@ public class Order {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    @Column(name = "limit_price", precision = 18, scale = 4)
+    @Column(name = "limit_price", precision = 19, scale = 4)
     private BigDecimal limitPrice;
 
     @Enumerated(EnumType.STRING)

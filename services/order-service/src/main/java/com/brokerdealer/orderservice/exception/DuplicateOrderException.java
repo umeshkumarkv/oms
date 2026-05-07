@@ -1,7 +1,7 @@
 package com.brokerdealer.orderservice.exception;
 
-public class DuplicateOrderException extends RuntimeException {
-    public DuplicateOrderException(String message) {
-        super(message);
+public class DuplicateOrderException extends SemanticValidationException {
+    public DuplicateOrderException() {
+        super("DUPLICATE_ORDER", "Duplicate order detected within 30 seconds");
     }
 }
