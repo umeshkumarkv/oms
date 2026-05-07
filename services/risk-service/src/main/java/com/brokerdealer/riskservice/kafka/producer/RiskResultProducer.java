@@ -1,5 +1,6 @@
 package com.brokerdealer.riskservice.kafka.producer;
 
+import com.brokerdealer.riskservice.dto.RiskEvaluationResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -14,8 +15,8 @@ public class RiskResultProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public void publishRiskResult(Object event) {
-        // TODO: implement — JIRA story BD-XX
-        log.info("Stub: publishRiskResult called");
+    public void publishRiskResult(RiskEvaluationResult result) {
+        kafkaTemplate.send(RISK_EVALUATION_RESULT, result.getOrderId().toString(), result);
+        log.info("Risk result published: orderId={} result={}", result.getOrderId(), result.getResult());
     }
 }

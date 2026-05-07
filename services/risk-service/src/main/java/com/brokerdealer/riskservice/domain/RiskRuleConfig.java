@@ -27,6 +27,9 @@ public class RiskRuleConfig {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
