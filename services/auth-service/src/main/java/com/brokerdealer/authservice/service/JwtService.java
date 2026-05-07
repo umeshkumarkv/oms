@@ -25,7 +25,7 @@ public class JwtService {
     private static final String CLAIM_USERNAME = "username";
     private static final String CLAIM_ROLE = "role";
     private static final String BLACKLIST_PREFIX = "auth:blacklist:";
-    private static final long EXPIRY_HOURS = 8;
+    private static final long EXPIRY_MINUTES = 30;
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final String jwtSecret;
@@ -38,7 +38,7 @@ public class JwtService {
 
     public String generateToken(UUID userId, String username, UserRole role) {
         Instant now = Instant.now();
-        Instant expiry = now.plusSeconds(EXPIRY_HOURS * 3600L);
+        Instant expiry = now.plusSeconds(EXPIRY_MINUTES * 60L);
         return Jwts.builder()
                 .claim(CLAIM_USER_ID, userId.toString())
                 .claim(CLAIM_USERNAME, username)

@@ -46,7 +46,7 @@ class AuthControllerTest {
     void shouldReturn200WithTokenOnSuccessfulLogin() throws Exception {
         LoginData loginData = LoginData.builder()
                 .token("eyJhbGciOiJIUzI1NiJ9.test.sig")
-                .expiresAt(Instant.now().plus(8, ChronoUnit.HOURS).toString())
+                .expiresAt(Instant.now().plus(30, ChronoUnit.MINUTES).toString())
                 .role("TRADER")
                 .userId(UUID.randomUUID().toString())
                 .displayName("trader.john")

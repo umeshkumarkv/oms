@@ -64,7 +64,7 @@ class JwtServiceTest {
         verify(valueOperations).set(
                 eq("auth:blacklist:" + token),
                 eq("blacklisted"),
-                longThat(ttl -> ttl > 0 && ttl <= 8 * 3600L),
+                longThat(ttl -> ttl > 0 && ttl <= 30 * 60L),
                 eq(TimeUnit.SECONDS)
         );
     }

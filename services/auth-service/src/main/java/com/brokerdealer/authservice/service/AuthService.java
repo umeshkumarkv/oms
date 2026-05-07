@@ -49,7 +49,7 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole());
-        Instant expiresAt = Instant.now().plusSeconds(8 * 3600L);
+        Instant expiresAt = Instant.now().plusSeconds(30 * 60L);
 
         log.info("Login attempt: username={} role={} result=success", user.getUsername(), user.getRole());
 
