@@ -23,14 +23,14 @@ import java.util.UUID;
  * forwarded by the API gateway. No Spring Security dependency required.
  *
  * Permission matrix:
- *   GET /api/v1/audit/**  → VIEWER, OPERATIONS, ADMIN
+ *   GET /api/v1/audit/**  -- VIEWER, OPERATIONS (ADMIN excluded per BRD 12.2)
  */
 @Component
 @Slf4j
 public class RoleAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String ROLE_HEADER = "X-User-Role";
-    private static final Set<String> AUDIT_READ_ROLES = Set.of("VIEWER", "OPERATIONS", "ADMIN");
+    private static final Set<String> AUDIT_READ_ROLES = Set.of("VIEWER", "OPERATIONS");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

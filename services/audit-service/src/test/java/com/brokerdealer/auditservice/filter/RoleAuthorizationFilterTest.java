@@ -67,17 +67,19 @@ class RoleAuthorizationFilterTest {
     // ─── ADMIN role ───────────────────────────────────────────────────────────
 
     @Test
-    void shouldAllowAdminToGetAuditTrail() throws Exception {
+    void shouldReturn403WhenAdminGetsAuditTrail() throws Exception {
         mockMvc.perform(get("/api/v1/audit/trail")
                         .header("X-User-Role", "ADMIN"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
     }
 
     @Test
-    void shouldAllowAdminToGetOrderAudit() throws Exception {
+    void shouldReturn403WhenAdminGetsOrderAudit() throws Exception {
         mockMvc.perform(get("/api/v1/audit/orders/550e8400-e29b-41d4-a716-446655440000")
                         .header("X-User-Role", "ADMIN"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
     }
 
     // ─── Error envelope shape ─────────────────────────────────────────────────

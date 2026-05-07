@@ -22,8 +22,8 @@ import java.util.UUID;
  * forwarded by the API gateway. No Spring Security dependency required.
  *
  * Permission matrix:
- *   POST /api/v1/orders        → TRADER
- *   GET  /api/v1/orders/**     → VIEWER, TRADER, OPERATIONS, ADMIN
+ *   POST /api/v1/orders        -- TRADER only
+ *   GET  /api/v1/orders/**     -- VIEWER, TRADER, OPERATIONS (ADMIN excluded per BRD 12.2)
  */
 @Component
 @Slf4j
@@ -31,6 +31,7 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String ROLE_HEADER = "X-User-Role";
     private static final Set<String> ALL_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS", "ADMIN");
+    private static final Set<String> ORDER_READ_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -75,9 +76,9 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         if ("POST".equalsIgnoreCase(method) && path.equals("/api/v1/orders")) {
             return "TRADER".equals(role);
         }
-        // GET /api/v1/orders or /api/v1/orders/{id} — all roles
+        // GET /api/v1/orders or /api/v1/orders/{id} — VIEWER, TRADER, OPERATIONS only
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/orders")) {
-            return ALL_ROLES.contains(role);
+            return ORDER_READ_ROLES.contains(role);
         }
         return false;
     }
