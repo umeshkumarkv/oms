@@ -9,6 +9,8 @@ import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.domain.OrderType;
 import com.brokerdealer.orderservice.domain.TimeInForce;
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
+import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
+import com.brokerdealer.orderservice.dto.kafka.RiskEvaluationRequestedEvent;
 import com.brokerdealer.orderservice.dto.market.InstrumentResponse;
 import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
@@ -22,6 +24,7 @@ import com.brokerdealer.orderservice.exception.MarketClosedException;
 import com.brokerdealer.orderservice.exception.SymbolHaltedException;
 import com.brokerdealer.orderservice.exception.SymbolNotFoundException;
 import com.brokerdealer.orderservice.exception.ValidationException;
+import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
 import com.brokerdealer.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,8 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,6 +49,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ClientServiceClient clientServiceClient;
     private final MarketDataServiceClient marketDataServiceClient;
+    private final OrderEventProducer orderEventProducer;
 
     @Transactional
     public SubmitOrderResponse submitOrder(SubmitOrderRequest request, UUID userId) {
@@ -120,6 +126,43 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
         log.info("Order created: orderId={} clientId={} symbol={} side={} status=NEW",
                 savedOrder.getId(), savedOrder.getClientId(), savedOrder.getSymbol(), savedOrder.getSide());
+
+        // --- Compute orderValue for risk evaluation ---
+        BigDecimal orderValue;
+        if (OrderType.valueOf(request.getOrderType()) == OrderType.LIMIT) {
+            orderValue = new BigDecimal(request.getLimitPrice())
+                    .multiply(BigDecimal.valueOf(request.getQuantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+        } else {
+            // MARKET — use lastPrice already fetched from instrumentResponse
+            orderValue = new BigDecimal(instrumentResponse.getData().getLastPrice())
+                    .multiply(BigDecimal.valueOf(request.getQuantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // --- Publish order.state.changed (NEW) ---
+        orderEventProducer.publishOrderStateChanged(OrderStateChangedEvent.builder()
+                .orderId(savedOrder.getId())
+                .clientId(savedOrder.getClientId())
+                .fromState(null)
+                .toState(OrderStatus.NEW.name())
+                .triggeredBy("USER:" + userId)
+                .timestamp(Instant.now().toString())
+                .metadata(Collections.emptyMap())
+                .build());
+
+        // --- Publish risk.evaluation.requested ---
+        orderEventProducer.publishRiskEvaluationRequested(RiskEvaluationRequestedEvent.builder()
+                .orderId(savedOrder.getId())
+                .clientId(savedOrder.getClientId())
+                .symbol(savedOrder.getSymbol())
+                .side(savedOrder.getSide().name())
+                .orderType(savedOrder.getOrderType().name())
+                .quantity(savedOrder.getQuantity())
+                .limitPrice(savedOrder.getLimitPrice() != null ? savedOrder.getLimitPrice().toPlainString() : null)
+                .timeInForce(savedOrder.getTimeInForce().name())
+                .orderValue(orderValue.toPlainString())
+                .build());
 
         return SubmitOrderResponse.builder()
                 .data(SubmitOrderData.builder()
