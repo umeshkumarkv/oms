@@ -125,8 +125,8 @@ public class FillSimulationService {
         executionRepository.save(execution);
 
         executionEventProducer.publishExecutionCompleted(toEvent(execution));
-        log.info("LIMIT full fill: orderId={} executedQty={} executedPrice={}",
-                request.getOrderId(), request.getQuantity(), executedPrice);
+        log.info("LIMIT full fill: orderId={} executedQty={} fillType=FULL",
+                request.getOrderId(), request.getQuantity());
     }
 
     @Transactional

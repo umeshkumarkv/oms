@@ -3,9 +3,9 @@
 
 ALTER TABLE execution_schema.executions
     ADD COLUMN fill_type            VARCHAR(10)   NOT NULL DEFAULT 'FULL',
-    ADD COLUMN fill_value           NUMERIC(18,4) NOT NULL DEFAULT 0,
+    ADD COLUMN fill_value           NUMERIC(19,4) NOT NULL DEFAULT 0,
     ADD COLUMN remaining_quantity   INTEGER       NOT NULL DEFAULT 0,
-    ADD COLUMN market_price_at_fill NUMERIC(18,4) NOT NULL DEFAULT 0,
+    ADD COLUMN market_price_at_fill NUMERIC(19,4) NOT NULL DEFAULT 0,
     ADD COLUMN execution_venue      VARCHAR(50)   NOT NULL DEFAULT 'MOCK_ECN',
     ADD COLUMN client_id            UUID          NOT NULL DEFAULT gen_random_uuid();
 
@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS execution_schema.pending_order_executions (
     side        VARCHAR(10)   NOT NULL,
     order_type  VARCHAR(10)   NOT NULL,
     quantity    INTEGER       NOT NULL CHECK (quantity > 0),
-    limit_price NUMERIC(18,4) NOT NULL,
-    last_price  NUMERIC(18,4) NOT NULL,
-    order_value NUMERIC(18,4) NOT NULL,
+    limit_price NUMERIC(19,4) NOT NULL,
+    last_price  NUMERIC(19,4) NOT NULL,
+    order_value NUMERIC(19,4) NOT NULL,
     status      VARCHAR(10)   NOT NULL DEFAULT 'PENDING',
     created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),

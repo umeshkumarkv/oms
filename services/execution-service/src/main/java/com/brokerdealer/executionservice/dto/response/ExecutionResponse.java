@@ -1,14 +1,10 @@
 package com.brokerdealer.executionservice.dto.response;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Value;
 
-@Data
+@Value
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class ExecutionResponse {
     private String executionId;
     private String orderId;
