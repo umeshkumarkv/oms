@@ -6,6 +6,8 @@ import com.brokerdealer.orderservice.domain.ExpiryApplied;
 import com.brokerdealer.orderservice.domain.Order;
 import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
+import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
+import com.brokerdealer.orderservice.dto.kafka.RiskEvaluationRequestedEvent;
 import com.brokerdealer.orderservice.dto.market.InstrumentResponse;
 import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
@@ -18,10 +20,12 @@ import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
 import com.brokerdealer.orderservice.exception.SymbolHaltedException;
 import com.brokerdealer.orderservice.exception.SymbolNotFoundException;
 import com.brokerdealer.orderservice.exception.ValidationException;
+import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
 import com.brokerdealer.orderservice.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +52,8 @@ class OrderServiceTest {
     private ClientServiceClient clientServiceClient;
     @Mock
     private MarketDataServiceClient marketDataServiceClient;
+    @Mock
+    private OrderEventProducer orderEventProducer;
 
     @InjectMocks
     private OrderService orderService;
@@ -160,7 +166,62 @@ class OrderServiceTest {
         assertThat(response.getData().getExpiryApplied()).isNull();
     }
 
-    // --- L1 validation failures ---
+    // --- Kafka publishing ---
+
+    @Test
+    void shouldPublishOrderStateChangedAfterOrderPersisted() {
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<OrderStateChangedEvent> captor = ArgumentCaptor.forClass(OrderStateChangedEvent.class);
+        verify(orderEventProducer).publishOrderStateChanged(captor.capture());
+
+        OrderStateChangedEvent event = captor.getValue();
+        assertThat(event.getToState()).isEqualTo(OrderStatus.NEW.name());
+        assertThat(event.getFromState()).isNull();
+        assertThat(event.getTriggeredBy()).isEqualTo("USER:" + userId);
+        assertThat(event.getOrderId()).isNotNull();
+        assertThat(event.getTimestamp()).isNotNull();
+    }
+
+    @Test
+    void shouldPublishRiskEvaluationRequestedAfterOrderPersisted() {
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+
+        RiskEvaluationRequestedEvent event = captor.getValue();
+        assertThat(event.getSymbol()).isEqualTo("AAPL");
+        assertThat(event.getSide()).isEqualTo("BUY");
+        assertThat(event.getOrderType()).isEqualTo("MARKET");
+        assertThat(event.getQuantity()).isEqualTo(10);
+        assertThat(event.getOrderValue()).isNotNull();
+        assertThat(event.getOrderId()).isNotNull();
+    }
+
+    @Test
+    void shouldComputeOrderValueFromLimitPriceForLimitOrders() {
+        orderService.submitOrder(limitBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+
+        // limitPrice=150.00, qty=10 → orderValue=1500.00
+        assertThat(captor.getValue().getOrderValue()).isEqualTo("1500.00");
+    }
+
+    @Test
+    void shouldComputeOrderValueFromLastPriceForMarketOrders() {
+        // lastPrice=150.00 (from setUp), qty=10 → orderValue=1500.00
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+
+        assertThat(captor.getValue().getOrderValue()).isEqualTo("1500.00");
+    }
+
+    // --- L1 validation failures (no Kafka) ---
 
     @Test
     void shouldThrowValidationExceptionWhenLimitPriceMissingForLimitOrder() {
@@ -172,6 +233,7 @@ class OrderServiceTest {
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("limitPrice is required");
         verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
     }
 
     @Test

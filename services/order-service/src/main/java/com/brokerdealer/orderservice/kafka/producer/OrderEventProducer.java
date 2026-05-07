@@ -1,5 +1,7 @@
 package com.brokerdealer.orderservice.kafka.producer;
 
+import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
+import com.brokerdealer.orderservice.dto.kafka.RiskEvaluationRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -16,18 +18,20 @@ public class OrderEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public void publishOrderStateChanged(Object event) {
-        // TODO: implement — JIRA story BD-XX
-        log.info("Stub: publishOrderStateChanged called");
+    public void publishOrderStateChanged(OrderStateChangedEvent event) {
+        kafkaTemplate.send(ORDER_STATE_CHANGED, event.getOrderId().toString(), event);
+        log.debug("Published order.state.changed: orderId={} {} -> {}",
+                event.getOrderId(), event.getFromState(), event.getToState());
     }
 
-    public void publishRiskEvaluationRequested(Object event) {
-        // TODO: implement — JIRA story BD-XX
-        log.info("Stub: publishRiskEvaluationRequested called");
+    public void publishRiskEvaluationRequested(RiskEvaluationRequestedEvent event) {
+        kafkaTemplate.send(RISK_EVALUATION_REQUESTED, event.getOrderId().toString(), event);
+        log.debug("Published risk.evaluation.requested: orderId={} symbol={} orderValue={}",
+                event.getOrderId(), event.getSymbol(), event.getOrderValue());
     }
 
     public void publishOrderExecutionRequested(Object event) {
-        // TODO: implement — JIRA story BD-XX
+        // TODO: implement — SCRUM-48
         log.info("Stub: publishOrderExecutionRequested called");
     }
 }
