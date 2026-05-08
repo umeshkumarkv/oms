@@ -1,6 +1,6 @@
 export type OrderSide = 'BUY' | 'SELL'
 export type OrderType = 'MARKET' | 'LIMIT'
-export type TimeInForce = 'DAY' | 'GTC'
+export type TimeInForce = 'DAY' | 'GTD'
 export type OrderStatus =
   | 'NEW'
   | 'VALIDATED'
@@ -24,7 +24,7 @@ export interface SubmitOrderRequest {
   tif: TimeInForce
   quantity: number
   limitPrice?: string
-  expiryDate?: string
+  gtdDate?: string
 }
 
 export interface OrderSummary {
