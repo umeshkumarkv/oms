@@ -4,6 +4,9 @@ spring:
       enabled: true
   application:
     name: risk-service
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME:brokerdealer}

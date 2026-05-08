@@ -36,7 +36,7 @@ public class RiskEvaluationConsumer {
                 .result(result.getResult())
                 .ruleCode(result.getFailedRule())
                 .reason(result.getReason())
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .build());
     }
 }

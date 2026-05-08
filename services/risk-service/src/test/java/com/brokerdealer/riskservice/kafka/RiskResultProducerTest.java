@@ -33,7 +33,7 @@ class RiskResultProducerTest {
                 .result("PASSED")
                 .ruleCode(null)
                 .reason(null)
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .build();
 
         riskResultProducer.publishRiskResult(result);
@@ -49,7 +49,7 @@ class RiskResultProducerTest {
                 .result("REJECTED")
                 .ruleCode("SINGLE_ORDER_QTY_LIMIT")
                 .reason("Qty exceeds limit")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .build();
 
         riskResultProducer.publishRiskResult(result);

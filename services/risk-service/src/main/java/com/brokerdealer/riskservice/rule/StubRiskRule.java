@@ -2,6 +2,7 @@ package com.brokerdealer.riskservice.rule;
 
 import com.brokerdealer.riskservice.domain.RiskResult;
 import com.brokerdealer.riskservice.domain.RiskRule;
+import com.brokerdealer.riskservice.dto.RiskContext;
 import com.brokerdealer.riskservice.dto.RiskEvaluationRequest;
 import lombok.RequiredArgsConstructor;
 
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 public class StubRiskRule implements RiskRule {
 
     private final String ruleCode;
+    private final boolean enabled;
 
     @Override
     public String getRuleCode() {
@@ -20,7 +22,12 @@ public class StubRiskRule implements RiskRule {
     }
 
     @Override
-    public RiskResult evaluate(RiskEvaluationRequest request) {
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    @Override
+    public RiskResult evaluate(RiskEvaluationRequest request, RiskContext context) {
         return RiskResult.passed();
     }
 }

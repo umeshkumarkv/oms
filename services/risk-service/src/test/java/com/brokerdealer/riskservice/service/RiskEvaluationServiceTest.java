@@ -63,7 +63,7 @@ class RiskEvaluationServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(riskRuleConfigRepository.findByEnabledTrueOrderByPriority()).thenReturn(
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(
                 List.of(qtyLimitConfig(true, "10000", 1), valueLimitConfig(true, "500000", 2)));
         riskEvaluationService.loadRules();
     }
@@ -71,7 +71,6 @@ class RiskEvaluationServiceTest {
     @Test
     void shouldReturnPassedWhenAllEnabledRulesPass() {
         RiskEvaluationRequest request = sampleRequest();
-        // qty=100 < 10000 and value=15000 < 500000
 
         RiskResult result = riskEvaluationService.evaluate(request);
 
@@ -94,8 +93,8 @@ class RiskEvaluationServiceTest {
     @Test
     void shouldReturnRejectedWhenOrderValueExceedsLimit() {
         RiskEvaluationRequest request = sampleRequest();
-        request.setQuantity(100);   // qty passes
-        request.setOrderValue("600000.00");  // value fails
+        request.setQuantity(100);
+        request.setOrderValue("600000.00");
 
         RiskResult result = riskEvaluationService.evaluate(request);
 
@@ -105,7 +104,6 @@ class RiskEvaluationServiceTest {
 
     @Test
     void shouldStopAtFirstFailedRuleAndNotEvaluateFurtherRules() {
-        // qty fails first — value rule should not be reached
         RiskEvaluationRequest request = sampleRequest();
         request.setQuantity(15000);
         request.setOrderValue("600000.00");
@@ -117,8 +115,25 @@ class RiskEvaluationServiceTest {
     }
 
     @Test
-    void shouldReturnPassedWhenNoRulesEnabled() {
-        when(riskRuleConfigRepository.findByEnabledTrueOrderByPriority()).thenReturn(List.of());
+    void shouldSkipDisabledRulesDuringEvaluation() {
+        // qty rule is disabled — order with qty=15000 should NOT be rejected
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(
+                List.of(qtyLimitConfig(false, "10000", 1), valueLimitConfig(true, "500000", 2)));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setQuantity(15000);
+        request.setOrderValue("400000.00"); // value passes
+
+        RiskResult result = riskEvaluationService.evaluate(request);
+
+        assertThat(result.getResult()).isEqualTo("PASSED");
+    }
+
+    @Test
+    void shouldReturnPassedWhenAllRulesDisabled() {
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(
+                List.of(qtyLimitConfig(false, "10000", 1), valueLimitConfig(false, "500000", 2)));
         riskEvaluationService.loadRules();
 
         RiskResult result = riskEvaluationService.evaluate(sampleRequest());
@@ -135,7 +150,7 @@ class RiskEvaluationServiceTest {
                 .priority(1)
                 .updatedAt(Instant.now())
                 .build();
-        when(riskRuleConfigRepository.findByEnabledTrueOrderByPriority()).thenReturn(List.of(unknownConfig));
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(unknownConfig));
         riskEvaluationService.loadRules();
 
         RiskResult result = riskEvaluationService.evaluate(sampleRequest());

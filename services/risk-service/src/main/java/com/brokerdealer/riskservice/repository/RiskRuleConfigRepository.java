@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface RiskRuleConfigRepository extends JpaRepository<RiskRuleConfig, String> {
 
-    List<RiskRuleConfig> findByEnabledTrueOrderByPriority();
+    List<RiskRuleConfig> findAllByOrderByPriorityAsc();
 }

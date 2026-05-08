@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -92,5 +93,27 @@ class RiskEvaluationConsumerTest {
         assertThat(result.getResult()).isEqualTo("REJECTED");
         assertThat(result.getRuleCode()).isEqualTo("SINGLE_ORDER_QTY_LIMIT");
         assertThat(result.getReason()).contains("15000");
+    }
+
+    @Test
+    void shouldPropagateExceptionSoKafkaErrorHandlerCanRouteToDlt() {
+        // Consumer must NOT swallow exceptions — Spring Kafka's DefaultErrorHandler
+        // catches the propagated exception, retries 3 times, then routes to DLT
+        UUID orderId = UUID.randomUUID();
+        Map<String, Object> event = Map.of(
+                "orderId", orderId.toString(),
+                "clientId", UUID.randomUUID().toString(),
+                "symbol", "AAPL",
+                "side", "BUY",
+                "orderType", "LIMIT",
+                "quantity", 100,
+                "limitPrice", "150.00",
+                "orderValue", "15000.00"
+        );
+        when(riskEvaluationService.evaluate(any())).thenThrow(new RuntimeException("simulated downstream failure"));
+
+        assertThatThrownBy(() -> riskEvaluationConsumer.consumeRiskEvaluationRequested(event))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("simulated downstream failure");
     }
 }

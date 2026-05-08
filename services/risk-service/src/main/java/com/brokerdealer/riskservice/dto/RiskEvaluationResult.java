@@ -3,6 +3,7 @@ package com.brokerdealer.riskservice.dto;
 import lombok.Builder;
 import lombok.Value;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Value
@@ -13,5 +14,5 @@ public class RiskEvaluationResult {
     String result;
     String ruleCode;
     String reason;
-    String timestamp;
+    Instant timestamp;
 }

@@ -3,6 +3,7 @@ package com.brokerdealer.riskservice.service;
 import com.brokerdealer.riskservice.domain.RiskResult;
 import com.brokerdealer.riskservice.domain.RiskRule;
 import com.brokerdealer.riskservice.domain.RiskRuleConfig;
+import com.brokerdealer.riskservice.dto.RiskContext;
 import com.brokerdealer.riskservice.dto.RiskEvaluationRequest;
 import com.brokerdealer.riskservice.repository.RiskRuleConfigRepository;
 import com.brokerdealer.riskservice.rule.OrderValueLimitRule;
@@ -22,22 +23,30 @@ import java.util.stream.Collectors;
 public class RiskEvaluationService {
 
     private final RiskRuleConfigRepository riskRuleConfigRepository;
-    private List<RiskRule> enabledRules;
+    private List<RiskRule> rules;
 
     @PostConstruct
     void loadRules() {
-        List<RiskRuleConfig> configs = riskRuleConfigRepository.findByEnabledTrueOrderByPriority();
-        enabledRules = configs.stream()
+        List<RiskRuleConfig> configs = riskRuleConfigRepository.findAllByOrderByPriorityAsc();
+        rules = configs.stream()
                 .map(this::buildRule)
                 .collect(Collectors.toList());
-        log.info("Risk rules loaded: count={} codes={}", enabledRules.size(),
-                enabledRules.stream().map(RiskRule::getRuleCode).collect(Collectors.joining(",")));
+        long enabledCount = rules.stream().filter(RiskRule::isEnabled).count();
+        log.info("Risk rules loaded: total={} enabled={} codes={}", rules.size(), enabledCount,
+                rules.stream().filter(RiskRule::isEnabled).map(RiskRule::getRuleCode).collect(Collectors.joining(",")));
     }
 
     public RiskResult evaluate(RiskEvaluationRequest request) {
         log.debug("Evaluating order: orderId={} qty={}", request.getOrderId(), request.getQuantity());
-        for (RiskRule rule : enabledRules) {
-            RiskResult result = rule.evaluate(request);
+        RiskContext context = RiskContext.builder()
+                .orderId(request.getOrderId())
+                .clientId(request.getClientId())
+                .build();
+        for (RiskRule rule : rules) {
+            if (!rule.isEnabled()) {
+                continue;
+            }
+            RiskResult result = rule.evaluate(request, context);
             if ("REJECTED".equals(result.getResult())) {
                 log.info("Order risk rejected: orderId={} rule={}", request.getOrderId(), result.getFailedRule());
                 return result;
@@ -49,9 +58,9 @@ public class RiskEvaluationService {
 
     private RiskRule buildRule(RiskRuleConfig config) {
         return switch (config.getRuleCode()) {
-            case "SINGLE_ORDER_QTY_LIMIT" -> new SingleOrderQtyLimitRule(config.getThresholdValue());
-            case "ORDER_VALUE_LIMIT" -> new OrderValueLimitRule(config.getThresholdValue());
-            default -> new StubRiskRule(config.getRuleCode());
+            case "SINGLE_ORDER_QTY_LIMIT" -> new SingleOrderQtyLimitRule(config.getThresholdValue(), config.getEnabled());
+            case "ORDER_VALUE_LIMIT" -> new OrderValueLimitRule(config.getThresholdValue(), config.getEnabled());
+            default -> new StubRiskRule(config.getRuleCode(), config.getEnabled());
         };
     }
 }
