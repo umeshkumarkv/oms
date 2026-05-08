@@ -74,7 +74,7 @@ class OrderEventProducerTest {
                 .orderType("LIMIT")
                 .quantity(50)
                 .limitPrice("200.00")
-                .timeInForce("GTC")
+                .timeInForce("GTD")
                 .orderValue("10000.00")
                 .build();
 
@@ -90,7 +90,7 @@ class OrderEventProducerTest {
         RiskEvaluationRequestedEvent captured = (RiskEvaluationRequestedEvent) payloadCaptor.getValue();
         assertThat(captured.getOrderValue()).isEqualTo("10000.00");
         assertThat(captured.getLimitPrice()).isEqualTo("200.00");
-        assertThat(captured.getTimeInForce()).isEqualTo("GTC");
+        assertThat(captured.getTimeInForce()).isEqualTo("GTD");
         assertThat(captured.getSymbol()).isEqualTo("TSLA");
         assertThat(captured.getQuantity()).isEqualTo(50);
     }
