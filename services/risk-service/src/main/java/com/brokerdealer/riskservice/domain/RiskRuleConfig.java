@@ -18,14 +18,26 @@ public class RiskRuleConfig {
     @Column(name = "rule_code", nullable = false, length = 100)
     private String ruleCode;
 
+    @Column(name = "rule_name", nullable = false, length = 200)
+    private String ruleName;
+
+    @Column(name = "rule_category", nullable = false, length = 50)
+    private String ruleCategory;
+
     @Column(name = "enabled", nullable = false)
     private Boolean enabled;
 
     @Column(name = "threshold_value", precision = 19, scale = 4)
     private BigDecimal thresholdValue;
 
+    @Column(name = "threshold_unit", length = 50)
+    private String thresholdUnit;
+
     @Column(name = "description", length = 500)
     private String description;
+
+    @Column(name = "action", nullable = false, length = 20)
+    private String action;
 
     @Column(name = "priority", nullable = false)
     private Integer priority;
