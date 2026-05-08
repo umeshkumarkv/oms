@@ -171,9 +171,9 @@ class OrderServiceTest {
     }
 
     @Test
-    void shouldApplyDefaultExpiryForGtcOrder() {
+    void shouldApplyDefaultExpiryForGtdOrder() {
         SubmitOrderRequest request = marketBuyRequest();
-        request.setTimeInForce("GTC");
+        request.setTimeInForce("GTD");
 
         SubmitOrderResponse response = orderService.submitOrder(request, userId);
 
@@ -182,9 +182,9 @@ class OrderServiceTest {
     }
 
     @Test
-    void shouldApplyTraderExpiryForGtcOrderWithDate() {
+    void shouldApplyTraderExpiryForGtdOrderWithDate() {
         SubmitOrderRequest request = marketBuyRequest();
-        request.setTimeInForce("GTC");
+        request.setTimeInForce("GTD");
         LocalDate futureDate = nextWeekday(LocalDate.now().plusDays(10));
         request.setExpiryDate(futureDate);
 
@@ -296,7 +296,7 @@ class OrderServiceTest {
     @Test
     void shouldThrowValidationExceptionForInvalidTimeInForce() {
         SubmitOrderRequest request = marketBuyRequest();
-        request.setTimeInForce("GTD");
+        request.setTimeInForce("INVALID");
 
         assertThatThrownBy(() -> orderService.submitOrder(request, userId))
                 .isInstanceOf(ValidationException.class)
@@ -306,7 +306,7 @@ class OrderServiceTest {
     @Test
     void shouldThrowInvalidExpiryDateExceptionForPastDate() {
         SubmitOrderRequest request = marketBuyRequest();
-        request.setTimeInForce("GTC");
+        request.setTimeInForce("GTD");
         request.setExpiryDate(LocalDate.now().minusDays(1));
 
         assertThatThrownBy(() -> orderService.submitOrder(request, userId))
@@ -317,7 +317,7 @@ class OrderServiceTest {
     @Test
     void shouldThrowInvalidExpiryDateExceptionForWeekendDate() {
         SubmitOrderRequest request = marketBuyRequest();
-        request.setTimeInForce("GTC");
+        request.setTimeInForce("GTD");
         // Find next Saturday
         LocalDate saturday = LocalDate.now().plusDays(1);
         while (saturday.getDayOfWeek().getValue() != 6) {

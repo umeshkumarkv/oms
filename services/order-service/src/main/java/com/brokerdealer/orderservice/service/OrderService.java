@@ -58,7 +58,7 @@ import java.util.UUID;
 @Slf4j
 public class OrderService {
 
-    private static final int GTC_DEFAULT_EXPIRY_DAYS = 180;
+    private static final int GTD_DEFAULT_EXPIRY_DAYS = 180;
 
     private static final int MAX_PAGE_SIZE = 200;
     private static final String ORDER_CACHE_KEY_PREFIX = "order:state:";
@@ -110,13 +110,13 @@ public class OrderService {
         ExpiryApplied expiryApplied = null;
         TimeInForce tif = TimeInForce.valueOf(request.getTimeInForce());
 
-        if (tif == TimeInForce.GTC) {
+        if (tif == TimeInForce.GTD) {
             if (request.getExpiryDate() != null) {
                 validateExpiryDate(request.getExpiryDate());
                 expiryDate = request.getExpiryDate();
                 expiryApplied = ExpiryApplied.TRADER;
             } else {
-                expiryDate = LocalDate.now().plusDays(GTC_DEFAULT_EXPIRY_DAYS);
+                expiryDate = LocalDate.now().plusDays(GTD_DEFAULT_EXPIRY_DAYS);
                 expiryApplied = ExpiryApplied.DEFAULT;
             }
         }
@@ -222,7 +222,7 @@ public class OrderService {
         try {
             TimeInForce.valueOf(request.getTimeInForce());
         } catch (IllegalArgumentException e) {
-            throw new ValidationException("VALIDATION_ERROR", "Invalid timeInForce: must be DAY or GTC");
+            throw new ValidationException("VALIDATION_ERROR", "Invalid timeInForce: must be DAY or GTD");
         }
 
         // limitPrice rules
