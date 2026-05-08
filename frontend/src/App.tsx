@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
 import NavBar from './components/NavBar'
 import Sidebar from './components/Sidebar'
 import LoginPage from './pages/LoginPage'
@@ -11,12 +12,6 @@ import AuditTrailPage from './pages/AuditTrailPage'
 import OrderEntryPage from './pages/OrderEntryPage'
 import AdminPanelPage from './pages/AdminPanelPage'
 import MarketDataPage from './pages/MarketDataPage'
-
-// Redirects unauthenticated users to / (login)
-const ProtectedRoute: React.FC = () => {
-  const { user } = useAuth()
-  return user ? <Outlet /> : <Navigate to="/" replace />
-}
 
 const SIDEBAR_KEY = 'oms-sidebar-collapsed'
 
@@ -57,7 +52,12 @@ const AppRoutes: React.FC = () => (
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/orders" element={<OrderBlotterPage />} />
-        <Route path="/orders/new" element={<OrderEntryPage />} />
+
+        {/* TRADER only — all other authenticated roles redirected to /dashboard */}
+        <Route element={<ProtectedRoute allowedRoles={['TRADER']} />}>
+          <Route path="/orders/new" element={<OrderEntryPage />} />
+        </Route>
+
         <Route path="/portfolio" element={<PortfolioPage />} />
         <Route path="/audit" element={<AuditTrailPage />} />
         <Route path="/admin" element={<AdminPanelPage />} />

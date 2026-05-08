@@ -22,6 +22,7 @@ interface NavItem {
   icon: React.ReactNode
   label: string
   end?: boolean
+  roles?: string[]
 }
 
 interface NavGroup {
@@ -39,7 +40,7 @@ const GROUPS: NavGroup[] = [
   {
     label: 'Trading',
     items: [
-      { to: '/orders/new', icon: <FilePlus size={ICON} />, label: 'New Order' },
+      { to: '/orders/new', icon: <FilePlus size={ICON} />, label: 'New Order', roles: ['TRADER'] },
       { to: '/orders', icon: <ClipboardList size={ICON} />, label: 'Order Blotter', end: true },
     ],
   },
@@ -67,7 +68,12 @@ const ADMIN_GROUP: NavGroup = {
 
 const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
   const { user } = useAuth()
-  const groups = user?.role === 'ADMIN' ? [...GROUPS, ADMIN_GROUP] : GROUPS
+  const userRole = user?.role ?? ''
+  const allGroups = userRole === 'ADMIN' ? [...GROUPS, ADMIN_GROUP] : GROUPS
+  const visibleGroups = allGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => !item.roles || item.roles.includes(userRole)),
+  }))
 
   return (
     <aside
@@ -87,7 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
         borderRight: '1px solid rgba(255,255,255,0.08)',
       }}
     >
-      {groups.map((group) => (
+      {visibleGroups.map((group) => (
         <div key={group.label}>
           <div className="sidebar-group-header">{group.label}</div>
           {group.items.map(({ to, icon, label, end }) => (
