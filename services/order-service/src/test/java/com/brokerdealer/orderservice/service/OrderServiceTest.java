@@ -14,6 +14,7 @@ import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
+import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
@@ -35,9 +36,14 @@ import org.mockito.quality.Strictness;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -382,6 +388,50 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
                 .isInstanceOf(ServiceUnavailableException.class);
+    }
+
+    // --- Cash reservation ---
+
+    @Test
+    void shouldReserveCashBeforeOrderPersistOnBuyLimitOrder() {
+        // limitPrice=150.00, qty=10 → orderValue=1500.00
+        orderService.submitOrder(limitBuyRequest(), userId);
+
+        org.mockito.InOrder inOrder = inOrder(clientServiceClient, orderRepository);
+        inOrder.verify(clientServiceClient).reserveCash(eq(clientId), eq(new BigDecimal("1500.00")));
+        inOrder.verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldSkipCashReservationForSellOrder() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+
+        orderService.submitOrder(request, userId);
+
+        verify(clientServiceClient, never()).reserveCash(any(), any());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldRejectBuyOrderWhenReserveCashReturns422() {
+        doThrow(new InsufficientBuyingPowerException())
+                .when(clientServiceClient).reserveCash(eq(clientId), any(BigDecimal.class));
+
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(InsufficientBuyingPowerException.class);
+        verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
+    }
+
+    @Test
+    void shouldReturn503WhenClientServiceUnavailableOnCashReservation() {
+        doThrow(new ServiceUnavailableException("client-service"))
+                .when(clientServiceClient).reserveCash(eq(clientId), any(BigDecimal.class));
+
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(ServiceUnavailableException.class);
+        verify(orderRepository, never()).save(any());
     }
 
     // --- Helpers ---
