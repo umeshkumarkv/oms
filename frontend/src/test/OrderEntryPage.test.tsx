@@ -138,6 +138,20 @@ describe('OrderEntryPage — submit body', () => {
   })
 })
 
+describe('OrderEntryPage — submit button spinner', () => {
+  it('shouldNotShowSpinnerWhenNotSubmitting', async () => {
+    const { container } = renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    expect(container.querySelector('.btn-spinner')).toBeNull()
+  })
+
+  it('shouldShowSubmitOrderTextWhenNotSubmitting', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    expect(screen.queryByText('Submitting…')).toBeNull()
+  })
+})
+
 describe('OrderEntryPage — order preview', () => {
   it('shouldNotShowExpiresRowForDayOrders', async () => {
     renderPage()

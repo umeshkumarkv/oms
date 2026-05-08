@@ -454,7 +454,12 @@ const OrderEntryPage: React.FC = () => {
             onClick={handleSubmit}
             disabled={submitting || !allChecksPass}
           >
-            {submitting ? 'Submitting…' : 'Submit Order'}
+            {submitting ? (
+              <>
+                <span className="btn-spinner" aria-label="Loading" />
+                Submitting…
+              </>
+            ) : 'Submit Order'}
           </button>
         </div>
 

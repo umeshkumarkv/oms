@@ -213,6 +213,7 @@ Global utility classes defined in `src/index.css`:
 | `.sidebar-link.active` | Active nav link with left border          |
 | `.sidebar-label`    | Label text that fades on collapse            |
 | `.sidebar-group-header` | Section label above nav groups           |
+| `.btn-spinner`          | Rotating circle spinner inside buttons (submit loading state) |
 
 Do not add global classes without documenting them here.
 

@@ -85,6 +85,23 @@ body {
   animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
+/* ── Submit button spinner ──────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
 /* ── Card hover lift ────────────────────────────────────────────────────────── */
 .card-hover {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
