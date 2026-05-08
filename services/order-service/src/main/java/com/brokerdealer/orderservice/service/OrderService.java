@@ -229,20 +229,20 @@ public class OrderService {
         OrderType orderType = OrderType.valueOf(request.getOrderType());
         if (orderType == OrderType.LIMIT) {
             if (request.getLimitPrice() == null || request.getLimitPrice().isBlank()) {
-                throw new ValidationException("LIMIT_PRICE_REQUIRED",
+                throw new ValidationException("limitPrice", "LIMIT_PRICE_REQUIRED",
                         "limitPrice is required for LIMIT orders");
             }
             try {
                 BigDecimal price = new BigDecimal(request.getLimitPrice());
                 if (price.compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new ValidationException("VALIDATION_ERROR", "limitPrice must be greater than 0");
+                    throw new ValidationException("limitPrice", "VALIDATION_ERROR", "limitPrice must be greater than 0");
                 }
             } catch (NumberFormatException e) {
-                throw new ValidationException("VALIDATION_ERROR", "limitPrice must be a valid decimal number");
+                throw new ValidationException("limitPrice", "VALIDATION_ERROR", "limitPrice must be a valid decimal number");
             }
         }
         if (orderType == OrderType.MARKET && request.getLimitPrice() != null && !request.getLimitPrice().isBlank()) {
-            throw new ValidationException("LIMIT_PRICE_NOT_ALLOWED",
+            throw new ValidationException("limitPrice", "LIMIT_PRICE_NOT_ALLOWED",
                     "limitPrice must not be provided for MARKET orders");
         }
     }

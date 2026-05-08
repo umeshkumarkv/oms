@@ -1,5 +1,6 @@
 package com.brokerdealer.orderservice.exception;
 
+import com.brokerdealer.orderservice.dto.response.FieldErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,17 +20,24 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
-        log.warn("L1 validation error: code={} message={}", ex.getErrorCode(), ex.getMessage());
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getErrorCode(), ex.getMessage(), List.of());
+        log.warn("L1 validation error: code={} field={} message={}", ex.getErrorCode(), ex.getFieldName(), ex.getMessage());
+        List<FieldErrorResponse> details = ex.getFieldName() != null
+                ? List.of(FieldErrorResponse.builder().field(ex.getFieldName()).code(ex.getErrorCode()).message(ex.getMessage()).build())
+                : List.of();
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getErrorCode(), ex.getMessage(), details);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
-        List<String> details = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+        List<FieldErrorResponse> details = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> FieldErrorResponse.builder()
+                        .field(fe.getField())
+                        .code("VALIDATION_ERROR")
+                        .message(fe.getDefaultMessage())
+                        .build())
                 .collect(Collectors.toList());
-        String message = details.isEmpty() ? "Validation failed" : details.get(0);
-        log.warn("L1 bean validation error: {}", details);
+        String message = details.isEmpty() ? "Validation failed" : details.get(0).getMessage();
+        log.warn("L1 bean validation error: fields={}", details.stream().map(FieldErrorResponse::getField).toList());
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, details);
     }
 
@@ -59,7 +67,7 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(
-            HttpStatus status, String code, String message, List<String> details) {
+            HttpStatus status, String code, String message, List<?> details) {
         Map<String, Object> body = Map.of(
             "error", Map.of(
                 "code", code,

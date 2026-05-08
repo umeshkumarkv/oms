@@ -1,5 +1,6 @@
 package com.brokerdealer.orderservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,6 +32,7 @@ public class SubmitOrderRequest {
     @NotBlank(message = "orderType is required")
     private String orderType;
 
+    @JsonProperty("tif")
     @NotBlank(message = "timeInForce is required")
     private String timeInForce;
 
@@ -41,6 +43,7 @@ public class SubmitOrderRequest {
     /** Required for LIMIT orders; must be null for MARKET orders. BigDecimal as String. */
     private String limitPrice;
 
-    /** Optional for GTC orders. If provided, sets expiryApplied=TRADER; otherwise defaults to today+180. */
+    /** Optional for GTD orders. If provided, sets expiryApplied=TRADER; otherwise defaults to today+180. */
+    @JsonProperty("gtdDate")
     private LocalDate expiryDate;
 }

@@ -37,8 +37,11 @@ paths:
               example:
                 error:
                   code: VALIDATION_ERROR
-                  message: Order validation failed
-                  details: ["quantity must be greater than 0"]
+                  message: quantity must be greater than 0
+                  details:
+                    - field: quantity
+                      code: VALIDATION_ERROR
+                      message: quantity must be greater than 0
         '422':
           description: Level 2 semantic validation failure
           content:
@@ -292,6 +295,16 @@ components:
             details:
               type: array
               items:
-                type: string
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: quantity
+                  code:
+                    type: string
+                    example: VALIDATION_ERROR
+                  message:
+                    type: string
+                    example: quantity must be greater than 0
         meta:
           $ref: '#/components/schemas/ResponseMeta'

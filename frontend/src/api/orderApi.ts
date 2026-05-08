@@ -39,10 +39,10 @@ export const submitOrder = async (order: SubmitOrderRequest): Promise<SubmitOrde
     symbol:        order.symbol,
     side:          order.side,
     orderType:     order.orderType,
-    timeInForce:   order.tif,
+    tif:           order.tif,
     quantity:      order.quantity,
     limitPrice:    order.limitPrice,
-    expiryDate:    order.gtdDate ?? undefined,
+    gtdDate:       order.gtdDate ?? undefined,
   }
   const res = await http.post('/orders', body)
   return res.data.data

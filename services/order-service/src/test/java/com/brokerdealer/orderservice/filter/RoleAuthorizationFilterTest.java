@@ -85,7 +85,7 @@ class RoleAuthorizationFilterTest {
 
         String validBody = """
                 {"clientOrderId":"ORD-001","clientId":"a1000000-0000-0000-0000-000000000001",
-                 "symbol":"AAPL","side":"BUY","orderType":"MARKET","timeInForce":"DAY","quantity":10}
+                 "symbol":"AAPL","side":"BUY","orderType":"MARKET","tif":"DAY","quantity":10}
                 """;
         mockMvc.perform(post("/api/v1/orders")
                         .header("X-User-Role", "TRADER")

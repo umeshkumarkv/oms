@@ -91,6 +91,7 @@ const s = {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface FieldErrors { quantity?: string; limitPrice?: string; gtdDate?: string; symbol?: string }
+interface ErrorDetail { field: string; code: string; message: string }
 
 interface SubmitError {
   type: 'MARKET_CLOSED' | 'RISK_REJECTED' | 'INVALID_GTD_DATE' | 'VALIDATION_ERROR' | 'GENERIC'
@@ -240,9 +241,11 @@ const OrderEntryPage: React.FC = () => {
       setShowToast(true)
       setTimeout(() => { setShowToast(false); navigate('/orders') }, 2500)
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string } } } }
-      const code    = axiosErr?.response?.data?.error?.code ?? ''
-      const message = axiosErr?.response?.data?.error?.message ?? 'An error occurred. Please try again.'
+      const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string; details?: ErrorDetail[] } } } }
+      const errBody  = axiosErr?.response?.data?.error
+      const code     = errBody?.code ?? ''
+      const message  = errBody?.message ?? 'An error occurred. Please try again.'
+      const details  = errBody?.details ?? []
 
       if (code === 'MARKET_CLOSED') {
         setSubmitError({ type: 'MARKET_CLOSED', message })
@@ -253,7 +256,24 @@ const OrderEntryPage: React.FC = () => {
         setSubmitError({ type: 'INVALID_GTD_DATE', message })
         setFieldErrors((f) => ({ ...f, gtdDate: message }))
       } else {
-        setSubmitError({ type: 'VALIDATION_ERROR', message })
+        // 400 VALIDATION_ERROR — map backend field names to FieldErrors keys
+        // backend uses `expiryDate` Java field name; UI uses `gtdDate`
+        const FIELD_MAP: Record<string, keyof FieldErrors> = {
+          quantity:   'quantity',
+          limitPrice: 'limitPrice',
+          symbol:     'symbol',
+          expiryDate: 'gtdDate',
+        }
+        const mapped: FieldErrors = {}
+        for (const d of details) {
+          const key = FIELD_MAP[d.field]
+          if (key) mapped[key] = d.message
+        }
+        if (Object.keys(mapped).length > 0) {
+          setFieldErrors(mapped)
+        } else {
+          setSubmitError({ type: 'VALIDATION_ERROR', message })
+        }
       }
     } finally {
       setSubmitting(false)
