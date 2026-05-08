@@ -24,6 +24,8 @@ this file first.
 | Icons      | lucide-react                 | 1.x      |
 | Font       | @fontsource/inter            | 5.x      |
 | Date Picker | react-datepicker             | 4.x      |
+| WebSocket  | @stomp/stompjs               | 7.x      |
+| WebSocket  | sockjs-client                | 1.x      |
 | Testing    | Vitest + React Testing Library | 1.x    |
 
 ---
@@ -214,6 +216,8 @@ Global utility classes defined in `src/index.css`:
 | `.sidebar-label`    | Label text that fades on collapse            |
 | `.sidebar-group-header` | Section label above nav groups           |
 | `.btn-spinner`          | Rotating circle spinner inside buttons (submit loading state) |
+| `.toast-slide-in`       | Slide-in animation for notification toasts (translateX 110%→0, opacity 0→1, 0.25s) |
+| `.toast-fade-out`       | Fade-out animation for dismissed toasts (opacity 1→0, 0.3s)  |
 
 Do not add global classes without documenting them here.
 
