@@ -21,11 +21,14 @@ public class RiskRuleConfig {
     @Column(name = "enabled", nullable = false)
     private Boolean enabled;
 
-    @Column(name = "threshold_value", precision = 18, scale = 4)
+    @Column(name = "threshold_value", precision = 19, scale = 4)
     private BigDecimal thresholdValue;
 
     @Column(name = "description", length = 500)
     private String description;
+
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
