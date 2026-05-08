@@ -1,6 +1,8 @@
 package com.brokerdealer.orderservice.client;
 
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
+import com.brokerdealer.orderservice.dto.client.ReserveCashRequest;
+import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Component
@@ -37,6 +40,26 @@ public class ClientServiceClient {
 
     public ClientResponse getClientFallback(UUID clientId, Throwable t) {
         log.warn("Circuit breaker open for client-service: clientId={} reason={}", clientId, t.getMessage());
+        throw new ServiceUnavailableException("client-service");
+    }
+
+    @CircuitBreaker(name = "client-service", fallbackMethod = "reserveCashFallback")
+    public void reserveCash(UUID clientId, BigDecimal orderValue) {
+        String url = clientServiceUrl + "/api/v1/clients/" + clientId + "/reserved-cash";
+        ReserveCashRequest body = ReserveCashRequest.builder()
+                .adjustment(orderValue.toPlainString())
+                .reason("BUY order reservation")
+                .build();
+        log.debug("Calling client-service: PATCH {} adjustment={}", url, orderValue.toPlainString());
+        try {
+            restTemplate.patchForObject(url, body, Void.class);
+        } catch (HttpClientErrorException.UnprocessableEntity e) {
+            throw new InsufficientBuyingPowerException();
+        }
+    }
+
+    public void reserveCashFallback(UUID clientId, BigDecimal orderValue, Throwable t) {
+        log.warn("Circuit breaker open for client-service reserveCash: clientId={} reason={}", clientId, t.getMessage());
         throw new ServiceUnavailableException("client-service");
     }
 }

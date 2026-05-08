@@ -102,12 +102,30 @@ public class OrderService {
             }
         }
 
-        // --- Create and persist order in NEW state ---
+        // --- Compute orderValue for risk evaluation and cash reservation ---
         BigDecimal limitPrice = null;
         if (request.getLimitPrice() != null && !request.getLimitPrice().isBlank()) {
             limitPrice = new BigDecimal(request.getLimitPrice());
         }
 
+        BigDecimal orderValue;
+        if (OrderType.valueOf(request.getOrderType()) == OrderType.LIMIT) {
+            orderValue = new BigDecimal(request.getLimitPrice())
+                    .multiply(BigDecimal.valueOf(request.getQuantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+        } else {
+            // MARKET — use lastPrice already fetched from instrumentResponse
+            orderValue = new BigDecimal(instrumentResponse.getData().getLastPrice())
+                    .multiply(BigDecimal.valueOf(request.getQuantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // --- Reserve cash for BUY orders before persisting ---
+        if (OrderSide.valueOf(request.getSide()) == OrderSide.BUY) {
+            clientServiceClient.reserveCash(request.getClientId(), orderValue);
+        }
+
+        // --- Create and persist order in NEW state ---
         Order order = Order.builder()
                 .clientOrderId(request.getClientOrderId())
                 .clientId(request.getClientId())
@@ -126,19 +144,6 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
         log.info("Order created: orderId={} clientId={} symbol={} side={} status=NEW",
                 savedOrder.getId(), savedOrder.getClientId(), savedOrder.getSymbol(), savedOrder.getSide());
-
-        // --- Compute orderValue for risk evaluation ---
-        BigDecimal orderValue;
-        if (OrderType.valueOf(request.getOrderType()) == OrderType.LIMIT) {
-            orderValue = new BigDecimal(request.getLimitPrice())
-                    .multiply(BigDecimal.valueOf(request.getQuantity()))
-                    .setScale(2, RoundingMode.HALF_UP);
-        } else {
-            // MARKET — use lastPrice already fetched from instrumentResponse
-            orderValue = new BigDecimal(instrumentResponse.getData().getLastPrice())
-                    .multiply(BigDecimal.valueOf(request.getQuantity()))
-                    .setScale(2, RoundingMode.HALF_UP);
-        }
 
         // --- Publish order.state.changed (NEW) ---
         orderEventProducer.publishOrderStateChanged(OrderStateChangedEvent.builder()
