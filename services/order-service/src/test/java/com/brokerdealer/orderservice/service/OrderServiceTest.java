@@ -43,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -396,8 +397,9 @@ class OrderServiceTest {
         // limitPrice=150.00, qty=10 → orderValue=1500.00
         orderService.submitOrder(limitBuyRequest(), userId);
 
-        verify(clientServiceClient).reserveCash(eq(clientId), eq(new BigDecimal("1500.00")));
-        verify(orderRepository).save(any(Order.class));
+        org.mockito.InOrder inOrder = inOrder(clientServiceClient, orderRepository);
+        inOrder.verify(clientServiceClient).reserveCash(eq(clientId), eq(new BigDecimal("1500.00")));
+        inOrder.verify(orderRepository).save(any(Order.class));
     }
 
     @Test
