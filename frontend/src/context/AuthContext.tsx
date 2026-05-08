@@ -22,7 +22,18 @@ type AuthAction =
   | { type: 'SESSION_EXPIRED' }
   | { type: 'CLEAR_SESSION_EXPIRED' }
 
-const initialState: AuthState = { user: null, sessionExpired: false }
+const STORAGE_KEY = 'oms-auth-user'
+
+function loadStoredUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as AuthUser) : null
+  } catch {
+    return null
+  }
+}
+
+const initialState: AuthState = { user: loadStoredUser(), sessionExpired: false }
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
@@ -53,7 +64,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [state, dispatch] = useReducer(authReducer, initialState)
   const navigate = useNavigate()
 
+  // Restore API client state from persisted session on mount
+  useEffect(() => {
+    const stored = loadStoredUser()
+    if (stored) {
+      setApiToken(stored.token)
+      setCurrentUser(stored)
+      marketDataWs.setToken(stored.token)
+    }
+  }, [])
+
   const login = useCallback((user: AuthUser) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     setApiToken(user.token)
     setCurrentUser(user)
     marketDataWs.setToken(user.token)
@@ -61,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY)
     setApiToken(null)
     setCurrentUser(null)
     marketDataWs.setToken(null)
@@ -75,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen for session-expired events dispatched by the Axios response interceptor
   useEffect(() => {
     const handler = () => {
+      localStorage.removeItem(STORAGE_KEY)
       setApiToken(null)
       setCurrentUser(null)
       marketDataWs.setToken(null)
