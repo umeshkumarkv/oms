@@ -59,6 +59,8 @@ app:
       url: ${CLIENT_SERVICE_URL:http://client-service:8083}
     marketdata-service:
       url: ${MARKETDATA_SERVICE_URL:http://marketdata-service:8084}
+    execution-service:
+      url: ${EXECUTION_SERVICE_URL:http://execution-service:8086}
 
 resilience4j:
   circuitbreaker:
@@ -73,11 +75,18 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 10s
         permitted-number-of-calls-in-half-open-state: 3
+      execution-service:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
   timelimiter:
     instances:
       client-service:
         timeout-duration: 2s
       marketdata-service:
+        timeout-duration: 2s
+      execution-service:
         timeout-duration: 2s
 
 logging:

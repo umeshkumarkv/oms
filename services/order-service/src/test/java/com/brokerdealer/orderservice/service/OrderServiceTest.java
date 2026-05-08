@@ -1,22 +1,30 @@
 package com.brokerdealer.orderservice.service;
 
 import com.brokerdealer.orderservice.client.ClientServiceClient;
+import com.brokerdealer.orderservice.client.ExecutionServiceClient;
 import com.brokerdealer.orderservice.client.MarketDataServiceClient;
 import com.brokerdealer.orderservice.domain.ExpiryApplied;
 import com.brokerdealer.orderservice.domain.Order;
+import com.brokerdealer.orderservice.domain.OrderSide;
 import com.brokerdealer.orderservice.domain.OrderStatus;
+import com.brokerdealer.orderservice.domain.OrderType;
+import com.brokerdealer.orderservice.domain.TimeInForce;
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
+import com.brokerdealer.orderservice.dto.execution.ExecutionItem;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
 import com.brokerdealer.orderservice.dto.kafka.RiskEvaluationRequestedEvent;
 import com.brokerdealer.orderservice.dto.market.InstrumentResponse;
 import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
+import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
+import com.brokerdealer.orderservice.dto.response.OrderListResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
+import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
 import com.brokerdealer.orderservice.exception.SymbolHaltedException;
 import com.brokerdealer.orderservice.exception.SymbolNotFoundException;
@@ -32,11 +40,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-
-import java.time.LocalDate;
-import java.util.UUID;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,6 +77,12 @@ class OrderServiceTest {
     private MarketDataServiceClient marketDataServiceClient;
     @Mock
     private OrderEventProducer orderEventProducer;
+    @Mock
+    private ExecutionServiceClient executionServiceClient;
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+    @Mock
+    private ValueOperations<String, Object> valueOperations;
 
     @InjectMocks
     private OrderService orderService;
@@ -96,6 +119,13 @@ class OrderServiceTest {
         InstrumentResponse instrResponse = new InstrumentResponse();
         instrResponse.setData(instrData);
         when(marketDataServiceClient.getInstrument("AAPL")).thenReturn(instrResponse);
+
+        // Default: Redis returns nothing (cache miss)
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(any())).thenReturn(null);
+
+        // Default: execution-service returns no fills
+        when(executionServiceClient.getFills(any())).thenReturn(Collections.emptyList());
 
         // Default repository: save passes through with generated ID
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
@@ -432,6 +462,147 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
                 .isInstanceOf(ServiceUnavailableException.class);
         verify(orderRepository, never()).save(any());
+    }
+
+    // --- GET /orders/{id} ---
+
+    @Test
+    void shouldReturnOrderDetailOnCacheMiss() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.NEW);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        OrderDetailResponse response = orderService.getOrderById(orderId);
+
+        assertThat(response.getData().getOrderId()).isEqualTo(orderId);
+        assertThat(response.getData().getStatus()).isEqualTo("NEW");
+        assertThat(response.getData().getFilledQuantity()).isEqualTo(0);
+        assertThat(response.getData().getFills()).isEmpty();
+        assertThat(response.getMeta().getTimestamp()).isNotNull();
+        verify(valueOperations).set(eq("order:state:" + orderId), eq(order));
+    }
+
+    @Test
+    void shouldReturnOrderDetailFromCacheOnCacheHit() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.RISK_CHECK_PASSED);
+        when(valueOperations.get("order:state:" + orderId)).thenReturn(order);
+
+        OrderDetailResponse response = orderService.getOrderById(orderId);
+
+        assertThat(response.getData().getStatus()).isEqualTo("RISK_CHECK_PASSED");
+        verify(orderRepository, never()).findById(any());
+    }
+
+    @Test
+    void shouldIncludeFillsAndComputeAggregates() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.FILLED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        ExecutionItem fill1 = new ExecutionItem();
+        fill1.setExecutionId("ex-1");
+        fill1.setExecutedQty(5);
+        fill1.setExecutedPrice("150.00");
+        fill1.setFillType("PARTIAL");
+        fill1.setExecutedAt(Instant.now().toString());
+
+        ExecutionItem fill2 = new ExecutionItem();
+        fill2.setExecutionId("ex-2");
+        fill2.setExecutedQty(5);
+        fill2.setExecutedPrice("152.00");
+        fill2.setFillType("FULL");
+        fill2.setExecutedAt(Instant.now().toString());
+
+        when(executionServiceClient.getFills(orderId)).thenReturn(List.of(fill1, fill2));
+
+        OrderDetailResponse response = orderService.getOrderById(orderId);
+
+        assertThat(response.getData().getFilledQuantity()).isEqualTo(10);
+        assertThat(response.getData().getAvgFillPrice()).isEqualTo("151.0000");
+        assertThat(response.getData().getFills()).hasSize(2);
+    }
+
+    @Test
+    void shouldThrowOrderNotFoundWhenOrderDoesNotExist() {
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getOrderById(orderId))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void shouldReturnEmptyFillsWhenExecutionServiceUnavailable() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.SENT_TO_EXECUTION);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(executionServiceClient.getFills(orderId)).thenReturn(Collections.emptyList());
+
+        OrderDetailResponse response = orderService.getOrderById(orderId);
+
+        assertThat(response.getData().getFills()).isEmpty();
+        assertThat(response.getData().getFilledQuantity()).isEqualTo(0);
+        assertThat(response.getData().getAvgFillPrice()).isNull();
+    }
+
+    // --- GET /orders ---
+
+    @Test
+    void shouldReturnPaginatedOrderList() {
+        Order order = buildOrder(UUID.randomUUID(), OrderStatus.NEW);
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+        OrderListResponse response = orderService.getOrders(null, null, null, null, 0, 50);
+
+        assertThat(response.getData().getOrders()).hasSize(1);
+        assertThat(response.getData().getTotalCount()).isEqualTo(1);
+        assertThat(response.getData().getPage()).isEqualTo(0);
+        assertThat(response.getData().getPageSize()).isEqualTo(50);
+        assertThat(response.getMeta().getTimestamp()).isNotNull();
+    }
+
+    @Test
+    void shouldCapPageSizeAt200() {
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        OrderListResponse response = orderService.getOrders(null, null, null, null, 0, 500);
+
+        assertThat(response.getData().getPageSize()).isEqualTo(200);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenNoOrdersMatch() {
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 50), 0));
+
+        OrderListResponse response = orderService.getOrders("FILLED", clientId, null, null, 0, 50);
+
+        assertThat(response.getData().getOrders()).isEmpty();
+        assertThat(response.getData().getTotalCount()).isEqualTo(0);
+        assertThat(response.getData().getTotalPages()).isEqualTo(0);
+    }
+
+    // --- Helpers ---
+
+    private Order buildOrder(UUID id, OrderStatus status) {
+        Instant now = Instant.now();
+        return Order.builder()
+                .id(id)
+                .clientId(clientId)
+                .symbol("AAPL")
+                .side(OrderSide.BUY)
+                .orderType(OrderType.LIMIT)
+                .timeInForce(TimeInForce.DAY)
+                .quantity(10)
+                .limitPrice(new BigDecimal("150.00"))
+                .status(status)
+                .createdBy(userId)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
     }
 
     // --- Helpers ---

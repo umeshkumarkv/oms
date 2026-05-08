@@ -1,6 +1,8 @@
 package com.brokerdealer.orderservice.controller;
 
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
+import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
+import com.brokerdealer.orderservice.dto.response.OrderListResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.service.OrderService;
 import jakarta.validation.Valid;
@@ -41,18 +43,20 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getOrders(
+    public ResponseEntity<OrderListResponse> getOrders(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID clientId,
+            @RequestParam(required = false) String side,
+            @RequestParam(required = false) String timeInForce,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        // TODO: implement — SCRUM-44
-        return ResponseEntity.ok().build();
+            @RequestParam(defaultValue = "50") int pageSize) {
+        OrderListResponse response = orderService.getOrders(status, clientId, side, timeInForce, page, pageSize);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getOrderById(@PathVariable UUID id) {
-        // TODO: implement — SCRUM-44
-        return ResponseEntity.ok().build();
+    public ResponseEntity<OrderDetailResponse> getOrderById(@PathVariable UUID id) {
+        OrderDetailResponse response = orderService.getOrderById(id);
+        return ResponseEntity.ok(response);
     }
 }
