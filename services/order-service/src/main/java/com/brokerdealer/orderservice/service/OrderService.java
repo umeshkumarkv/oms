@@ -1,6 +1,7 @@
 package com.brokerdealer.orderservice.service;
 
 import com.brokerdealer.orderservice.client.ClientServiceClient;
+import com.brokerdealer.orderservice.client.ExecutionServiceClient;
 import com.brokerdealer.orderservice.client.MarketDataServiceClient;
 import com.brokerdealer.orderservice.domain.ExpiryApplied;
 import com.brokerdealer.orderservice.domain.Order;
@@ -9,11 +10,17 @@ import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.domain.OrderType;
 import com.brokerdealer.orderservice.domain.TimeInForce;
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
+import com.brokerdealer.orderservice.dto.execution.ExecutionItem;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
 import com.brokerdealer.orderservice.dto.kafka.RiskEvaluationRequestedEvent;
 import com.brokerdealer.orderservice.dto.market.InstrumentResponse;
 import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
+import com.brokerdealer.orderservice.dto.response.FillResponse;
+import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
+import com.brokerdealer.orderservice.dto.response.OrderListData;
+import com.brokerdealer.orderservice.dto.response.OrderListResponse;
+import com.brokerdealer.orderservice.dto.response.OrderResponse;
 import com.brokerdealer.orderservice.dto.response.ResponseMeta;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
@@ -21,13 +28,19 @@ import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
+import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.exception.SymbolHaltedException;
 import com.brokerdealer.orderservice.exception.SymbolNotFoundException;
 import com.brokerdealer.orderservice.exception.ValidationException;
 import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
 import com.brokerdealer.orderservice.repository.OrderRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +48,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -46,10 +60,15 @@ public class OrderService {
 
     private static final int GTC_DEFAULT_EXPIRY_DAYS = 180;
 
+    private static final int MAX_PAGE_SIZE = 200;
+    private static final String ORDER_CACHE_KEY_PREFIX = "order:state:";
+
     private final OrderRepository orderRepository;
     private final ClientServiceClient clientServiceClient;
     private final MarketDataServiceClient marketDataServiceClient;
     private final OrderEventProducer orderEventProducer;
+    private final ExecutionServiceClient executionServiceClient;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Transactional
     public SubmitOrderResponse submitOrder(SubmitOrderRequest request, UUID userId) {
@@ -240,13 +259,134 @@ public class OrderService {
         }
     }
 
-    public Optional<Object> getOrderById(UUID id) {
-        // TODO: implement — SCRUM-44
-        return Optional.empty();
+    public OrderDetailResponse getOrderById(UUID id) {
+        String cacheKey = ORDER_CACHE_KEY_PREFIX + id;
+        Order order = null;
+
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached instanceof Order cachedOrder) {
+            log.debug("Cache hit for order: orderId={}", id);
+            order = cachedOrder;
+        }
+
+        if (order == null) {
+            order = orderRepository.findById(id)
+                    .orElseThrow(() -> new OrderNotFoundException(id));
+            redisTemplate.opsForValue().set(cacheKey, order);
+            log.debug("Cache miss — populated: orderId={}", id);
+        }
+
+        List<ExecutionItem> fills = executionServiceClient.getFills(id);
+        OrderResponse orderResponse = toOrderResponse(order, fills);
+
+        return OrderDetailResponse.builder()
+                .data(orderResponse)
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
     }
 
-    public Object getOrders(String status, UUID clientId, int page, int size) {
-        // TODO: implement — SCRUM-44
-        return null;
+    public OrderListResponse getOrders(String status, UUID clientId, String side, String timeInForce,
+                                       int page, int pageSize) {
+        int validatedPageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
+        int validatedPage = Math.max(page, 0);
+
+        Specification<Order> spec = buildOrderSpec(status, clientId, side, timeInForce);
+        Page<Order> ordersPage = orderRepository.findAll(spec, PageRequest.of(validatedPage, validatedPageSize));
+
+        List<OrderResponse> items = ordersPage.getContent().stream()
+                .map(o -> toOrderResponse(o, Collections.emptyList()))
+                .toList();
+
+        return OrderListResponse.builder()
+                .data(OrderListData.builder()
+                        .orders(items)
+                        .page(validatedPage)
+                        .pageSize(validatedPageSize)
+                        .totalCount(ordersPage.getTotalElements())
+                        .totalPages(ordersPage.getTotalPages())
+                        .build())
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+    }
+
+    private Specification<Order> buildOrderSpec(String status, UUID clientId, String side, String timeInForce) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (status != null && !status.isBlank()) {
+                try {
+                    predicates.add(cb.equal(root.get("status"), OrderStatus.valueOf(status)));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            if (clientId != null) {
+                predicates.add(cb.equal(root.get("clientId"), clientId));
+            }
+            if (side != null && !side.isBlank()) {
+                try {
+                    predicates.add(cb.equal(root.get("side"), OrderSide.valueOf(side)));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            if (timeInForce != null && !timeInForce.isBlank()) {
+                try {
+                    predicates.add(cb.equal(root.get("timeInForce"), TimeInForce.valueOf(timeInForce)));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private OrderResponse toOrderResponse(Order order, List<ExecutionItem> fills) {
+        int filledQuantity = fills.stream()
+                .mapToInt(f -> f.getExecutedQty() != null ? f.getExecutedQty() : 0)
+                .sum();
+
+        String avgFillPrice = null;
+        if (filledQuantity > 0) {
+            BigDecimal totalValue = fills.stream()
+                    .filter(f -> f.getExecutedPrice() != null && f.getExecutedQty() != null)
+                    .map(f -> new BigDecimal(f.getExecutedPrice())
+                            .multiply(BigDecimal.valueOf(f.getExecutedQty())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            avgFillPrice = totalValue
+                    .divide(BigDecimal.valueOf(filledQuantity), 4, RoundingMode.HALF_UP)
+                    .toPlainString();
+        }
+
+        List<FillResponse> fillResponses = fills.stream()
+                .map(f -> FillResponse.builder()
+                        .executionId(f.getExecutionId())
+                        .executedQty(f.getExecutedQty())
+                        .executedPrice(f.getExecutedPrice())
+                        .fillType(f.getFillType())
+                        .executedAt(f.getExecutedAt())
+                        .build())
+                .toList();
+
+        return OrderResponse.builder()
+                .orderId(order.getId())
+                .clientId(order.getClientId())
+                .clientOrderId(order.getClientOrderId())
+                .symbol(order.getSymbol())
+                .side(order.getSide() != null ? order.getSide().name() : null)
+                .orderType(order.getOrderType() != null ? order.getOrderType().name() : null)
+                .timeInForce(order.getTimeInForce() != null ? order.getTimeInForce().name() : null)
+                .quantity(order.getQuantity())
+                .limitPrice(order.getLimitPrice() != null ? order.getLimitPrice().toPlainString() : null)
+                .status(order.getStatus() != null ? order.getStatus().name() : null)
+                .rejectionReason(order.getRejectionReason())
+                .expiryDate(order.getExpiryDate())
+                .expiryApplied(order.getExpiryApplied() != null ? order.getExpiryApplied().name() : null)
+                .createdAt(order.getCreatedAt() != null ? order.getCreatedAt().toString() : null)
+                .updatedAt(order.getUpdatedAt() != null ? order.getUpdatedAt().toString() : null)
+                .createdBy(order.getCreatedBy())
+                .filledQuantity(filledQuantity)
+                .avgFillPrice(avgFillPrice)
+                .fills(fillResponses)
+                .build();
     }
 }
