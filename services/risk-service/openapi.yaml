@@ -15,6 +15,13 @@ paths:
       operationId: getRiskRules
       security:
         - bearerAuth: []
+      parameters:
+        - name: X-User-Role
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN]
       responses:
         '200':
           description: List of risk rules
@@ -22,6 +29,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RiskRuleListResponse'
+        '401':
+          description: Missing role header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Role not permitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: FORBIDDEN
+                  message: Role TRADER is not permitted to GET /api/v1/risk/rules
+                  details: []
 
   /api/v1/risk/rules/{ruleCode}:
     patch:
@@ -35,12 +59,28 @@ paths:
           required: true
           schema:
             type: string
+        - name: X-User-Role
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN]
+        - name: X-User-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: User ID forwarded by gateway — recorded as changedBy in audit
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateRiskRuleRequest'
+            example:
+              enabled: true
+              changeReason: "Enabling for demo"
       responses:
         '200':
           description: Risk rule updated
@@ -48,6 +88,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RiskRuleResponse'
+        '400':
+          description: Validation error — changeReason missing or blank
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: changeReason is required
+                  details: []
         '404':
           description: Rule not found
           content:
@@ -59,6 +110,33 @@ paths:
                   code: RULE_NOT_FOUND
                   message: Risk rule not found
                   details: []
+
+  /api/v1/risk/rules/audit:
+    get:
+      summary: Get risk rule change audit log
+      operationId: getRiskRuleAuditLog
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-User-Role
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN]
+      responses:
+        '200':
+          description: Audit log ordered by changedAt descending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskRuleAuditListResponse'
+        '403':
+          description: Role not permitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   securitySchemes:
@@ -73,13 +151,31 @@ components:
       properties:
         ruleCode:
           type: string
+          example: SINGLE_ORDER_QTY_LIMIT
+        ruleName:
+          type: string
+          example: Single Order Quantity Limit
+        ruleCategory:
+          type: string
+          example: FINANCIAL_LIMIT
+        description:
+          type: string
         enabled:
           type: boolean
         thresholdValue:
           type: string
           nullable: true
-        description:
+          example: "10000.0000"
+        thresholdUnit:
           type: string
+          nullable: true
+          example: QUANTITY
+        action:
+          type: string
+          example: REJECT
+        priority:
+          type: integer
+          example: 1
 
     RiskRuleListResponse:
       type: object
@@ -101,13 +197,58 @@ components:
 
     UpdateRiskRuleRequest:
       type: object
-      required: [enabled]
+      required:
+        - changeReason
       properties:
         enabled:
           type: boolean
+          nullable: true
         thresholdValue:
           type: string
           nullable: true
+          description: BigDecimal string representation
+        changeReason:
+          type: string
+          description: Mandatory reason for the change — recorded in audit log
+
+    RiskRuleAuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruleCode:
+          type: string
+        fieldChanged:
+          type: string
+          example: enabled
+        oldValue:
+          type: string
+          nullable: true
+          example: "false"
+        newValue:
+          type: string
+          nullable: true
+          example: "true"
+        changedBy:
+          type: string
+          example: "admin-user-uuid"
+        changeReason:
+          type: string
+          example: "Enabling for demo"
+        changedAt:
+          type: string
+          format: date-time
+
+    RiskRuleAuditListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskRuleAuditEntry'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
 
     ResponseMeta:
       type: object
