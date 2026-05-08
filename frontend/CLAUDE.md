@@ -266,5 +266,4 @@ Do not add global classes without documenting them here.
 - Mobile layout (screen < 700px only hides login left panel)
 - Drag-and-drop order management
 - Real-time charting (TradingView or similar)
-- Notification popover / notification centre
 - User preference persistence beyond sidebar state
