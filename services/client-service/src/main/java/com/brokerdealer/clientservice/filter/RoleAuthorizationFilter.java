@@ -23,8 +23,9 @@ import java.util.UUID;
  * forwarded by the API gateway. No Spring Security dependency required.
  *
  * Permission matrix:
- *   GET   /api/v1/clients/**              -- VIEWER, TRADER, OPERATIONS, ADMIN
- *   PATCH /api/v1/clients/{id}/reserved-cash  -- system call (order-service), no X-User-Role required
+ *   GET   /api/v1/clients/**                   -- VIEWER, TRADER, OPERATIONS, ADMIN
+ *   GET   /api/v1/clients/{id}/portfolio       -- VIEWER, TRADER, OPERATIONS (ADMIN excluded per BRD 12.2)
+ *   PATCH /api/v1/clients/{id}/reserved-cash   -- system call (order-service), no X-User-Role required
  */
 @Component
 @Slf4j
@@ -76,8 +77,15 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
     }
 
     private boolean isAllowed(String role, String method, String path) {
+        if (!ALL_ROLES.contains(role)) {
+            return false;
+        }
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/clients")) {
-            return ALL_ROLES.contains(role);
+            // ADMIN cannot access portfolio data per BRD Section 12.2
+            if (path.contains("/portfolio") && "ADMIN".equals(role)) {
+                return false;
+            }
+            return true;
         }
         return false;
     }

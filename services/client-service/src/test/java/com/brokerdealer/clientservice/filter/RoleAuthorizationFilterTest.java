@@ -107,6 +107,16 @@ class RoleAuthorizationFilterTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void shouldReturn403WhenAdminGetsPortfolio() throws Exception {
+        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID + "/portfolio")
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
     // ─── System call — reserved-cash PATCH bypasses role check ───────────────
 
     @Test
