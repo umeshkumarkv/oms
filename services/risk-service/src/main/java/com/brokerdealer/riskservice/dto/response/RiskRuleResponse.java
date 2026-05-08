@@ -3,8 +3,6 @@ package com.brokerdealer.riskservice.dto.response;
 import lombok.Builder;
 import lombok.Value;
 
-import java.math.BigDecimal;
-
 @Value
 @Builder
 public class RiskRuleResponse {
@@ -13,7 +11,7 @@ public class RiskRuleResponse {
     String ruleCategory;
     String description;
     Boolean enabled;
-    BigDecimal thresholdValue;
+    String thresholdValue;
     String thresholdUnit;
     String action;
     Integer priority;

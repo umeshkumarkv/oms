@@ -14,7 +14,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -50,7 +49,7 @@ class RiskRuleControllerTest {
                 .ruleName("Price Deviation Check")
                 .ruleCategory("FAT_FINGER")
                 .enabled(false)
-                .thresholdValue(new BigDecimal("10.0000"))
+                .thresholdValue("10.0000")
                 .thresholdUnit("PERCENT")
                 .action("REJECT")
                 .priority(3)
@@ -90,7 +89,7 @@ class RiskRuleControllerTest {
                 .ruleName("Price Deviation Check")
                 .ruleCategory("FAT_FINGER")
                 .enabled(true)
-                .thresholdValue(new BigDecimal("10.0000"))
+                .thresholdValue("10.0000")
                 .thresholdUnit("PERCENT")
                 .action("REJECT")
                 .priority(3)

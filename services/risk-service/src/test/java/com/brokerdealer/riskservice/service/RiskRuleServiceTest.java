@@ -125,7 +125,7 @@ class RiskRuleServiceTest {
         request.setChangeReason("Tightening threshold");
 
         RiskRuleResponse response = RiskRuleResponse.builder()
-                .ruleCode("PRICE_DEVIATION_CHECK").thresholdValue(new BigDecimal("15.0000")).build();
+                .ruleCode("PRICE_DEVIATION_CHECK").thresholdValue("15.0000").build();
 
         when(riskRuleConfigRepository.findById("PRICE_DEVIATION_CHECK")).thenReturn(Optional.of(sampleRule));
         when(riskRuleConfigRepository.save(any())).thenReturn(sampleRule);
