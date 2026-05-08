@@ -1,6 +1,7 @@
 package com.brokerdealer.notificationservice.kafka.consumer;
 
 import com.brokerdealer.notificationservice.domain.NotificationType;
+import com.brokerdealer.notificationservice.dto.event.RiskEvaluationResultEvent;
 import com.brokerdealer.notificationservice.dto.response.NotificationResponse;
 import com.brokerdealer.notificationservice.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -9,8 +10,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -19,34 +18,35 @@ public class RiskResultConsumer {
 
     private final NotificationService notificationService;
 
-    @KafkaListener(topics = "risk.evaluation.result",
-                   groupId = "notification-service-risk.evaluation.result-group")
-    public void consumeRiskResult(Object event) {
-        // TODO: implement — JIRA story BD-XX
-        // Expected payload fields: orderId, clientId, result (PASSED/REJECTED), reason, timestamp
-        log.info("Stub: RiskResultConsumer.consumeRiskResult received message");
-
-        // Skeleton push — replace with real event deserialization in implementation story
-        if (event instanceof Map<?, ?> payload) {
-            try {
-                UUID clientId = UUID.fromString(String.valueOf(payload.get("clientId")));
-                UUID orderId  = UUID.fromString(String.valueOf(payload.get("orderId")));
-                String result = String.valueOf(payload.get("result"));
-
-                NotificationResponse notification = NotificationResponse.builder()
-                        .type(NotificationType.RISK_RESULT)
-                        .orderId(orderId)
-                        .clientId(clientId)
-                        .title("Risk Check Result")
-                        .message("Order " + orderId + " risk evaluation: " + result)
-                        .timestamp(Instant.now())
-                        .build();
-
-                notificationService.pushToClient(clientId, notification);
-                notificationService.broadcast(notification);
-            } catch (Exception e) {
-                log.warn("RiskResultConsumer: could not parse event payload: {}", e.getMessage());
-            }
+    @KafkaListener(
+            topics = "risk.evaluation.result",
+            groupId = "notification-service-risk.evaluation.result-group",
+            containerFactory = "riskResultListenerContainerFactory"
+    )
+    public void consumeRiskResult(RiskEvaluationResultEvent event) {
+        if (event.getClientId() == null || event.getOrderId() == null) {
+            log.warn("RiskResultConsumer: skipping event with null clientId or orderId");
+            return;
         }
+
+        if ("PASSED".equals(event.getResult())) {
+            log.debug("RiskResultConsumer: orderId={} PASSED — no push", event.getOrderId());
+            return;
+        }
+
+        log.info("RiskResultConsumer: orderId={} REJECTED rule={}", event.getOrderId(), event.getFailedRule());
+
+        NotificationResponse notification = NotificationResponse.builder()
+                .type(NotificationType.RISK_RESULT)
+                .orderId(event.getOrderId())
+                .clientId(event.getClientId())
+                .title("Order Rejected")
+                .message("Order " + event.getOrderId() + " rejected by risk rule "
+                        + event.getFailedRule() + ": " + event.getReason())
+                .timestamp(Instant.now())
+                .build();
+
+        notificationService.pushToClient(event.getClientId(), notification);
+        notificationService.broadcast(notification);
     }
 }

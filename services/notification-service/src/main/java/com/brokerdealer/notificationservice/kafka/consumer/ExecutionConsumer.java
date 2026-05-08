@@ -1,6 +1,7 @@
 package com.brokerdealer.notificationservice.kafka.consumer;
 
 import com.brokerdealer.notificationservice.domain.NotificationType;
+import com.brokerdealer.notificationservice.dto.event.ExecutionCompletedEvent;
 import com.brokerdealer.notificationservice.dto.response.NotificationResponse;
 import com.brokerdealer.notificationservice.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -9,8 +10,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -19,34 +18,43 @@ public class ExecutionConsumer {
 
     private final NotificationService notificationService;
 
-    @KafkaListener(topics = "execution.completed",
-                   groupId = "notification-service-execution.completed-group")
-    public void consumeExecutionCompleted(Object event) {
-        // TODO: implement — JIRA story BD-XX
-        // Expected payload fields: executionId, orderId, clientId, symbol, side, quantity, price, status, timestamp
-        log.info("Stub: ExecutionConsumer.consumeExecutionCompleted received message");
-
-        // Skeleton push — replace with real event deserialization in implementation story
-        if (event instanceof Map<?, ?> payload) {
-            try {
-                UUID clientId = UUID.fromString(String.valueOf(payload.get("clientId")));
-                UUID orderId  = UUID.fromString(String.valueOf(payload.get("orderId")));
-                String status = String.valueOf(payload.get("status"));
-
-                NotificationResponse notification = NotificationResponse.builder()
-                        .type(NotificationType.EXECUTION_COMPLETED)
-                        .orderId(orderId)
-                        .clientId(clientId)
-                        .title("Execution Update")
-                        .message("Order " + orderId + " execution status: " + status)
-                        .timestamp(Instant.now())
-                        .build();
-
-                notificationService.pushToClient(clientId, notification);
-                notificationService.broadcast(notification);
-            } catch (Exception e) {
-                log.warn("ExecutionConsumer: could not parse event payload: {}", e.getMessage());
-            }
+    @KafkaListener(
+            topics = "execution.completed",
+            groupId = "notification-service-execution.completed-group",
+            containerFactory = "executionListenerContainerFactory"
+    )
+    public void consumeExecutionCompleted(ExecutionCompletedEvent event) {
+        if (event.getClientId() == null || event.getOrderId() == null) {
+            log.warn("ExecutionConsumer: skipping event with null clientId or orderId");
+            return;
         }
+
+        log.info("ExecutionConsumer: orderId={} fillType={}", event.getOrderId(), event.getFillType());
+
+        String title;
+        String message;
+
+        if ("FULL".equals(event.getFillType())) {
+            title = "Order Filled";
+            message = event.getSymbol() + " " + event.getSide() + " " + event.getExecutedQty()
+                    + " \u2014 Fully filled at " + event.getExecutedPrice();
+        } else {
+            title = "Partial Fill";
+            message = event.getSymbol() + " " + event.getSide() + " " + event.getExecutedQty()
+                    + " filled at " + event.getExecutedPrice()
+                    + " \u2014 " + event.getRemainingQuantity() + " remaining";
+        }
+
+        NotificationResponse notification = NotificationResponse.builder()
+                .type(NotificationType.EXECUTION_COMPLETED)
+                .orderId(event.getOrderId())
+                .clientId(event.getClientId())
+                .title(title)
+                .message(message)
+                .timestamp(Instant.now())
+                .build();
+
+        notificationService.pushToClient(event.getClientId(), notification);
+        notificationService.broadcast(notification);
     }
 }

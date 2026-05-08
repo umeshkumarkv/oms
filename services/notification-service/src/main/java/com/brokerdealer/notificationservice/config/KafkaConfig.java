@@ -1,5 +1,8 @@
 package com.brokerdealer.notificationservice.config;
 
+import com.brokerdealer.notificationservice.dto.event.ExecutionCompletedEvent;
+import com.brokerdealer.notificationservice.dto.event.OrderStateChangedEvent;
+import com.brokerdealer.notificationservice.dto.event.RiskEvaluationResultEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -54,12 +57,58 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
-        // Exponential backoff: 1s, 2s, 4s (3 attempts) then publish to DLT
+        factory.setCommonErrorHandler(buildErrorHandler(kafkaTemplate));
+        return factory;
+    }
+
+    // ── Typed consumer factories (USE_TYPE_HEADERS=false) ─────────────────────
+    // notification-service does not have producing services' event classes on the
+    // classpath, so we must ignore __TypeId__ headers and deserialize to local DTOs.
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderStateChangedEvent>
+            orderStateListenerContainerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        ConcurrentKafkaListenerContainerFactory<String, OrderStateChangedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(typedConsumerFactory(OrderStateChangedEvent.class));
+        factory.setCommonErrorHandler(buildErrorHandler(kafkaTemplate));
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ExecutionCompletedEvent>
+            executionListenerContainerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        ConcurrentKafkaListenerContainerFactory<String, ExecutionCompletedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(typedConsumerFactory(ExecutionCompletedEvent.class));
+        factory.setCommonErrorHandler(buildErrorHandler(kafkaTemplate));
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, RiskEvaluationResultEvent>
+            riskResultListenerContainerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        ConcurrentKafkaListenerContainerFactory<String, RiskEvaluationResultEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(typedConsumerFactory(RiskEvaluationResultEvent.class));
+        factory.setCommonErrorHandler(buildErrorHandler(kafkaTemplate));
+        return factory;
+    }
+
+    private <T> ConsumerFactory<String, T> typedConsumerFactory(Class<T> targetType) {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.brokerdealer.*");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, targetType.getName());
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    private DefaultErrorHandler buildErrorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
         ExponentialBackOff backOff = new ExponentialBackOff(1000L, 2.0);
         backOff.setMaxAttempts(3);
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
-                new DeadLetterPublishingRecoverer(kafkaTemplate), backOff);
-        factory.setCommonErrorHandler(errorHandler);
-        return factory;
+        return new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate), backOff);
     }
 }
