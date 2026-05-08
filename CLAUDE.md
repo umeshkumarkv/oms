@@ -92,6 +92,7 @@ Gate labels on JIRA tickets enforce the pipeline.
 | Framework      | Spring Boot Web MVC           | 3.2.x        |
 | Build          | Maven multi-module            | 3.9+         |
 | Frontend       | React + TypeScript + Vite     | 18.x         |
+| Date Picker    | react-datepicker (frontend)   | 4.x          |
 | Database       | PostgreSQL                    | 15           |
 | ORM            | Spring Data JPA + Hibernate   | Via Boot     |
 | Migrations     | Flyway                        | Via Boot     |

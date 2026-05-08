@@ -23,6 +23,7 @@ this file first.
 | HTTP       | Axios                        | 1.x      |
 | Icons      | lucide-react                 | 1.x      |
 | Font       | @fontsource/inter            | 5.x      |
+| Date Picker | react-datepicker             | 4.x      |
 | Testing    | Vitest + React Testing Library | 1.x    |
 
 ---

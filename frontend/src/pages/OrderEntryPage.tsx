@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle, XCircle } from 'lucide-react'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
 import { getHolidays, getInstrument, getInstruments } from '../api/marketApi'
 import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
@@ -19,6 +21,13 @@ const tomorrowStr = (): string => {
   const d = new Date()
   d.setDate(d.getDate() + 1)
   return d.toISOString().split('T')[0]
+}
+
+const toYYYYMMDD = (d: Date): string => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -74,10 +83,14 @@ const s = {
   modalTitle:   { margin: '0 0 12px', fontSize: '17px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
   modalBody:    { fontSize: '13px', color: 'var(--color-text-primary)', marginBottom: '20px', lineHeight: 1.6 } as React.CSSProperties,
   modalClose:   { padding: '8px 20px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600 } as React.CSSProperties,
+
+  // GTD date picker wrapper
+  datepickerWrapper:      { border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
+  datepickerWrapperError: { border: '1.5px solid var(--color-error)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface FieldErrors { quantity?: string; limitPrice?: string; expiryDate?: string; symbol?: string }
+interface FieldErrors { quantity?: string; limitPrice?: string; gtdDate?: string; symbol?: string }
 
 interface SubmitError {
   type: 'MARKET_CLOSED' | 'RISK_REJECTED' | 'INVALID_GTD_DATE' | 'VALIDATION_ERROR' | 'GENERIC'
@@ -99,7 +112,7 @@ const OrderEntryPage: React.FC = () => {
   const [quantity,    setQuantity]    = useState('')
   const [limitPrice,  setLimitPrice]  = useState('')
   const [tif,         setTif]         = useState<TimeInForce>('DAY')
-  const [expiryDate,  setExpiryDate]  = useState('')
+  const [gtdDate,     setGtdDate]     = useState<Date | null>(null)
 
   const [instruments,  setInstruments]  = useState<Instrument[]>([])
   const [quote,        setQuote]        = useState<Instrument | null>(null)
@@ -116,9 +129,34 @@ const OrderEntryPage: React.FC = () => {
 
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Computed values for the GTD date picker
+  const tomorrow: Date = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
+
+  const holidayDates: Date[] = useMemo(
+    () => holidays.map((h) => new Date(h.holidayDate + 'T12:00:00')),
+    [holidays]
+  )
+
+  const gtdDateStr: string = useMemo(
+    () => (gtdDate ? toYYYYMMDD(gtdDate) : ''),
+    [gtdDate]
+  )
+
+  const gtdDisplayStr: string | null = useMemo(
+    () => gtdDate
+      ? gtdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : null,
+    [gtdDate]
+  )
+
   useEffect(() => {
     getInstruments().then(setInstruments)
-    getHolidays().then(setHolidays)
+    getHolidays().then(setHolidays).catch(() => {})
     getClients().then((list) => {
       setClients(list)
       if (list.length > 0) setClientId(list[0].clientId)
@@ -161,6 +199,8 @@ const OrderEntryPage: React.FC = () => {
   const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
   const heldQty    = holding ? holding.quantity : 0
 
+  const filterWeekdays = (date: Date): boolean => date.getDay() !== 0 && date.getDay() !== 6
+
   const isWeekendOrHoliday = (dateStr: string): boolean => {
     if (!dateStr) return false
     const d = new Date(dateStr + 'T12:00:00')
@@ -172,7 +212,7 @@ const OrderEntryPage: React.FC = () => {
     symbol:     symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
     quantity:   !isNaN(qty) && qty > 0,
     limitPrice: orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0),
-    gtdDate:    tif === 'DAY' || (expiryDate !== '' && expiryDate >= tomorrowStr() && !isWeekendOrHoliday(expiryDate)),
+    gtdDate:    tif === 'DAY' || (gtdDate !== null && gtdDateStr >= tomorrowStr() && !isWeekendOrHoliday(gtdDateStr)),
     notHalted:  !quote || !quote.halted,
   }
 
@@ -194,7 +234,7 @@ const OrderEntryPage: React.FC = () => {
         quantity: qty,
         limitPrice: orderType === 'LIMIT' ? limitPrice : undefined,
         tif,
-        expiryDate: tif === 'GTC' && expiryDate ? expiryDate : undefined,
+        gtdDate: tif === 'GTD' && gtdDateStr ? gtdDateStr : undefined,
       })
       setToastMsg(`Order ${res.orderId} submitted successfully`)
       setShowToast(true)
@@ -211,7 +251,7 @@ const OrderEntryPage: React.FC = () => {
         setShowModal(true)
       } else if (code === 'INVALID_GTD_DATE') {
         setSubmitError({ type: 'INVALID_GTD_DATE', message })
-        setFieldErrors((f) => ({ ...f, expiryDate: message }))
+        setFieldErrors((f) => ({ ...f, gtdDate: message }))
       } else {
         setSubmitError({ type: 'VALIDATION_ERROR', message })
       }
@@ -367,33 +407,37 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Time in Force</label>
             <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(tif === 'DAY')} onClick={() => setTif('DAY')}>DAY</button>
-              <button style={s.toggleBtn(tif === 'GTC')} onClick={() => setTif('GTC')}>GTC</button>
+              <button
+                style={s.toggleBtn(tif === 'DAY')}
+                onClick={() => { setTif('DAY'); setGtdDate(null) }}
+              >DAY</button>
+              <button
+                style={s.toggleBtn(tif === 'GTD')}
+                onClick={() => setTif('GTD')}
+              >GTD</button>
             </div>
           </div>
 
-          {/* Expiry Date */}
-          {tif === 'GTC' && (
+          {/* GTD Date Picker */}
+          {tif === 'GTD' && (
             <div style={s.fieldGroup}>
-              <label style={s.label}>Expiry Date</label>
-              <input
-                style={(fieldErrors.expiryDate || (expiryDate && isWeekendOrHoliday(expiryDate))) ? s.inputError : s.input}
-                type="date"
-                min={tomorrowStr()}
-                value={expiryDate}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setExpiryDate(v)
-                  if (v && isWeekendOrHoliday(v)) {
-                    setFieldErrors((f) => ({ ...f, expiryDate: 'Market is closed on weekends and holidays' }))
-                  } else {
-                    setFieldErrors((f) => ({ ...f, expiryDate: undefined }))
-                  }
-                }}
-              />
-              {(fieldErrors.expiryDate || (expiryDate && isWeekendOrHoliday(expiryDate))) && (
-                <div style={s.errorText}>{fieldErrors.expiryDate ?? 'Market is closed on weekends and holidays'}</div>
-              )}
+              <label style={s.label}>GTD Date</label>
+              <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
+                <DatePicker
+                  selected={gtdDate}
+                  onChange={(date: Date | null) => {
+                    setGtdDate(date)
+                    setFieldErrors((f) => ({ ...f, gtdDate: undefined }))
+                  }}
+                  filterDate={filterWeekdays}
+                  excludeDates={holidayDates}
+                  minDate={tomorrow}
+                  dateFormat="MMM dd, yyyy"
+                  placeholderText="Select GTD date"
+                  className="gtd-datepicker-input"
+                />
+              </div>
+              {fieldErrors.gtdDate && <div style={s.errorText}>{fieldErrors.gtdDate}</div>}
             </div>
           )}
 
@@ -437,6 +481,12 @@ const OrderEntryPage: React.FC = () => {
               <span style={s.rowLabel}>Buying Power</span>
               <span style={s.rowValue(true, 'var(--color-success)')}>{portfolio ? fmt(portfolio.buyingPower) : '—'}</span>
             </div>
+            {tif === 'GTD' && gtdDisplayStr && (
+              <div style={s.row}>
+                <span style={s.rowLabel}>Expires</span>
+                <span style={s.rowValue()}>{gtdDisplayStr} at 4:00 PM ET</span>
+              </div>
+            )}
 
             {orderValue > 0 && (
               <>
@@ -465,11 +515,11 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.card}>
             <h2 style={s.cardTitle}>Validation</h2>
             {[
-              { label: 'Symbol entered',                                                                                   pass: checks.symbol     },
-              { label: 'Quantity > 0',                                                                                     pass: checks.quantity   },
-              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                      pass: checks.limitPrice },
-              { label: tif === 'GTC'   ? 'Expiry date is a future trading day' : 'DAY order — no expiry needed',          pass: checks.gtdDate    },
-              { label: 'Symbol not halted',                                                                                pass: checks.notHalted  },
+              { label: 'Symbol entered',                                                                                    pass: checks.symbol     },
+              { label: 'Quantity > 0',                                                                                      pass: checks.quantity   },
+              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                       pass: checks.limitPrice },
+              { label: tif === 'GTD'   ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',              pass: checks.gtdDate    },
+              { label: 'Symbol not halted',                                                                                 pass: checks.notHalted  },
             ].map(({ label, pass }) => (
               <div key={label} style={s.checkRow}>
                 {pass
