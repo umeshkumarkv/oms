@@ -7,6 +7,7 @@ import com.brokerdealer.riskservice.dto.RiskContext;
 import com.brokerdealer.riskservice.dto.RiskEvaluationRequest;
 import com.brokerdealer.riskservice.repository.RiskRuleConfigRepository;
 import com.brokerdealer.riskservice.rule.MaxOrderQtyRule;
+import com.brokerdealer.riskservice.rule.MaxOrderValueRule;
 import com.brokerdealer.riskservice.rule.OrderValueLimitRule;
 import com.brokerdealer.riskservice.rule.SingleOrderQtyLimitRule;
 import com.brokerdealer.riskservice.rule.StubRiskRule;
@@ -62,6 +63,7 @@ public class RiskEvaluationService {
             case "SINGLE_ORDER_QTY_LIMIT" -> new SingleOrderQtyLimitRule(config.getThresholdValue(), config.getEnabled());
             case "ORDER_VALUE_LIMIT" -> new OrderValueLimitRule(config.getThresholdValue(), config.getEnabled());
             case "RULE_MAX_ORDER_QTY" -> new MaxOrderQtyRule(config.getThresholdValue(), config.getEnabled());
+            case "RULE_MAX_ORDER_VALUE" -> new MaxOrderValueRule(config.getThresholdValue(), config.getEnabled());
             default -> new StubRiskRule(config.getRuleCode(), config.getEnabled());
         };
     }
