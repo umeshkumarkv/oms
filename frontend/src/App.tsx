@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import NavBar from './components/NavBar'
 import Sidebar from './components/Sidebar'
+import NotificationToast from './components/NotificationToast'
+import { useNotifications } from './hooks/useNotifications'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import OrderBlotterPage from './pages/OrderBlotterPage'
@@ -19,6 +21,12 @@ const SIDEBAR_KEY = 'oms-sidebar-collapsed'
 const AppLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState<boolean>(
     () => localStorage.getItem(SIDEBAR_KEY) === 'true'
+  )
+  const { user } = useAuth()
+  const { notifications, dismiss } = useNotifications(
+    user?.token ?? '',
+    user?.userId ?? '',
+    user?.role ?? ''
   )
 
   const toggleSidebar = () => {
@@ -38,6 +46,7 @@ const AppLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      <NotificationToast notifications={notifications} onDismiss={dismiss} />
     </div>
   )
 }
