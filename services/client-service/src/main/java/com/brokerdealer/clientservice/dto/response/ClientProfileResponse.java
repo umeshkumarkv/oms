@@ -19,4 +19,5 @@ public class ClientProfileResponse {
     Boolean tradingEnabled;
     KycStatus kycStatus;
     LocalDate kycExpiryDate;
+    Boolean marginCallActive;
 }
