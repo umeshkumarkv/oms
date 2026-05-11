@@ -2,6 +2,7 @@ package com.brokerdealer.orderservice.dto.client;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -18,6 +19,7 @@ public class ClientResponse {
         private String status;        // "ACTIVE" | "BLOCKED"
         private Boolean tradingEnabled;
         private String kycStatus;
+        private LocalDate kycExpiryDate;
         private Boolean marginCallActive;
     }
 }

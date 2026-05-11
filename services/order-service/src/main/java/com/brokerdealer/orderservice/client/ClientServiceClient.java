@@ -8,6 +8,9 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -31,7 +34,10 @@ public class ClientServiceClient {
         String url = clientServiceUrl + "/api/v1/clients/" + clientId;
         log.debug("Calling client-service: GET {}", url);
         try {
-            ResponseEntity<ClientResponse> response = restTemplate.getForEntity(url, ClientResponse.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-User-Role", "SYSTEM");
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<ClientResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity, ClientResponse.class);
             return response.getBody();
         } catch (HttpClientErrorException.NotFound e) {
             return null;

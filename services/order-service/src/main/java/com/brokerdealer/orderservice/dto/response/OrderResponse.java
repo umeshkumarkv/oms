@@ -10,7 +10,7 @@ import java.util.UUID;
 @Value
 @Builder
 public class OrderResponse {
-    UUID orderId;
+    UUID id;
     UUID clientId;
     String clientOrderId;
     String symbol;
