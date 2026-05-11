@@ -21,6 +21,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.springframework.http.HttpMethod;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -50,7 +52,7 @@ class ClientServiceClientTest {
         data.setStatus("ACTIVE");
         expected.setData(data);
 
-        when(restTemplate.getForEntity(anyString(), eq(ClientResponse.class)))
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(ClientResponse.class)))
                 .thenReturn(ResponseEntity.ok(expected));
 
         ClientResponse result = clientServiceClient.getClient(clientId);
@@ -61,7 +63,7 @@ class ClientServiceClientTest {
 
     @Test
     void shouldReturnNullWhenClientNotFound() {
-        when(restTemplate.getForEntity(anyString(), eq(ClientResponse.class)))
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(ClientResponse.class)))
                 .thenThrow(HttpClientErrorException.NotFound.class);
 
         ClientResponse result = clientServiceClient.getClient(clientId);

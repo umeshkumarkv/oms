@@ -561,7 +561,7 @@ class OrderServiceTest {
 
         OrderDetailResponse response = orderService.getOrderById(orderId);
 
-        assertThat(response.getData().getOrderId()).isEqualTo(orderId);
+        assertThat(response.getData().getId()).isEqualTo(orderId);
         assertThat(response.getData().getStatus()).isEqualTo("NEW");
         assertThat(response.getData().getFilledQuantity()).isEqualTo(0);
         assertThat(response.getData().getFills()).isEmpty();

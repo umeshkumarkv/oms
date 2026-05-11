@@ -394,7 +394,7 @@ public class OrderService {
                 .toList();
 
         return OrderResponse.builder()
-                .orderId(order.getId())
+                .id(order.getId())
                 .clientId(order.getClientId())
                 .clientOrderId(order.getClientOrderId())
                 .symbol(order.getSymbol())

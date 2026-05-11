@@ -234,7 +234,7 @@ class OrderControllerTest {
         mockMvc.perform(get("/api/v1/orders/" + orderId)
                         .header("X-User-Role", "TRADER"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.data.id").value(orderId.toString()))
                 .andExpect(jsonPath("$.data.status").value("NEW"))
                 .andExpect(jsonPath("$.data.fills").isArray())
                 .andExpect(jsonPath("$.meta.timestamp").isNotEmpty());
@@ -284,7 +284,7 @@ class OrderControllerTest {
 
     private OrderDetailResponse buildDetailResponse() {
         OrderResponse orderResponse = OrderResponse.builder()
-                .orderId(orderId)
+                .id(orderId)
                 .clientId(clientId)
                 .symbol("AAPL")
                 .side("BUY")
@@ -308,7 +308,7 @@ class OrderControllerTest {
 
     private OrderListResponse buildListResponse() {
         OrderResponse orderResponse = OrderResponse.builder()
-                .orderId(orderId)
+                .id(orderId)
                 .clientId(clientId)
                 .symbol("AAPL")
                 .side("BUY")

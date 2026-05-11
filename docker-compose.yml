@@ -11,6 +11,12 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/2181'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     networks:
       - broker-dealer-net
 
@@ -18,7 +24,8 @@ services:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
     environment:
@@ -36,6 +43,12 @@ services:
         order.state.changed.DLT:1:1,
         risk.evaluation.requested.DLT:1:1,
         execution.completed.DLT:1:1
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - broker-dealer-net
 
@@ -98,15 +111,18 @@ services:
       SPRING_DATASOURCE_PASSWORD: brokerdealer
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -127,15 +143,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=auth_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -156,15 +175,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=order_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8082/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -185,15 +207,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=client_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8083/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -215,15 +240,18 @@ services:
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
       SPRING_PROFILES_ACTIVE: dev
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8084/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -244,15 +272,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=risk_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8085/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -273,15 +304,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=execution_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8086/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -302,15 +336,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=audit_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
-      - redis
-      - postgres
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8087/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 
@@ -326,13 +363,14 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8088/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     networks:
       - broker-dealer-net
 

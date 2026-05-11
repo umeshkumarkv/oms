@@ -32,7 +32,7 @@ import java.util.UUID;
 public class RoleAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String ROLE_HEADER = "X-User-Role";
-    private static final Set<String> ALL_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS", "ADMIN");
+    private static final Set<String> ALL_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS", "ADMIN", "SYSTEM");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -82,7 +82,8 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         }
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/clients")) {
             // ADMIN cannot access portfolio data per BRD Section 12.2
-            if (path.contains("/portfolio") && "ADMIN".equals(role)) {
+            // SYSTEM role (internal service-to-service) cannot access portfolio data
+            if (path.contains("/portfolio") && ("ADMIN".equals(role) || "SYSTEM".equals(role))) {
                 return false;
             }
             return true;
