@@ -136,7 +136,7 @@ const s = {
 
   grid:        { display: 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', alignItems: 'start' } as React.CSSProperties,
 
-  section:     { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflow: 'hidden' } as React.CSSProperties,
+  section:     { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'hidden' } as React.CSSProperties,
   sHead:       { padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
   sTitleRow:   { display: 'flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
   sTitle:      { margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' } as React.CSSProperties,
@@ -215,11 +215,13 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
       <thead>
         <tr>
           <th style={s.th}>Symbol</th>
-          <th style={s.thRight}>Last</th>
+          <th style={s.thRight}>Live Price</th>
+          <th style={s.thRight}>Prev Close</th>
           <th style={s.thRight}>Change</th>
           <th style={s.thRight}>Chg %</th>
           <th style={s.thRight}>Bid</th>
           <th style={s.thRight}>Ask</th>
+          <th style={s.thRight}>Volume</th>
           <th style={s.thRight}>Spread</th>
           <th style={s.thRight}>Day High</th>
           <th style={s.thRight}>Day Low</th>
@@ -231,7 +233,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
               <tr key={i}>
-                {Array.from({ length: 11 }).map((_, j) => (
+                {Array.from({ length: 13 }).map((_, j) => (
                   <td key={j} style={s.td}><div style={s.skeleton} /></td>
                 ))}
               </tr>
@@ -257,6 +259,8 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
 
                   <td style={s.tdMono}><strong>{fmt(livePx)}</strong></td>
 
+                  <td style={s.tdMono}>{inst.previousClose ? `$${fmt(inst.previousClose)}` : '—'}</td>
+
                   <td style={{ ...s.tdRight, fontVariantNumeric: 'tabular-nums', fontFamily: "'Menlo','Consolas',monospace" }}>
                     <span style={{ fontWeight: 600, color: pctColor(change) }}>
                       {change >= 0 ? '+' : ''}{fmt(change)}
@@ -276,6 +280,10 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
 
                   <td style={s.tdMono}>{fmt(liveBid)}</td>
                   <td style={s.tdMono}>{fmt(liveAsk)}</td>
+
+                  <td style={{ ...s.tdMono, color: '#334155' }}>
+                    {inst.volume != null ? inst.volume.toLocaleString() : '—'}
+                  </td>
 
                   <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
                     {spread(liveBid, liveAsk)}
@@ -435,9 +443,13 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
           <span style={s.spreadVal}>{selectedBase.previousClose ? `$${fmt(selectedBase.previousClose)}` : '—'}</span>
         </div>
 
-        <div style={s.tsRow}>
-          <span style={s.tsLabel}>Last Updated</span>
-          <span style={s.tsValue}>{fmtET(liveTs)}</span>
+        <div style={s.spreadRow}>
+          <span style={s.spreadLabel}>Last Updated</span>
+          <span style={s.spreadVal}>{fmtET(liveTs)}</span>
+          <span style={s.spreadLabel}>Volume</span>
+          <span style={s.spreadVal}>
+            {selectedBase.volume != null ? selectedBase.volume.toLocaleString() : '—'}
+          </span>
         </div>
 
         <div style={s.divider} />
@@ -511,7 +523,7 @@ const MarketDataPage: React.FC = () => {
         const sel = selectedRef.current
         const [insts, history] = await Promise.all([
           getInstruments(),
-          sel ? getTickHistory(sel) : Promise.resolve(null),
+          (sel && !wsLiveRef.current) ? getTickHistory(sel) : Promise.resolve(null),
         ])
         setInstruments(insts as Instrument[])
         if (sel) {
