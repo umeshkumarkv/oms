@@ -15,6 +15,8 @@ export function useNotifications(token: string, userId: string, role: string) {
   }, [])
 
   useEffect(() => {
+    if (!token || !userId) return
+
     const destination =
       role === 'TRADER'
         ? `/topic/notifications/${userId}`

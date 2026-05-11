@@ -1,5 +1,6 @@
 package com.brokerdealer.auditservice.controller;
 
+import com.brokerdealer.auditservice.dto.response.AuditTrailResponse;
 import com.brokerdealer.auditservice.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,20 +16,18 @@ public class AuditController {
     private final AuditService auditService;
 
     @GetMapping("/orders/{id}")
-    public ResponseEntity<?> getOrderAuditTrail(@PathVariable UUID id) {
-        // TODO: implement — JIRA story BD-XX
-        return ResponseEntity.ok().build();
+    public ResponseEntity<AuditTrailResponse> getOrderAuditTrail(@PathVariable UUID id) {
+        return ResponseEntity.ok(auditService.getOrderAuditTrail(id));
     }
 
     @GetMapping("/trail")
-    public ResponseEntity<?> getAuditTrail(
+    public ResponseEntity<AuditTrailResponse> getAuditTrail(
             @RequestParam(required = false) UUID clientId,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String entityType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        // TODO: implement — JIRA story BD-XX
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(auditService.getAuditTrail(clientId, page, size));
     }
 }

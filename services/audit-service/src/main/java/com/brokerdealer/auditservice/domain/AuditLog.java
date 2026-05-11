@@ -41,6 +41,9 @@ public class AuditLog {
     @Column(name = "event_timestamp", nullable = false)
     private Instant eventTimestamp;
 
+    @Column(name = "client_id")
+    private UUID clientId;
+
     @Column(name = "metadata", columnDefinition = "TEXT")
     private String metadata;
 }
