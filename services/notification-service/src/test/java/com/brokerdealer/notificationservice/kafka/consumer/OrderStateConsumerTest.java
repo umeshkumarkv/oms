@@ -11,7 +11,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +29,8 @@ class OrderStateConsumerTest {
     void shouldPushToClientOnValidEvent() {
         OrderStateChangedEvent event = validEvent();
         consumer.consumeOrderStateChanged(event);
-        verify(notificationService).pushToClient(eq(event.getClientId()), any());
+        // pushes to userId (auth userId) when present, not clientId
+        verify(notificationService).pushToClient(eq(event.getUserId()), any());
     }
 
     @Test
@@ -77,13 +77,14 @@ class OrderStateConsumerTest {
     }
 
     @Test
-    void shouldSkipWhenClientIdIsNull() {
+    void shouldSkipPushWhenBothUserIdAndClientIdAreNull() {
         OrderStateChangedEvent event = validEvent();
         event.setClientId(null);
+        event.setUserId(null);
 
         consumer.consumeOrderStateChanged(event);
 
-        verifyNoInteractions(notificationService);
+        verify(notificationService, never()).pushToClient(any(), any());
     }
 
     @Test
@@ -97,13 +98,13 @@ class OrderStateConsumerTest {
     }
 
     @Test
-    void shouldNotCallPushWhenClientIdIsNull() {
+    void shouldFallbackToClientIdWhenUserIdIsNull() {
         OrderStateChangedEvent event = validEvent();
-        event.setClientId(null);
+        event.setUserId(null);
 
         consumer.consumeOrderStateChanged(event);
 
-        verify(notificationService, never()).pushToClient(any(), any());
+        verify(notificationService).pushToClient(eq(event.getClientId()), any());
     }
 
     @Test
@@ -120,10 +121,11 @@ class OrderStateConsumerTest {
         return new OrderStateChangedEvent(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
+                UUID.randomUUID(),
                 "NEW",
                 "VALIDATED",
-                "SYSTEM",
-                Instant.now()
+                "USER:system",
+                "2026-05-11T10:00:00Z"
         );
     }
 }

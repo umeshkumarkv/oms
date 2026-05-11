@@ -14,8 +14,9 @@ public class RiskEvaluationResultEvent {
 
     private UUID orderId;
     private UUID clientId;
+    private UUID userId;
     private String result;
-    private String failedRule;
+    private String ruleCode;
     private String reason;
     private Instant timestamp;
 }

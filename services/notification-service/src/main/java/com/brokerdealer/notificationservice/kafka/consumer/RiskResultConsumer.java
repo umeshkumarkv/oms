@@ -10,6 +10,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -24,8 +25,8 @@ public class RiskResultConsumer {
             containerFactory = "riskResultListenerContainerFactory"
     )
     public void consumeRiskResult(RiskEvaluationResultEvent event) {
-        if (event.getClientId() == null || event.getOrderId() == null) {
-            log.warn("RiskResultConsumer: skipping event with null clientId or orderId");
+        if (event.getOrderId() == null) {
+            log.warn("RiskResultConsumer: skipping event with null orderId");
             return;
         }
 
@@ -34,7 +35,7 @@ public class RiskResultConsumer {
             return;
         }
 
-        log.info("RiskResultConsumer: orderId={} REJECTED rule={}", event.getOrderId(), event.getFailedRule());
+        log.info("RiskResultConsumer: orderId={} REJECTED rule={}", event.getOrderId(), event.getRuleCode());
 
         NotificationResponse notification = NotificationResponse.builder()
                 .type(NotificationType.RISK_RESULT)
@@ -42,11 +43,15 @@ public class RiskResultConsumer {
                 .clientId(event.getClientId())
                 .title("Order Rejected")
                 .message("Order " + event.getOrderId() + " rejected by risk rule "
-                        + event.getFailedRule() + ": " + event.getReason())
+                        + event.getRuleCode() + ": " + event.getReason())
                 .timestamp(Instant.now())
                 .build();
 
-        notificationService.pushToClient(event.getClientId(), notification);
+        // Push to the trader who owns the order (by auth userId), fallback to clientId
+        UUID pushTarget = event.getUserId() != null ? event.getUserId() : event.getClientId();
+        if (pushTarget != null) {
+            notificationService.pushToClient(pushTarget, notification);
+        }
         notificationService.broadcast(notification);
     }
 }

@@ -9,6 +9,7 @@ public class RiskEvaluationRequest {
 
     private UUID orderId;
     private UUID clientId;
+    private UUID userId;
     private String symbol;
     private String side;
     private String orderType;

@@ -16,6 +16,7 @@ public class OrderStateChangedEvent {
 
     private UUID orderId;
     private UUID clientId;
+    private UUID userId;         // auth-service userId (createdBy) — for targeted WS push
     private String fromState;    // null on initial NEW publication
     private String toState;
     private String triggeredBy;  // "USER:{userId}" | "SYSTEM:OMS" | "SYSTEM:RISK_ENGINE"

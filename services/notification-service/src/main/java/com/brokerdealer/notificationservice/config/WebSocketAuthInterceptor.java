@@ -47,10 +47,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-            String username = claims.get("username", String.class);
-            String principalName = (username != null && !username.isBlank()) ? username : claims.getSubject();
-            accessor.setUser(new UsernamePasswordAuthenticationToken(principalName, null, Collections.emptyList()));
-            log.debug("WebSocket CONNECT authenticated: userId={}", claims.getSubject());
+            final String userId = claims.get("userId", String.class);
+            accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList()));
+            log.debug("WebSocket CONNECT authenticated: userId={}", userId);
         } catch (Exception e) {
             log.warn("WebSocket CONNECT rejected — invalid JWT: {}", e.getMessage());
             throw new IllegalArgumentException("Invalid JWT token");

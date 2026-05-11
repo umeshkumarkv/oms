@@ -11,6 +11,8 @@ import java.util.UUID;
 public class RiskEvaluationResult {
 
     UUID orderId;
+    UUID clientId;
+    UUID userId;
     String result;
     String ruleCode;
     String reason;

@@ -10,6 +10,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -24,13 +25,13 @@ public class OrderStateConsumer {
             containerFactory = "orderStateListenerContainerFactory"
     )
     public void consumeOrderStateChanged(OrderStateChangedEvent event) {
-        if (event.getClientId() == null || event.getOrderId() == null) {
-            log.warn("OrderStateConsumer: skipping event with null clientId or orderId");
+        if (event.getOrderId() == null) {
+            log.warn("OrderStateConsumer: skipping event with null orderId");
             return;
         }
 
         log.info("OrderStateConsumer: orderId={} {} -> {}",
-                event.getOrderId(), event.getPreviousState(), event.getNewState());
+                event.getOrderId(), event.getFromState(), event.getToState());
 
         NotificationResponse notification = NotificationResponse.builder()
                 .type(NotificationType.ORDER_STATE_CHANGED)
@@ -38,11 +39,15 @@ public class OrderStateConsumer {
                 .clientId(event.getClientId())
                 .title("Order Update")
                 .message("Order " + event.getOrderId() + " transitioned "
-                        + event.getPreviousState() + " \u2192 " + event.getNewState())
+                        + event.getFromState() + " \u2192 " + event.getToState())
                 .timestamp(Instant.now())
                 .build();
 
-        notificationService.pushToClient(event.getClientId(), notification);
+        // Push to the trader who owns the order (by auth userId), fallback to clientId
+        UUID pushTarget = event.getUserId() != null ? event.getUserId() : event.getClientId();
+        if (pushTarget != null) {
+            notificationService.pushToClient(pushTarget, notification);
+        }
         notificationService.broadcast(notification);
     }
 }

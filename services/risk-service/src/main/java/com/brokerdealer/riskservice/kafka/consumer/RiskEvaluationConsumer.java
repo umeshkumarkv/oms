@@ -33,6 +33,8 @@ public class RiskEvaluationConsumer {
 
         riskResultProducer.publishRiskResult(RiskEvaluationResult.builder()
                 .orderId(request.getOrderId())
+                .clientId(request.getClientId())
+                .userId(request.getUserId())
                 .result(result.getResult())
                 .ruleCode(result.getFailedRule())
                 .reason(result.getReason())
