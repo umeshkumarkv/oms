@@ -5,7 +5,7 @@ import { Instrument, MarketConfig, TickEntry } from '../types/market.types'
 import { marketDataWs } from '../services/websocketService'
 import { getCurrentUser } from '../api/authApi'
 import { IntradayChart, generateIntraday, IntradayPoint } from '../components/StockCard'
-import { useMarketSocket } from '../hooks/useMarketSocket'
+import { useMarketSocket, TickData } from '../hooks/useMarketSocket'
 import { isMarketOpen } from '../utils/marketHours'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ interface WatchlistPanelProps {
   instruments: Instrument[]
   loading:     boolean
   selected:    string | null
-  ticks:       Record<string, { price: number; bid: number; ask: number; timestamp: string }>
+  ticks:       Record<string, TickData>
   marketOpen:  boolean
   onSelect:    (symbol: string) => void
 }
@@ -240,14 +240,17 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
             ))
           : instruments.map(inst => {
               // WS tick overrides REST data; REST data is always kept fresh by the unified poll
-              const tick    = ticks[inst.symbol]
-              const livePx  = tick?.price ?? Number(inst.lastPrice)
-              const liveBid = tick?.bid   ?? Number(inst.bidPrice)
-              const liveAsk = tick?.ask   ?? Number(inst.askPrice)
-              const liveTs  = tick?.timestamp ?? inst.dataTimestamp
-              const prev    = Number(inst.previousClose ?? inst.lastPrice)
-              const change  = livePx - prev
-              const changePct = prev !== 0 ? (change / prev) * 100 : 0
+              const tick        = ticks[inst.symbol]
+              const livePx      = tick?.price         ?? Number(inst.lastPrice)
+              const liveBid     = tick?.bid            ?? Number(inst.bidPrice)
+              const liveAsk     = tick?.ask            ?? Number(inst.askPrice)
+              const liveTs      = tick?.timestamp      ?? inst.dataTimestamp
+              const livePrev    = tick?.previousClose  ?? Number(inst.previousClose ?? inst.lastPrice)
+              const liveDayHigh = tick?.dayHigh        ?? (inst.dayHigh ? Number(inst.dayHigh) : null)
+              const liveDayLow  = tick?.dayLow         ?? (inst.dayLow  ? Number(inst.dayLow)  : null)
+              const liveVolume  = tick?.volume         ?? inst.volume   ?? null
+              const change      = tick?.change         ?? (livePx - livePrev)
+              const changePct   = tick?.changePct      ?? (livePrev !== 0 ? (change / livePrev) * 100 : 0)
 
               return (
                 <tr
@@ -259,7 +262,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
 
                   <td style={s.tdMono}><strong>{fmt(livePx)}</strong></td>
 
-                  <td style={s.tdMono}>{inst.previousClose ? `$${fmt(inst.previousClose)}` : '—'}</td>
+                  <td style={s.tdMono}>{livePrev ? `$${fmt(livePrev)}` : '—'}</td>
 
                   <td style={{ ...s.tdRight, fontVariantNumeric: 'tabular-nums', fontFamily: "'Menlo','Consolas',monospace" }}>
                     <span style={{ fontWeight: 600, color: pctColor(change) }}>
@@ -282,7 +285,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                   <td style={s.tdMono}>{fmt(liveAsk)}</td>
 
                   <td style={{ ...s.tdMono, color: '#334155' }}>
-                    {inst.volume != null ? inst.volume.toLocaleString() : '—'}
+                    {liveVolume != null ? liveVolume.toLocaleString() : '—'}
                   </td>
 
                   <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
@@ -290,10 +293,10 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                   </td>
 
                   <td style={{ ...s.tdMono, color: '#10b981' }}>
-                    {inst.dayHigh ? `$${fmt(inst.dayHigh)}` : '—'}
+                    {liveDayHigh != null ? `$${fmt(liveDayHigh)}` : '—'}
                   </td>
                   <td style={{ ...s.tdMono, color: '#ef4444' }}>
-                    {inst.dayLow ? `$${fmt(inst.dayLow)}` : '—'}
+                    {liveDayLow != null ? `$${fmt(liveDayLow)}` : '—'}
                   </td>
 
                   <td style={s.td}>
@@ -325,7 +328,7 @@ interface StockDetailPanelProps {
   detailLoading:  boolean
   candles:        IntradayPoint[]     // from unified poll — in sync with watchlist
   candlesLoading: boolean
-  ticks:          Record<string, { price: number; bid: number; ask: number; timestamp: string }>
+  ticks:          Record<string, TickData>
   marketOpen:     boolean
   onNavigate:     (path: string) => void
 }
@@ -370,7 +373,7 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
   const liveBid   = tick?.bid       ?? Number(selectedBase.bidPrice)
   const liveAsk   = tick?.ask       ?? Number(selectedBase.askPrice)
   const liveTs    = tick?.timestamp ?? selectedBase.dataTimestamp
-  const prevClose = Number(selectedBase.previousClose ?? selectedBase.lastPrice)
+  const prevClose = tick?.previousClose ?? Number(selectedBase.previousClose ?? selectedBase.lastPrice)
   const change    = livePx - prevClose
   const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
   const halted    = selectedBase.halted   ?? false
@@ -440,7 +443,7 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
           <span style={s.spreadLabel}>Spread</span>
           <span style={s.spreadVal}>{spread(liveBid, liveAsk)}</span>
           <span style={s.spreadLabel}>Prev Close</span>
-          <span style={s.spreadVal}>{selectedBase.previousClose ? `$${fmt(selectedBase.previousClose)}` : '—'}</span>
+          <span style={s.spreadVal}>{prevClose ? `$${fmt(prevClose)}` : '—'}</span>
         </div>
 
         <div style={s.spreadRow}>
@@ -448,7 +451,9 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
           <span style={s.spreadVal}>{fmtET(liveTs)}</span>
           <span style={s.spreadLabel}>Volume</span>
           <span style={s.spreadVal}>
-            {selectedBase.volume != null ? selectedBase.volume.toLocaleString() : '—'}
+            {(tick?.volume ?? selectedBase.volume) != null
+              ? (tick?.volume ?? selectedBase.volume)!.toLocaleString()
+              : '—'}
           </span>
         </div>
 
@@ -519,20 +524,19 @@ const MarketDataPage: React.FC = () => {
     const intervalMs = config?.pollingIntervalMs ?? 5_000
 
     const poll = async () => {
+      if (wsLiveRef.current) return  // WS live — all price data comes from socket
       try {
         const sel = selectedRef.current
         const [insts, history] = await Promise.all([
           getInstruments(),
-          (sel && !wsLiveRef.current) ? getTickHistory(sel) : Promise.resolve(null),
+          sel ? getTickHistory(sel) : Promise.resolve(null),
         ])
         setInstruments(insts as Instrument[])
         if (sel) {
           const updated = (insts as Instrument[]).find(i => i.symbol === sel) ?? null
           setSelectedBase(updated)
         }
-        // Only reset candles from DB when WS is offline.
-        // When WS is live it appends ticks directly — resetting here would wipe live data.
-        if (history && history.ticks.length >= 2 && !wsLiveRef.current) {
+        if (history && history.ticks.length >= 2) {
           setCandles(candlesFromTicks(history.ticks))
         }
       } catch { /* silent — next tick retries */ }

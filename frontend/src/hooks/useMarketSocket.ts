@@ -2,11 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { marketDataWs } from '../services/websocketService'
 
 export interface TickData {
-  symbol:    string
-  price:     number
-  bid:       number
-  ask:       number
-  timestamp: string
+  symbol:        string
+  price:         number
+  bid:           number
+  ask:           number
+  timestamp:     string
+  previousClose: number | null
+  dayHigh:       number | null
+  dayLow:        number | null
+  volume:        number | null
+  change:        number | null
+  changePct:     number | null
 }
 
 interface UseMarketSocketResult {
@@ -54,11 +60,17 @@ export function useMarketSocket(symbols: string[]): UseMarketSocketResult {
       setTicks(prev => ({
         ...prev,
         [tick.symbol]: {
-          symbol:    tick.symbol,
-          price:     Number(tick.lastPrice),
-          bid:       Number(tick.bidPrice),
-          ask:       Number(tick.askPrice),
-          timestamp: tick.dataTimestamp,
+          symbol:        tick.symbol,
+          price:         Number(tick.lastPrice),
+          bid:           Number(tick.bidPrice),
+          ask:           Number(tick.askPrice),
+          timestamp:     tick.dataTimestamp,
+          previousClose: tick.previousClose != null ? Number(tick.previousClose) : null,
+          dayHigh:       tick.dayHigh       != null ? Number(tick.dayHigh)       : null,
+          dayLow:        tick.dayLow        != null ? Number(tick.dayLow)        : null,
+          volume:        tick.volume        ?? null,
+          change:        tick.change        != null ? Number(tick.change)        : null,
+          changePct:     tick.changePct     != null ? Number(tick.changePct)     : null,
         },
       }))
     })
