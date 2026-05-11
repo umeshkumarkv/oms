@@ -36,8 +36,8 @@ public class ClientServiceClient {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-User-Role", "SYSTEM");
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-            ResponseEntity<ClientResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity, ClientResponse.class);
+            ResponseEntity<ClientResponse> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), ClientResponse.class);
             return response.getBody();
         } catch (HttpClientErrorException.NotFound e) {
             return null;

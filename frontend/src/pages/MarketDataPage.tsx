@@ -5,7 +5,7 @@ import { Instrument, MarketConfig, TickEntry } from '../types/market.types'
 import { marketDataWs } from '../services/websocketService'
 import { getCurrentUser } from '../api/authApi'
 import { IntradayChart, generateIntraday, IntradayPoint } from '../components/StockCard'
-import { useMarketSocket } from '../hooks/useMarketSocket'
+import { useMarketSocket, TickData } from '../hooks/useMarketSocket'
 import { isMarketOpen } from '../utils/marketHours'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ const s = {
 
   grid:        { display: 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', alignItems: 'start' } as React.CSSProperties,
 
-  section:     { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflow: 'hidden' } as React.CSSProperties,
+  section:     { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'hidden' } as React.CSSProperties,
   sHead:       { padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
   sTitleRow:   { display: 'flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
   sTitle:      { margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' } as React.CSSProperties,
@@ -195,7 +195,7 @@ interface WatchlistPanelProps {
   instruments: Instrument[]
   loading:     boolean
   selected:    string | null
-  ticks:       Record<string, { price: number; bid: number; ask: number; timestamp: string }>
+  ticks:       Record<string, TickData>
   marketOpen:  boolean
   onSelect:    (symbol: string) => void
 }
@@ -215,11 +215,13 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
       <thead>
         <tr>
           <th style={s.th}>Symbol</th>
-          <th style={s.thRight}>Last</th>
+          <th style={s.thRight}>Live Price</th>
+          <th style={s.thRight}>Prev Close</th>
           <th style={s.thRight}>Change</th>
           <th style={s.thRight}>Chg %</th>
           <th style={s.thRight}>Bid</th>
           <th style={s.thRight}>Ask</th>
+          <th style={s.thRight}>Volume</th>
           <th style={s.thRight}>Spread</th>
           <th style={s.thRight}>Day High</th>
           <th style={s.thRight}>Day Low</th>
@@ -231,21 +233,24 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
               <tr key={i}>
-                {Array.from({ length: 11 }).map((_, j) => (
+                {Array.from({ length: 13 }).map((_, j) => (
                   <td key={j} style={s.td}><div style={s.skeleton} /></td>
                 ))}
               </tr>
             ))
           : instruments.map(inst => {
               // WS tick overrides REST data; REST data is always kept fresh by the unified poll
-              const tick    = ticks[inst.symbol]
-              const livePx  = tick?.price ?? Number(inst.lastPrice)
-              const liveBid = tick?.bid   ?? Number(inst.bidPrice)
-              const liveAsk = tick?.ask   ?? Number(inst.askPrice)
-              const liveTs  = tick?.timestamp ?? inst.dataTimestamp
-              const prev    = Number(inst.previousClose ?? inst.lastPrice)
-              const change  = livePx - prev
-              const changePct = prev !== 0 ? (change / prev) * 100 : 0
+              const tick        = ticks[inst.symbol]
+              const livePx      = tick?.price         ?? Number(inst.lastPrice)
+              const liveBid     = tick?.bid            ?? Number(inst.bidPrice)
+              const liveAsk     = tick?.ask            ?? Number(inst.askPrice)
+              const liveTs      = tick?.timestamp      ?? inst.dataTimestamp
+              const livePrev    = tick?.previousClose  ?? Number(inst.previousClose ?? inst.lastPrice)
+              const liveDayHigh = tick?.dayHigh        ?? (inst.dayHigh ? Number(inst.dayHigh) : null)
+              const liveDayLow  = tick?.dayLow         ?? (inst.dayLow  ? Number(inst.dayLow)  : null)
+              const liveVolume  = tick?.volume         ?? inst.volume   ?? null
+              const change      = tick?.change         ?? (livePx - livePrev)
+              const changePct   = tick?.changePct      ?? (livePrev !== 0 ? (change / livePrev) * 100 : 0)
 
               return (
                 <tr
@@ -256,6 +261,8 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                   <td style={s.td}><div style={s.symbolCell}>{inst.symbol}</div></td>
 
                   <td style={s.tdMono}><strong>{fmt(livePx)}</strong></td>
+
+                  <td style={s.tdMono}>{livePrev ? `$${fmt(livePrev)}` : '—'}</td>
 
                   <td style={{ ...s.tdRight, fontVariantNumeric: 'tabular-nums', fontFamily: "'Menlo','Consolas',monospace" }}>
                     <span style={{ fontWeight: 600, color: pctColor(change) }}>
@@ -277,15 +284,19 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                   <td style={s.tdMono}>{fmt(liveBid)}</td>
                   <td style={s.tdMono}>{fmt(liveAsk)}</td>
 
+                  <td style={{ ...s.tdMono, color: '#334155' }}>
+                    {liveVolume != null ? liveVolume.toLocaleString() : '—'}
+                  </td>
+
                   <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
                     {spread(liveBid, liveAsk)}
                   </td>
 
                   <td style={{ ...s.tdMono, color: '#10b981' }}>
-                    {inst.dayHigh ? `$${fmt(inst.dayHigh)}` : '—'}
+                    {liveDayHigh != null ? `$${fmt(liveDayHigh)}` : '—'}
                   </td>
                   <td style={{ ...s.tdMono, color: '#ef4444' }}>
-                    {inst.dayLow ? `$${fmt(inst.dayLow)}` : '—'}
+                    {liveDayLow != null ? `$${fmt(liveDayLow)}` : '—'}
                   </td>
 
                   <td style={s.td}>
@@ -317,7 +328,7 @@ interface StockDetailPanelProps {
   detailLoading:  boolean
   candles:        IntradayPoint[]     // from unified poll — in sync with watchlist
   candlesLoading: boolean
-  ticks:          Record<string, { price: number; bid: number; ask: number; timestamp: string }>
+  ticks:          Record<string, TickData>
   marketOpen:     boolean
   onNavigate:     (path: string) => void
 }
@@ -362,7 +373,7 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
   const liveBid   = tick?.bid       ?? Number(selectedBase.bidPrice)
   const liveAsk   = tick?.ask       ?? Number(selectedBase.askPrice)
   const liveTs    = tick?.timestamp ?? selectedBase.dataTimestamp
-  const prevClose = Number(selectedBase.previousClose ?? selectedBase.lastPrice)
+  const prevClose = tick?.previousClose ?? Number(selectedBase.previousClose ?? selectedBase.lastPrice)
   const change    = livePx - prevClose
   const changePct = prevClose !== 0 ? (change / prevClose) * 100 : 0
   const halted    = selectedBase.halted   ?? false
@@ -432,12 +443,18 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
           <span style={s.spreadLabel}>Spread</span>
           <span style={s.spreadVal}>{spread(liveBid, liveAsk)}</span>
           <span style={s.spreadLabel}>Prev Close</span>
-          <span style={s.spreadVal}>{selectedBase.previousClose ? `$${fmt(selectedBase.previousClose)}` : '—'}</span>
+          <span style={s.spreadVal}>{prevClose ? `$${fmt(prevClose)}` : '—'}</span>
         </div>
 
-        <div style={s.tsRow}>
-          <span style={s.tsLabel}>Last Updated</span>
-          <span style={s.tsValue}>{fmtET(liveTs)}</span>
+        <div style={s.spreadRow}>
+          <span style={s.spreadLabel}>Last Updated</span>
+          <span style={s.spreadVal}>{fmtET(liveTs)}</span>
+          <span style={s.spreadLabel}>Volume</span>
+          <span style={s.spreadVal}>
+            {(tick?.volume ?? selectedBase.volume) != null
+              ? (tick?.volume ?? selectedBase.volume)!.toLocaleString()
+              : '—'}
+          </span>
         </div>
 
         <div style={s.divider} />
@@ -507,6 +524,7 @@ const MarketDataPage: React.FC = () => {
     const intervalMs = config?.pollingIntervalMs ?? 5_000
 
     const poll = async () => {
+      if (wsLiveRef.current) return  // WS live — all price data comes from socket
       try {
         const sel = selectedRef.current
         const [insts, history] = await Promise.all([
@@ -518,9 +536,7 @@ const MarketDataPage: React.FC = () => {
           const updated = (insts as Instrument[]).find(i => i.symbol === sel) ?? null
           setSelectedBase(updated)
         }
-        // Only reset candles from DB when WS is offline.
-        // When WS is live it appends ticks directly — resetting here would wipe live data.
-        if (history && history.ticks.length >= 2 && !wsLiveRef.current) {
+        if (history && history.ticks.length >= 2) {
           setCandles(candlesFromTicks(history.ticks))
         }
       } catch { /* silent — next tick retries */ }

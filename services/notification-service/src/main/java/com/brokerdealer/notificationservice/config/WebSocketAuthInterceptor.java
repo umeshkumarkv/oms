@@ -13,8 +13,10 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+
 import java.nio.charset.StandardCharsets;
-import java.security.Principal;
+import java.util.Collections;
 
 @Component
 @Slf4j
@@ -46,10 +48,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                     .parseSignedClaims(token)
                     .getPayload();
             final String userId = claims.get("userId", String.class);
-            accessor.setUser(new Principal() {
-                @Override public String getName() { return userId; }
-                @Override public String toString() { return "StompPrincipal(" + userId + ")"; }
-            });
+            accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList()));
             log.debug("WebSocket CONNECT authenticated: userId={}", userId);
         } catch (Exception e) {
             log.warn("WebSocket CONNECT rejected — invalid JWT: {}", e.getMessage());

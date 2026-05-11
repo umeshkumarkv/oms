@@ -1,5 +1,6 @@
 package com.brokerdealer.orderservice.client;
 
+import com.brokerdealer.orderservice.dto.market.HolidaysResponse;
 import com.brokerdealer.orderservice.dto.market.InstrumentResponse;
 import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
@@ -13,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -88,6 +91,40 @@ class MarketDataServiceClientTest {
     @Test
     void shouldThrowServiceUnavailableOnMarketHoursFallback() {
         assertThatThrownBy(() -> marketDataServiceClient.getMarketHoursFallback(new RuntimeException("timeout")))
+                .isInstanceOf(ServiceUnavailableException.class)
+                .hasMessageContaining("marketdata-service");
+    }
+
+    @Test
+    void shouldReturnHolidayDatesFromMarketdataService() {
+        HolidaysResponse.HolidayItem item = new HolidaysResponse.HolidayItem();
+        item.setHolidayDate("2026-01-01");
+        item.setHolidayName("New Year's Day");
+
+        HolidaysResponse expected = new HolidaysResponse();
+        expected.setData(List.of(item));
+
+        when(restTemplate.getForEntity(anyString(), eq(HolidaysResponse.class)))
+                .thenReturn(ResponseEntity.ok(expected));
+
+        List<String> result = marketDataServiceClient.getHolidays();
+
+        assertThat(result).containsExactly("2026-01-01");
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenHolidaysResponseBodyIsNull() {
+        when(restTemplate.getForEntity(anyString(), eq(HolidaysResponse.class)))
+                .thenReturn(ResponseEntity.ok(null));
+
+        List<String> result = marketDataServiceClient.getHolidays();
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldThrowServiceUnavailableOnHolidaysFallback() {
+        assertThatThrownBy(() -> marketDataServiceClient.getHolidaysFallback(new RuntimeException("timeout")))
                 .isInstanceOf(ServiceUnavailableException.class)
                 .hasMessageContaining("marketdata-service");
     }

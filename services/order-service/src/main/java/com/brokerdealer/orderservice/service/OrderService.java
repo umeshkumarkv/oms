@@ -48,6 +48,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -59,6 +62,8 @@ import java.util.UUID;
 public class OrderService {
 
     private static final int GTD_DEFAULT_EXPIRY_DAYS = 180;
+    private static final ZoneId ET_ZONE = ZoneId.of("America/New_York");
+    private static final LocalTime MARKET_CLOSE_TIME = LocalTime.of(16, 0);
 
     private static final int MAX_PAGE_SIZE = 200;
     private static final String ORDER_CACHE_KEY_PREFIX = "order:state:";
@@ -191,13 +196,21 @@ public class OrderService {
                 .marginCallActive(clientResponse.getData().getMarginCallActive())
                 .build());
 
+        String expiresAt = null;
+        if (tif == TimeInForce.GTD && savedOrder.getExpiryDate() != null) {
+            expiresAt = ZonedDateTime.of(savedOrder.getExpiryDate(), MARKET_CLOSE_TIME, ET_ZONE)
+                    .toInstant().toString();
+        }
+
         return SubmitOrderResponse.builder()
                 .data(SubmitOrderData.builder()
                         .orderId(savedOrder.getId())
                         .status(OrderStatus.NEW.name())
+                        .tif(tif.name())
                         .expiryDate(savedOrder.getExpiryDate())
                         .expiryApplied(savedOrder.getExpiryApplied() != null
                                 ? savedOrder.getExpiryApplied().name() : null)
+                        .expiresAt(expiresAt)
                         .build())
                 .meta(ResponseMeta.builder()
                         .timestamp(Instant.now().toString())
@@ -253,12 +266,15 @@ public class OrderService {
     private void validateExpiryDate(LocalDate expiryDate) {
         LocalDate today = LocalDate.now();
         if (!expiryDate.isAfter(today)) {
-            throw new InvalidExpiryDateException("expiryDate must be a future date");
+            throw new InvalidExpiryDateException("gtdDate must be a future date (not today or past)");
         }
-        // Weekends are not valid expiry dates
         java.time.DayOfWeek day = expiryDate.getDayOfWeek();
         if (day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY) {
-            throw new InvalidExpiryDateException("expiryDate must not be a weekend");
+            throw new InvalidExpiryDateException("gtdDate must not be a weekend");
+        }
+        List<String> holidays = marketDataServiceClient.getHolidays();
+        if (holidays.contains(expiryDate.toString())) {
+            throw new InvalidExpiryDateException("gtdDate must not be a US market holiday");
         }
     }
 
@@ -293,6 +309,15 @@ public class OrderService {
 
     public OrderListResponse getOrders(String status, UUID clientId, String side, String timeInForce,
                                        int page, int pageSize) {
+        if (timeInForce != null && !timeInForce.isBlank()) {
+            try {
+                TimeInForce.valueOf(timeInForce);
+            } catch (IllegalArgumentException e) {
+                throw new ValidationException("VALIDATION_ERROR",
+                        "Invalid tif filter value: must be DAY or GTD");
+            }
+        }
+
         int validatedPageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         int validatedPage = Math.max(page, 0);
 

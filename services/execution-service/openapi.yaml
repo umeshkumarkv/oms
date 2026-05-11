@@ -71,7 +71,7 @@ components:
           example: "175.50"
         fillType:
           type: string
-          enum: [FULL, PARTIAL]
+          enum: [FULL, PARTIAL, REJECTED]
           example: FULL
         fillValue:
           type: string

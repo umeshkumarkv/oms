@@ -50,6 +50,9 @@ import org.springframework.data.redis.core.ValueOperations;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -119,6 +122,9 @@ class OrderServiceTest {
         InstrumentResponse instrResponse = new InstrumentResponse();
         instrResponse.setData(instrData);
         when(marketDataServiceClient.getInstrument("AAPL")).thenReturn(instrResponse);
+
+        // Default: no holidays (so any future weekday is valid)
+        when(marketDataServiceClient.getHolidays()).thenReturn(Collections.emptyList());
 
         // Default: Redis returns nothing (cache miss)
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -304,6 +310,52 @@ class OrderServiceTest {
     }
 
     @Test
+    void shouldIncludeTifAndExpiresAtInGtdResponse() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setTimeInForce("GTD");
+        LocalDate futureDate = nextWeekday(LocalDate.now().plusDays(10));
+        request.setExpiryDate(futureDate);
+        String expectedExpiresAt = ZonedDateTime.of(futureDate, LocalTime.of(16, 0),
+                ZoneId.of("America/New_York")).toInstant().toString();
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        assertThat(response.getData().getTif()).isEqualTo("GTD");
+        assertThat(response.getData().getExpiresAt()).isEqualTo(expectedExpiresAt);
+    }
+
+    @Test
+    void shouldIncludeTifInDayOrderResponse() {
+        SubmitOrderResponse response = orderService.submitOrder(marketBuyRequest(), userId);
+
+        assertThat(response.getData().getTif()).isEqualTo("DAY");
+        assertThat(response.getData().getExpiresAt()).isNull();
+    }
+
+    @Test
+    void shouldRejectGtcTimeInForceWithValidationException() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setTimeInForce("GTC");
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Invalid timeInForce");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowInvalidExpiryDateExceptionForTodayDate() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setTimeInForce("GTD");
+        request.setExpiryDate(LocalDate.now());
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(InvalidExpiryDateException.class)
+                .hasMessageContaining("future date");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
     void shouldThrowInvalidExpiryDateExceptionForPastDate() {
         SubmitOrderRequest request = marketBuyRequest();
         request.setTimeInForce("GTD");
@@ -327,6 +379,41 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.submitOrder(request, userId))
                 .isInstanceOf(InvalidExpiryDateException.class);
+    }
+
+    @Test
+    void shouldThrowInvalidExpiryDateExceptionForHoliday() {
+        LocalDate holiday = nextWeekday(LocalDate.now().plusDays(10));
+        when(marketDataServiceClient.getHolidays()).thenReturn(List.of(holiday.toString()));
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setTimeInForce("GTD");
+        request.setExpiryDate(holiday);
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(InvalidExpiryDateException.class)
+                .hasMessageContaining("holiday");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowServiceUnavailableWhenHolidaysCircuitBreakerOpen() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setTimeInForce("GTD");
+        request.setExpiryDate(nextWeekday(LocalDate.now().plusDays(10)));
+        when(marketDataServiceClient.getHolidays())
+                .thenThrow(new ServiceUnavailableException("marketdata-service"));
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(ServiceUnavailableException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowValidationExceptionForInvalidTifFilter() {
+        assertThatThrownBy(() -> orderService.getOrders(null, null, null, "GTC", 0, 50))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Invalid tif filter value");
     }
 
     // --- L2 validation failures ---

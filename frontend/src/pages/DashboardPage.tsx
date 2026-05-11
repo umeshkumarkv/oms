@@ -87,7 +87,7 @@ const s = {
   actText: { flex: 1, fontSize: '13px', color: 'var(--color-text-primary)' } as React.CSSProperties,
   actTime: { fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
 
-  // GTC row
+  // GTD row
   gtdRow:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)', fontSize: '13px' } as React.CSSProperties,
   sidePill:   (side: string) => ({
     display: 'inline-block', padding: '2px 7px', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 700,
@@ -115,8 +115,8 @@ interface Metrics {
   openCount:       number
   filledCount:     number
   expiredCount:    number
-  gtcCount:        number
-  gtcExpiringSoon: OrderSummary[]
+  gtdCount:        number
+  gtdExpiringSoon: OrderSummary[]
 }
 
 interface ActivityEvent {
@@ -142,20 +142,20 @@ const DashboardPage: React.FC = () => {
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     try {
-      const [openPage, filledPage, expiredPage, gtcPage, hours] = await Promise.all([
+      const [openPage, filledPage, expiredPage, gtdPage, hours] = await Promise.all([
         getOrders({ status: 'OPEN' }),
         getOrders({ status: 'FILLED' }),
         getOrders({ status: 'EXPIRED' }),
-        getOrders({ tif: 'GTC', status: 'OPEN' }),
+        getOrders({ tif: 'GTD', status: 'OPEN' }),
         getMarketHours(),
       ])
-      const gtcExpiringSoon = (gtcPage.orders ?? []).filter(isExpiringSoon)
+      const gtdExpiringSoon = (gtdPage.orders ?? []).filter(isExpiringSoon)
       setMetrics({
         openCount:       openPage.totalCount,
         filledCount:     filledPage.totalCount,
         expiredCount:    expiredPage.totalCount,
-        gtcCount:        gtcPage.totalCount,
-        gtcExpiringSoon,
+        gtdCount:        gtdPage.totalCount,
+        gtdExpiringSoon,
       })
       setMarketHours(hours)
     } finally {
@@ -235,12 +235,12 @@ const DashboardPage: React.FC = () => {
         </div>
 
         <div style={s.card('#3b82f6')} className="card-hover">
-          <div style={s.cardLabel}>GTC Active</div>
+          <div style={s.cardLabel}>GTD Active</div>
           {loading
             ? <div className="skeleton" style={{ height: '36px', width: '64px' }} />
-            : <div style={s.cardValue('var(--color-buy)')}>{metrics?.gtcCount ?? 0}</div>
+            : <div style={s.cardValue('var(--color-buy)')}>{metrics?.gtdCount ?? 0}</div>
           }
-          <div style={s.cardFooter}>Good-till-cancelled</div>
+          <div style={s.cardFooter}>Good-till-date</div>
         </div>
 
       </div>
@@ -279,7 +279,7 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right — Quick Actions + GTC Expiring Soon */}
+        {/* Right — Quick Actions + GTD Expiring Soon */}
         <div style={s.rightCol}>
 
           {/* Quick Actions */}
@@ -313,10 +313,10 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* GTC Expiring Soon */}
+          {/* GTD Expiring Soon */}
           <div style={s.section}>
             <div style={s.sectionHeader}>
-              <h2 style={s.sectionTitle}>GTC Expiring Soon</h2>
+              <h2 style={s.sectionTitle}>GTD Expiring Soon</h2>
               <span style={s.refreshNote}>Within 2 days</span>
             </div>
             <div style={s.sectionBody}>
@@ -325,10 +325,10 @@ const DashboardPage: React.FC = () => {
                   <div className="skeleton" style={{ height: '20px', width: '100%' }} />
                   <div className="skeleton" style={{ height: '20px', width: '80%' }} />
                 </div>
-              ) : !metrics || metrics.gtcExpiringSoon.length === 0 ? (
-                <div style={s.emptyMsg}>No GTC orders expiring within 2 days</div>
+              ) : !metrics || metrics.gtdExpiringSoon.length === 0 ? (
+                <div style={s.emptyMsg}>No GTD orders expiring within 2 days</div>
               ) : (
-                metrics.gtcExpiringSoon.map((order) => (
+                metrics.gtdExpiringSoon.map((order) => (
                   <div key={order.id} style={s.gtdRow}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '13px' }}>{order.symbol}</span>
