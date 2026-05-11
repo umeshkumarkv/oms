@@ -15,12 +15,15 @@ import com.brokerdealer.clientservice.repository.ClientRepository;
 import com.brokerdealer.clientservice.repository.HoldingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -32,6 +35,7 @@ public class ClientService {
     private final HoldingRepository holdingRepository;
     private final ClientMapper clientMapper;
     private final MarketDataClient marketDataClient;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     public List<ClientProfileResponse> getAllClients() {
         log.debug("Fetching all client profiles");
@@ -128,5 +132,79 @@ public class ClientService {
                 .reservedCash(newReservedCash.toPlainString())
                 .buyingPower(buyingPower.toPlainString())
                 .build();
+    }
+
+    @Transactional
+    public void processExecutionFill(Map<String, Object> payload) {
+        UUID clientId = UUID.fromString((String) payload.get("clientId"));
+        String side = (String) payload.get("side");
+        String fillType = (String) payload.get("fillType");
+        int executedQty = ((Number) payload.get("executedQty")).intValue();
+        BigDecimal executedPrice = new BigDecimal((String) payload.get("executedPrice"));
+        BigDecimal fillValue = new BigDecimal((String) payload.get("fillValue"));
+        String symbol = (String) payload.get("symbol");
+
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new ClientNotFoundException("CLIENT_NOT_FOUND", "Client not found: " + clientId));
+
+        if ("BUY".equals(side)) {
+            if ("REJECTED".equals(fillType)) {
+                int remainingQty = ((Number) payload.get("remainingQuantity")).intValue();
+                BigDecimal marketPrice = new BigDecimal((String) payload.get("marketPriceAtFill"));
+                BigDecimal releaseAmount = BigDecimal.valueOf(remainingQty)
+                        .multiply(marketPrice).setScale(2, RoundingMode.HALF_UP);
+                client.setReservedCash(client.getReservedCash().subtract(releaseAmount)
+                        .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+                log.info("Reserved cash released on rejection: clientId={} released={}", clientId, releaseAmount);
+            } else {
+                client.setReservedCash(client.getReservedCash().subtract(fillValue)
+                        .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+                client.setCashBalance(client.getCashBalance().subtract(fillValue)
+                        .setScale(2, RoundingMode.HALF_UP));
+                upsertHolding(clientId, symbol, executedQty, executedPrice);
+                log.info("BUY fill applied: clientId={} symbol={} qty={} fillType={}", clientId, symbol, executedQty, fillType);
+            }
+        } else if ("SELL".equals(side) && !"REJECTED".equals(fillType)) {
+            client.setCashBalance(client.getCashBalance().add(fillValue).setScale(2, RoundingMode.HALF_UP));
+            reduceHolding(clientId, symbol, executedQty);
+            log.info("SELL fill applied: clientId={} symbol={} qty={}", clientId, symbol, executedQty);
+        }
+
+        clientRepository.save(client);
+        evictPortfolioCache(clientId);
+    }
+
+    private void upsertHolding(UUID clientId, String symbol, int executedQty, BigDecimal executedPrice) {
+        Optional<Holding> existing = holdingRepository.findByClientIdAndSymbol(clientId, symbol);
+        if (existing.isPresent()) {
+            Holding h = existing.get();
+            int newQty = h.getQuantity() + executedQty;
+            BigDecimal newAvg = h.getAvgPrice().multiply(BigDecimal.valueOf(h.getQuantity()))
+                    .add(executedPrice.multiply(BigDecimal.valueOf(executedQty)))
+                    .divide(BigDecimal.valueOf(newQty), 4, RoundingMode.HALF_UP);
+            h.setQuantity(newQty);
+            h.setAvgPrice(newAvg);
+            holdingRepository.save(h);
+        } else {
+            holdingRepository.save(Holding.builder()
+                    .clientId(clientId)
+                    .symbol(symbol)
+                    .quantity(executedQty)
+                    .avgPrice(executedPrice.setScale(4, RoundingMode.HALF_UP))
+                    .build());
+        }
+    }
+
+    private void reduceHolding(UUID clientId, String symbol, int executedQty) {
+        holdingRepository.findByClientIdAndSymbol(clientId, symbol).ifPresent(h -> {
+            int newQty = Math.max(0, h.getQuantity() - executedQty);
+            h.setQuantity(newQty);
+            holdingRepository.save(h);
+        });
+    }
+
+    private void evictPortfolioCache(UUID clientId) {
+        redisTemplate.delete("client:portfolio:" + clientId);
+        redisTemplate.delete("client:balance:" + clientId);
     }
 }

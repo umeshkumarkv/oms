@@ -113,16 +113,21 @@ const PortfolioPage: React.FC = () => {
     if (!clientId) return
     if (showLoading) setLoading(true)
     try {
-      const [clientData, portfolioData, auditData] = await Promise.all([
+      const [clientData, portfolioData] = await Promise.all([
         getClient(clientId),
         getPortfolio(clientId),
-        getAuditTrail({ clientId, size: 100 }),
       ])
       setClient(clientData)
       setPortfolio(portfolioData)
-      setFills(parseFillActivities(auditData?.records ?? []))
     } finally {
       setLoading(false)
+    }
+    // Audit trail is role-gated — load independently so a 403 never blocks portfolio
+    try {
+      const auditData = await getAuditTrail({ clientId, size: 100 })
+      setFills(parseFillActivities(auditData?.records ?? []))
+    } catch {
+      setFills([])
     }
   }
 

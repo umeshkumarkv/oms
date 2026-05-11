@@ -48,6 +48,12 @@ public class Order {
     @Column(name = "limit_price", precision = 19, scale = 4)
     private BigDecimal limitPrice;
 
+    @Column(name = "last_price", precision = 19, scale = 4)
+    private BigDecimal lastPrice;
+
+    @Column(name = "order_value", precision = 19, scale = 4)
+    private BigDecimal orderValue;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private OrderStatus status;

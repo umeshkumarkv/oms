@@ -42,7 +42,18 @@ public class RiskResultConsumer {
             groupId = "order-service-execution.completed-group"
     )
     public void consumeExecutionCompleted(Map<String, Object> payload) {
-        // TODO: implement — SCRUM-48
-        log.info("Stub: consumeExecutionCompleted received message");
+        UUID orderId = UUID.fromString((String) payload.get("orderId"));
+        String fillType = (String) payload.get("fillType");
+        log.info("Execution completed consumed: orderId={} fillType={}", orderId, fillType);
+
+        if ("FULL".equals(fillType)) {
+            orderStateMachineService.transitionOnExecutionFilled(orderId);
+        } else if ("PARTIAL".equals(fillType)) {
+            orderStateMachineService.transitionOnExecutionPartialFill(orderId);
+        } else if ("REJECTED".equals(fillType)) {
+            orderStateMachineService.transitionOnExecutionRejected(orderId);
+        } else {
+            log.warn("Unknown fillType in execution.completed: orderId={} fillType={}", orderId, fillType);
+        }
     }
 }

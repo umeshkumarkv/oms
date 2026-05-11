@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface HoldingRepository extends JpaRepository<Holding, UUID> {
 
     List<Holding> findByClientId(UUID clientId);
+
+    java.util.Optional<Holding> findByClientIdAndSymbol(UUID clientId, String symbol);
 }

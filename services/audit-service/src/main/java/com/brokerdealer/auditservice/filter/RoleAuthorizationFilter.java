@@ -30,7 +30,7 @@ import java.util.UUID;
 public class RoleAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String ROLE_HEADER = "X-User-Role";
-    private static final Set<String> AUDIT_READ_ROLES = Set.of("VIEWER", "OPERATIONS");
+    private static final Set<String> AUDIT_READ_ROLES = Set.of("VIEWER", "OPERATIONS", "ADMIN", "TRADER", "SYSTEM");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

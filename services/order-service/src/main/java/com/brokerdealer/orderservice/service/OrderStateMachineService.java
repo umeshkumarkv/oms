@@ -2,6 +2,7 @@ package com.brokerdealer.orderservice.service;
 
 import com.brokerdealer.orderservice.domain.Order;
 import com.brokerdealer.orderservice.domain.OrderStatus;
+import com.brokerdealer.orderservice.dto.kafka.OrderExecutionRequestedEvent;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
 import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
@@ -60,7 +61,19 @@ public class OrderStateMachineService {
         transitionState(order, OrderStatus.VALIDATED, OrderStatus.RISK_CHECK_PASSED, TRIGGERED_BY_RISK_ENGINE);
         transitionState(order, OrderStatus.RISK_CHECK_PASSED, OrderStatus.ACCEPTED, TRIGGERED_BY_OMS);
         transitionState(order, OrderStatus.ACCEPTED, OrderStatus.SENT_TO_EXECUTION, TRIGGERED_BY_OMS);
-        // NOTE: order.execution.requested NOT published here — scoped to SCRUM-48
+
+        orderEventProducer.publishOrderExecutionRequested(OrderExecutionRequestedEvent.builder()
+                .orderId(order.getId())
+                .clientId(order.getClientId())
+                .symbol(order.getSymbol())
+                .side(order.getSide().name())
+                .orderType(order.getOrderType().name())
+                .quantity(order.getQuantity())
+                .limitPrice(order.getLimitPrice())
+                .timeInForce(order.getTimeInForce().name())
+                .orderValue(order.getOrderValue())
+                .lastPrice(order.getLastPrice())
+                .build());
 
         evictRedisOrderState(orderId);
         log.info("Order reached SENT_TO_EXECUTION: orderId={}", orderId);
@@ -102,6 +115,50 @@ public class OrderStateMachineService {
 
         evictRedisOrderState(orderId);
         log.info("Order risk rejected: orderId={} ruleCode={}", orderId, ruleCode);
+    }
+
+    private static final String TRIGGERED_BY_EXECUTION = "SYSTEM:EXECUTION_ENGINE";
+    private static final Set<OrderStatus> EXECUTION_TERMINAL_STATES =
+            Set.of(OrderStatus.FILLED, OrderStatus.REJECTED, OrderStatus.CANCELLED, OrderStatus.EXPIRED);
+
+    @Transactional
+    public void transitionOnExecutionFilled(UUID orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        if (EXECUTION_TERMINAL_STATES.contains(order.getStatus())) {
+            log.warn("Idempotency: order already terminal: orderId={} status={}", orderId, order.getStatus());
+            return;
+        }
+        transitionState(order, order.getStatus(), OrderStatus.FILLED, TRIGGERED_BY_EXECUTION);
+        evictRedisOrderState(orderId);
+        log.info("Order FILLED: orderId={}", orderId);
+    }
+
+    @Transactional
+    public void transitionOnExecutionPartialFill(UUID orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        if (EXECUTION_TERMINAL_STATES.contains(order.getStatus()) ||
+                order.getStatus() == OrderStatus.PARTIALLY_FILLED) {
+            log.debug("Idempotency: skipping partial fill for orderId={} status={}", orderId, order.getStatus());
+            return;
+        }
+        transitionState(order, order.getStatus(), OrderStatus.PARTIALLY_FILLED, TRIGGERED_BY_EXECUTION);
+        evictRedisOrderState(orderId);
+        log.info("Order PARTIALLY_FILLED: orderId={}", orderId);
+    }
+
+    @Transactional
+    public void transitionOnExecutionRejected(UUID orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        if (EXECUTION_TERMINAL_STATES.contains(order.getStatus())) {
+            log.warn("Idempotency: order already terminal: orderId={} status={}", orderId, order.getStatus());
+            return;
+        }
+        transitionState(order, order.getStatus(), OrderStatus.REJECTED, TRIGGERED_BY_EXECUTION);
+        evictRedisOrderState(orderId);
+        log.info("Order REJECTED by execution: orderId={}", orderId);
     }
 
     private void transitionState(Order order, OrderStatus from, OrderStatus to, String triggeredBy) {

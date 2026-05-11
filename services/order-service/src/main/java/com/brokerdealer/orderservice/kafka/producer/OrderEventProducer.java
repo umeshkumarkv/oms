@@ -1,5 +1,6 @@
 package com.brokerdealer.orderservice.kafka.producer;
 
+import com.brokerdealer.orderservice.dto.kafka.OrderExecutionRequestedEvent;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
 import com.brokerdealer.orderservice.dto.kafka.RiskEvaluationRequestedEvent;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,9 @@ public class OrderEventProducer {
                 event.getOrderId(), event.getSymbol(), event.getOrderValue());
     }
 
-    public void publishOrderExecutionRequested(Object event) {
-        // TODO: implement — SCRUM-48
-        log.info("Stub: publishOrderExecutionRequested called");
+    public void publishOrderExecutionRequested(OrderExecutionRequestedEvent event) {
+        kafkaTemplate.send(ORDER_EXECUTION_REQUESTED, event.getOrderId().toString(), event);
+        log.debug("Published order.execution.requested: orderId={} symbol={} orderType={}",
+                event.getOrderId(), event.getSymbol(), event.getOrderType());
     }
 }

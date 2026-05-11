@@ -25,6 +25,7 @@ import com.brokerdealer.orderservice.dto.response.ResponseMeta;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
+import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
@@ -146,10 +147,13 @@ public class OrderService {
 
         // --- Reserve cash for BUY orders before persisting ---
         if (OrderSide.valueOf(request.getSide()) == OrderSide.BUY) {
-            clientServiceClient.reserveCash(request.getClientId(), orderValue);
+            boolean reserved = clientServiceClient.reserveCash(request.getClientId(), orderValue);
+            if (!reserved) throw new InsufficientBuyingPowerException();
         }
 
         // --- Create and persist order in NEW state ---
+        BigDecimal lastPrice = new BigDecimal(instrumentResponse.getData().getLastPrice());
+
         Order order = Order.builder()
                 .clientOrderId(request.getClientOrderId())
                 .clientId(request.getClientId())
@@ -159,6 +163,8 @@ public class OrderService {
                 .timeInForce(tif)
                 .quantity(request.getQuantity())
                 .limitPrice(limitPrice)
+                .lastPrice(lastPrice)
+                .orderValue(orderValue)
                 .status(OrderStatus.NEW)
                 .expiryDate(expiryDate)
                 .expiryApplied(expiryApplied)
