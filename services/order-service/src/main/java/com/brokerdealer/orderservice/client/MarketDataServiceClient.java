@@ -1,5 +1,6 @@
 package com.brokerdealer.orderservice.client;
 
+import com.brokerdealer.orderservice.dto.market.HolidaysResponse;
 import com.brokerdealer.orderservice.dto.market.InstrumentResponse;
 import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
@@ -11,6 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.Collections;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -49,6 +53,25 @@ public class MarketDataServiceClient {
 
     public MarketHoursResponse getMarketHoursFallback(Throwable t) {
         log.warn("Circuit breaker open for marketdata-service (hours): reason={}", t.getMessage());
+        throw new ServiceUnavailableException("marketdata-service");
+    }
+
+    @CircuitBreaker(name = "marketdata-service", fallbackMethod = "getHolidaysFallback")
+    public List<String> getHolidays() {
+        String url = marketDataServiceUrl + "/api/v1/market/holidays";
+        log.debug("Calling marketdata-service: GET {}", url);
+        ResponseEntity<HolidaysResponse> response = restTemplate.getForEntity(url, HolidaysResponse.class);
+        HolidaysResponse body = response.getBody();
+        if (body == null || body.getData() == null) {
+            return Collections.emptyList();
+        }
+        return body.getData().stream()
+                .map(HolidaysResponse.HolidayItem::getHolidayDate)
+                .toList();
+    }
+
+    public List<String> getHolidaysFallback(Throwable t) {
+        log.warn("Circuit breaker open for marketdata-service (holidays): reason={}", t.getMessage());
         throw new ServiceUnavailableException("marketdata-service");
     }
 }
