@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { getExecutions, GetOrdersParams, getOrders } from '../api/orderApi'
+import { getExecutions, GetOrdersParams, getOrder, getOrders } from '../api/orderApi'
+import { useNotificationsContext } from '../context/NotificationsContext'
 import { getOrderAudit } from '../api/auditApi'
 import { getClients } from '../api/clientApi'
 import { AuditRecord } from '../types/audit.types'
@@ -280,13 +281,12 @@ const OrderBlotterPage: React.FC = () => {
   const [drawerAudit,   setDrawerAudit]   = useState<AuditRecord[]>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
 
-  const wsConnected = false
+  const { notifications, wsConnected } = useNotificationsContext()
 
   const flashRow = useCallback((orderId: string) => {
     setFlashingIds(prev => new Set([...prev, orderId]))
     setTimeout(() => setFlashingIds(prev => { const n = new Set(prev); n.delete(orderId); return n }), 300)
   }, [])
-  void flashRow
 
   useEffect(() => {
     getClients().then(setClients).catch(() => {})
@@ -306,11 +306,36 @@ const OrderBlotterPage: React.FC = () => {
 
   useEffect(() => { loadOrders() }, [loadOrders])
 
+  // Polling fallback — only runs when WebSocket is not connected
   useEffect(() => {
     if (wsConnected) return
     const id = setInterval(loadOrders, 15_000)
     return () => clearInterval(id)
   }, [wsConnected, loadOrders])
+
+  // WebSocket-driven updates — upsert a single order on state-change events
+  const processedIds = useRef(new Set<string>())
+  useEffect(() => {
+    const last = notifications[notifications.length - 1]
+    if (!last || processedIds.current.has(last.id)) return
+    processedIds.current.add(last.id)
+
+    if ((last.type === 'ORDER_STATE_CHANGED' || last.type === 'EXECUTION_COMPLETED') && last.orderId) {
+      const targetId = last.orderId
+      getOrder(targetId)
+        .then(updated => {
+          setOrders(prev => {
+            const idx = prev.findIndex(o => o.id === updated.id)
+            if (idx === -1) return [updated, ...prev]
+            const next = [...prev]
+            next[idx] = updated
+            return next
+          })
+          flashRow(targetId)
+        })
+        .catch(() => {})
+    }
+  }, [notifications, flashRow])
 
   const openDrawer = useCallback(async (order: OrderSummary) => {
     setSelectedOrder(order)
@@ -386,7 +411,7 @@ const OrderBlotterPage: React.FC = () => {
           <h1 style={s.title}>Order Blotter</h1>
           <div style={s.subtitle}>
             {loading ? 'Loading…' : `${totalFiltered} order${totalFiltered !== 1 ? 's' : ''}`}
-            {' · '}auto-refresh every 15s
+            {' · '}{wsConnected ? 'live via WebSocket' : 'polling every 15s'}
           </div>
         </div>
         <span style={s.wsPill(wsConnected)}>

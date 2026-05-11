@@ -30,7 +30,8 @@ class RiskResultConsumerTest {
     void shouldPushRejectedNotificationWhenRiskRejected() {
         RiskEvaluationResultEvent event = rejectedEvent();
         consumer.consumeRiskResult(event);
-        verify(notificationService).pushToClient(eq(event.getClientId()), any());
+        // pushes to userId when present, not clientId
+        verify(notificationService).pushToClient(eq(event.getUserId()), any());
     }
 
     @Test
@@ -81,13 +82,14 @@ class RiskResultConsumerTest {
     }
 
     @Test
-    void shouldSkipWhenClientIdIsNull() {
+    void shouldSkipPushWhenBothUserIdAndClientIdAreNull() {
         RiskEvaluationResultEvent event = rejectedEvent();
         event.setClientId(null);
+        event.setUserId(null);
 
         consumer.consumeRiskResult(event);
 
-        verifyNoInteractions(notificationService);
+        verify(notificationService, never()).pushToClient(any(), any());
     }
 
     @Test
@@ -104,6 +106,7 @@ class RiskResultConsumerTest {
         return new RiskEvaluationResultEvent(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
+                UUID.randomUUID(),
                 "REJECTED",
                 "ORDER_VALUE_LIMIT",
                 "Order value exceeds limit",
@@ -113,6 +116,7 @@ class RiskResultConsumerTest {
 
     private RiskEvaluationResultEvent passedEvent() {
         return new RiskEvaluationResultEvent(
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "PASSED",

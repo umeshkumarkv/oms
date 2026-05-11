@@ -15,6 +15,7 @@ public class RiskEvaluationRequestedEvent {
 
     private UUID orderId;
     private UUID clientId;
+    private UUID userId;         // auth-service userId — passed through to risk result for WS push
     private String symbol;
     private String side;        // "BUY" | "SELL"
     private String orderType;   // "MARKET" | "LIMIT"

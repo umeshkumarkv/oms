@@ -8,6 +8,7 @@ const MAX_TOASTS = 5
 
 export function useNotifications(token: string, userId: string, role: string) {
   const [notifications, setNotifications] = useState<NotificationMessage[]>([])
+  const [wsConnected, setWsConnected] = useState(false)
 
   const dismiss = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
@@ -24,6 +25,7 @@ export function useNotifications(token: string, userId: string, role: string) {
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {
+        setWsConnected(true)
         client.subscribe(destination, frame => {
           try {
             const payload = JSON.parse(frame.body)
@@ -45,11 +47,16 @@ export function useNotifications(token: string, userId: string, role: string) {
           }
         })
       },
+      onDisconnect: () => { setWsConnected(false) },
+      onStompError: () => { setWsConnected(false) },
     })
 
     client.activate()
-    return () => { client.deactivate() }
+    return () => {
+      client.deactivate()
+      setWsConnected(false)
+    }
   }, [token, userId, role])
 
-  return { notifications, dismiss }
+  return { notifications, wsConnected, dismiss }
 }
