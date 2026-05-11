@@ -18,5 +18,6 @@ public class ClientResponse {
         private String status;        // "ACTIVE" | "BLOCKED"
         private Boolean tradingEnabled;
         private String kycStatus;
+        private Boolean marginCallActive;
     }
 }

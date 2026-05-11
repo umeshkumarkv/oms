@@ -16,4 +16,5 @@ public class RiskEvaluationRequest {
     private String limitPrice;
     private String timeInForce;
     private String orderValue;
+    private Boolean marginCallActive;
 }

@@ -186,6 +186,7 @@ public class OrderService {
                 .limitPrice(savedOrder.getLimitPrice() != null ? savedOrder.getLimitPrice().toPlainString() : null)
                 .timeInForce(savedOrder.getTimeInForce().name())
                 .orderValue(orderValue.toPlainString())
+                .marginCallActive(clientResponse.getData().getMarginCallActive())
                 .build());
 
         return SubmitOrderResponse.builder()
