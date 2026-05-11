@@ -33,18 +33,21 @@ public class FillSimulationService {
     private final ExecutionEventProducer executionEventProducer;
     private final MarketDataClient marketDataClient;
 
+    // Symbol overrides (FAIL→REJECTED, SLOW→PARTIAL) take precedence over quantity ranges.
+    FillType determineFillOutcome(OrderExecutionRequest request) {
+        String symbol = request.getSymbol();
+        if ("FAIL".equals(symbol)) return FillType.REJECTED;
+        if ("SLOW".equals(symbol)) return FillType.PARTIAL;
+
+        int qty = request.getQuantity();
+        if (qty >= 1000 && qty <= 1003) return FillType.REJECTED;
+        if (qty >= 10 && qty <= 99) return FillType.PARTIAL;
+        return FillType.FULL;
+    }
+
     @Transactional
     public void executeMarketFill(OrderExecutionRequest request) {
-        BigDecimal executedPrice = request.getLastPrice();
-        BigDecimal fillValue = computeFillValue(request.getQuantity(), executedPrice);
-
-        Execution execution = buildExecution(request, request.getQuantity(), executedPrice,
-                FillType.FULL, fillValue, 0, request.getLastPrice());
-        executionRepository.save(execution);
-
-        executionEventProducer.publishExecutionCompleted(toEvent(execution));
-        log.info("MARKET fill: orderId={} executedQty={} fillType=FULL",
-                request.getOrderId(), request.getQuantity());
+        executeFill(request, request.getLastPrice(), request.getLastPrice());
     }
 
     @Transactional
@@ -52,12 +55,7 @@ public class FillSimulationService {
         boolean conditionMet = checkLimitCondition(request.getSide(), request.getLastPrice(), request.getLimitPrice());
 
         if (conditionMet) {
-            double rand = ThreadLocalRandom.current().nextDouble();
-            if (rand < 0.70) {
-                executeFullLimitFill(request, request.getLastPrice());
-            } else {
-                executePartialLimitFill(request, request.getLastPrice());
-            }
+            executeFill(request, request.getLimitPrice(), request.getLastPrice());
         } else {
             PendingOrderExecution pending = PendingOrderExecution.builder()
                     .orderId(request.getOrderId())
@@ -105,45 +103,53 @@ public class FillSimulationService {
                 pendingRepository.save(order);
 
                 OrderExecutionRequest req = toOrderExecutionRequest(order, marketPrice);
-                double rand = ThreadLocalRandom.current().nextDouble();
-                if (rand < 0.70) {
-                    executeFullLimitFill(req, marketPrice);
-                } else {
-                    executePartialLimitFill(req, marketPrice);
-                }
+                executeFill(req, req.getLimitPrice(), marketPrice);
             }
         }
     }
 
     @Transactional
-    public void executeFullLimitFill(OrderExecutionRequest request, BigDecimal marketPrice) {
-        BigDecimal executedPrice = request.getLimitPrice();
-        BigDecimal fillValue = computeFillValue(request.getQuantity(), executedPrice);
-
-        Execution execution = buildExecution(request, request.getQuantity(), executedPrice,
-                FillType.FULL, fillValue, 0, marketPrice);
-        executionRepository.save(execution);
-
-        executionEventProducer.publishExecutionCompleted(toEvent(execution));
-        log.info("LIMIT full fill: orderId={} executedQty={} fillType=FULL",
-                request.getOrderId(), request.getQuantity());
+    public void executeFill(OrderExecutionRequest request, BigDecimal executedPrice, BigDecimal marketPrice) {
+        FillType outcome = determineFillOutcome(request);
+        switch (outcome) {
+            case FULL -> {
+                BigDecimal fillValue = computeFillValue(request.getQuantity(), executedPrice);
+                Execution execution = buildExecution(request, request.getQuantity(), executedPrice,
+                        FillType.FULL, fillValue, 0, marketPrice);
+                executionRepository.save(execution);
+                executionEventProducer.publishExecutionCompleted(toEvent(execution));
+                log.info("FULL fill: orderId={} symbol={} executedQty={}",
+                        request.getOrderId(), request.getSymbol(), request.getQuantity());
+            }
+            case PARTIAL -> executePartialFill(request, executedPrice, marketPrice);
+            case REJECTED -> executeRejectedFill(request, marketPrice);
+        }
     }
 
     @Transactional
-    public void executePartialLimitFill(OrderExecutionRequest request, BigDecimal marketPrice) {
+    public void executePartialFill(OrderExecutionRequest request, BigDecimal executedPrice, BigDecimal marketPrice) {
         int tranche1Qty = (int) Math.floor(request.getQuantity() * 0.60);
         int tranche2Qty = request.getQuantity() - tranche1Qty;
-        BigDecimal executedPrice = request.getLimitPrice();
 
         BigDecimal fillValue1 = computeFillValue(tranche1Qty, executedPrice);
         Execution tranche1 = buildExecution(request, tranche1Qty, executedPrice,
                 FillType.PARTIAL, fillValue1, tranche2Qty, marketPrice);
         executionRepository.save(tranche1);
         executionEventProducer.publishExecutionCompleted(toEvent(tranche1));
-        log.info("LIMIT partial fill tranche1: orderId={} executedQty={} remainingQty={}",
+        log.info("PARTIAL fill tranche1: orderId={} executedQty={} remainingQty={}",
                 request.getOrderId(), tranche1Qty, tranche2Qty);
 
         executeTrancheTwo(request, tranche2Qty, executedPrice, marketPrice);
+    }
+
+    @Transactional
+    public void executeRejectedFill(OrderExecutionRequest request, BigDecimal marketPrice) {
+        Execution rejection = buildExecution(request, 0, marketPrice,
+                FillType.REJECTED, BigDecimal.ZERO, request.getQuantity(), marketPrice);
+        executionRepository.save(rejection);
+        executionEventProducer.publishExecutionCompleted(toEvent(rejection));
+        log.info("REJECTED fill: orderId={} symbol={} qty={}",
+                request.getOrderId(), request.getSymbol(), request.getQuantity());
     }
 
     @Async
@@ -164,7 +170,7 @@ public class FillSimulationService {
                 FillType.FULL, fillValue2, 0, marketPrice);
         executionRepository.save(tranche2);
         executionEventProducer.publishExecutionCompleted(toEvent(tranche2));
-        log.info("LIMIT partial fill tranche2: orderId={} executedQty={} remainingQty=0",
+        log.info("PARTIAL fill tranche2: orderId={} executedQty={} remainingQty=0",
                 request.getOrderId(), qty);
     }
 

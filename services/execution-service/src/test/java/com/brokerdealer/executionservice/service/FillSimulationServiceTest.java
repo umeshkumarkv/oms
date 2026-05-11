@@ -37,36 +37,260 @@ class FillSimulationServiceTest {
     private static final UUID ORDER_ID = UUID.fromString("a1000000-0000-0000-0000-000000000001");
     private static final UUID CLIENT_ID = UUID.fromString("b2000000-0000-0000-0000-000000000001");
 
-    // ── MARKET fill ───────────────────────────────────────────────────────────
+    // ── determineFillOutcome — quantity ranges ─────────────────────────────────
 
     @Test
-    void shouldFillMarketOrderImmediatelyAtLastPrice() {
+    void shouldReturnFullWhenQuantityIsLessThan10() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 5, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    @Test
+    void shouldReturnFullWhenQuantityIsOne() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 1, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    @Test
+    void shouldReturnPartialWhenQuantityIs10() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 10, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.PARTIAL);
+    }
+
+    @Test
+    void shouldReturnPartialWhenQuantityIs50() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 50, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.PARTIAL);
+    }
+
+    @Test
+    void shouldReturnPartialWhenQuantityIs99() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 99, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.PARTIAL);
+    }
+
+    @Test
+    void shouldReturnFullWhenQuantityIs100() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 100, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    @Test
+    void shouldReturnFullWhenQuantityIs500() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 500, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    @Test
+    void shouldReturnFullWhenQuantityIs999() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 999, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    @Test
+    void shouldReturnRejectedWhenQuantityIs1000() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 1000, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.REJECTED);
+    }
+
+    @Test
+    void shouldReturnRejectedWhenQuantityIs1001() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 1001, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.REJECTED);
+    }
+
+    @Test
+    void shouldReturnRejectedWhenQuantityIs1003() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 1003, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.REJECTED);
+    }
+
+    @Test
+    void shouldReturnFullWhenQuantityIs1004() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 1004, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    @Test
+    void shouldReturnFullWhenQuantityIs2000() {
+        OrderExecutionRequest req = buildRequest(OrderType.MARKET, OrderSide.BUY, 2000, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.FULL);
+    }
+
+    // ── determineFillOutcome — symbol overrides ────────────────────────────────
+
+    @Test
+    void shouldReturnRejectedWhenSymbolIsFail() {
+        OrderExecutionRequest req = buildRequestWithSymbol("FAIL", 5, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.REJECTED);
+    }
+
+    @Test
+    void shouldReturnRejectedWhenSymbolIsFailRegardlessOfQty() {
+        OrderExecutionRequest req = buildRequestWithSymbol("FAIL", 500, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.REJECTED);
+    }
+
+    @Test
+    void shouldReturnPartialWhenSymbolIsSlow() {
+        OrderExecutionRequest req = buildRequestWithSymbol("SLOW", 5, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.PARTIAL);
+    }
+
+    @Test
+    void shouldReturnPartialWhenSymbolIsSlowOverridesRejectRange() {
+        OrderExecutionRequest req = buildRequestWithSymbol("SLOW", 1001, new BigDecimal("175.50"), null);
+        assertThat(fillSimulationService.determineFillOutcome(req)).isEqualTo(FillType.PARTIAL);
+    }
+
+    // ── executeMarketFill — deterministic routing ──────────────────────────────
+
+    @Test
+    void shouldFullFillMarketOrderWhenQtyLessThan10() {
         OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
-                100, new BigDecimal("175.50"), null);
-        when(executionRepository.save(any())).thenAnswer(inv -> {
-            Execution e = inv.getArgument(0);
-            e = Execution.builder()
-                    .id(UUID.randomUUID()).orderId(e.getOrderId()).clientId(e.getClientId())
-                    .symbol(e.getSymbol()).side(e.getSide()).executedQty(e.getExecutedQty())
-                    .executedPrice(e.getExecutedPrice()).fillType(e.getFillType())
-                    .fillValue(e.getFillValue()).remainingQuantity(e.getRemainingQuantity())
-                    .marketPriceAtFill(e.getMarketPriceAtFill()).executionVenue(e.getExecutionVenue())
-                    .executedAt(Instant.now()).build();
-            return e;
-        });
+                5, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
 
         fillSimulationService.executeMarketFill(request);
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
-        Execution saved = captor.getValue();
-
-        assertThat(saved.getFillType()).isEqualTo(FillType.FULL);
-        assertThat(saved.getExecutedPrice()).isEqualByComparingTo(new BigDecimal("175.50"));
-        assertThat(saved.getRemainingQuantity()).isZero();
-        assertThat(saved.getExecutionVenue()).isEqualTo("MOCK_ECN");
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.FULL);
+        assertThat(captor.getValue().getExecutedQty()).isEqualTo(5);
+        assertThat(captor.getValue().getRemainingQuantity()).isZero();
         verify(executionEventProducer).publishExecutionCompleted(any(ExecutionCompletedEvent.class));
     }
+
+    @Test
+    void shouldPartialFillMarketOrderWhenQtyBetween10And99() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                50, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository, atLeast(1)).save(captor.capture());
+        Execution tranche1 = captor.getAllValues().get(0);
+        assertThat(tranche1.getFillType()).isEqualTo(FillType.PARTIAL);
+        assertThat(tranche1.getExecutedQty()).isEqualTo(30); // floor(50 * 0.60)
+        assertThat(tranche1.getRemainingQuantity()).isEqualTo(20);
+    }
+
+    @Test
+    void shouldRejectMarketOrderWhenQtyBetween1000And1003() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                1001, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.REJECTED);
+        assertThat(captor.getValue().getExecutedQty()).isZero();
+        assertThat(captor.getValue().getFillValue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(captor.getValue().getRemainingQuantity()).isEqualTo(1001);
+        verify(executionEventProducer).publishExecutionCompleted(any(ExecutionCompletedEvent.class));
+    }
+
+    @Test
+    void shouldFullFillMarketOrderWhenQtyBetween100And999() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                500, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.FULL);
+        assertThat(captor.getValue().getExecutedQty()).isEqualTo(500);
+    }
+
+    @Test
+    void shouldFullFillMarketOrderWhenQtyAbove1003() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                2000, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.FULL);
+        assertThat(captor.getValue().getExecutedQty()).isEqualTo(2000);
+    }
+
+    @Test
+    void shouldRejectMarketOrderWhenSymbolIsFail() {
+        OrderExecutionRequest request = buildRequestWithSymbol("FAIL", 5, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.REJECTED);
+        assertThat(captor.getValue().getExecutedQty()).isZero();
+    }
+
+    @Test
+    void shouldPartialFillMarketOrderWhenSymbolIsSlowRegardlessOfQty() {
+        OrderExecutionRequest request = buildRequestWithSymbol("SLOW", 1001, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository, atLeast(1)).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).getFillType()).isEqualTo(FillType.PARTIAL);
+    }
+
+    // ── executeRejectedFill ────────────────────────────────────────────────────
+
+    @Test
+    void shouldPersistExecutionWithZeroQtyOnRejectedFill() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                1001, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"));
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getExecutedQty()).isZero();
+        assertThat(captor.getValue().getFillValue()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void shouldPublishExecutionCompletedWithRejectedFillType() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                1001, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"));
+
+        ArgumentCaptor<ExecutionCompletedEvent> captor = ArgumentCaptor.forClass(ExecutionCompletedEvent.class);
+        verify(executionEventProducer).publishExecutionCompleted(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo("REJECTED");
+        assertThat(captor.getValue().getExecutedQty()).isZero();
+    }
+
+    @Test
+    void shouldSetRemainingQuantityToOriginalOrderQuantityOnRejection() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                1001, new BigDecimal("175.50"), null);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"));
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getRemainingQuantity()).isEqualTo(1001);
+    }
+
+    // ── executeMarketFill — existing fill-value test ───────────────────────────
 
     @Test
     void shouldReturnCorrectFillValueForMarketOrder() {
@@ -112,25 +336,25 @@ class FillSimulationServiceTest {
         assertThat(result).isFalse();
     }
 
-    // ── LIMIT full fill ───────────────────────────────────────────────────────
+    // ── executeFill (LIMIT full-fill path) ────────────────────────────────────
 
     @Test
     void shouldFillLimitOrderAtLimitPriceNotMarketPrice() {
+        // qty=100 → FULL, executedPrice must be limitPrice (176.00) not marketPrice (175.50)
         OrderExecutionRequest request = buildRequest(OrderType.LIMIT, OrderSide.BUY,
                 100, new BigDecimal("175.50"), new BigDecimal("176.00"));
         when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-        fillSimulationService.executeFullLimitFill(request, new BigDecimal("175.50"));
+        fillSimulationService.executeFill(request, request.getLimitPrice(), new BigDecimal("175.50"));
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
-        // executedPrice must be limitPrice (176.00), not marketPrice
         assertThat(captor.getValue().getExecutedPrice()).isEqualByComparingTo(new BigDecimal("176.00"));
         assertThat(captor.getValue().getFillType()).isEqualTo(FillType.FULL);
         assertThat(captor.getValue().getRemainingQuantity()).isZero();
     }
 
-    // ── LIMIT partial fill ────────────────────────────────────────────────────
+    // ── executePartialFill (LIMIT partial-fill path) ──────────────────────────
 
     @Test
     void shouldSetRemainingQuantityCorrectlyForPartialFillTranche1() {
@@ -138,11 +362,11 @@ class FillSimulationServiceTest {
                 100, new BigDecimal("175.50"), new BigDecimal("176.00"));
         when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-        fillSimulationService.executePartialLimitFill(request, new BigDecimal("175.50"));
+        fillSimulationService.executePartialFill(request, request.getLimitPrice(), new BigDecimal("175.50"));
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository, atLeast(1)).save(captor.capture());
-        // First call is tranche1: 60% = 60 qty, remaining = 40
+        // tranche1: 60% = 60 qty, remaining = 40
         Execution tranche1 = captor.getAllValues().get(0);
         assertThat(tranche1.getFillType()).isEqualTo(FillType.PARTIAL);
         assertThat(tranche1.getExecutedQty()).isEqualTo(60);
@@ -211,10 +435,21 @@ class FillSimulationServiceTest {
 
     private OrderExecutionRequest buildRequest(OrderType orderType, OrderSide side,
                                                int qty, BigDecimal lastPrice, BigDecimal limitPrice) {
+        return buildRequestWithSymbolAndType(orderType, side, qty, lastPrice, limitPrice, "AAPL");
+    }
+
+    private OrderExecutionRequest buildRequestWithSymbol(String symbol, int qty,
+                                                         BigDecimal lastPrice, BigDecimal limitPrice) {
+        return buildRequestWithSymbolAndType(OrderType.MARKET, OrderSide.BUY, qty, lastPrice, limitPrice, symbol);
+    }
+
+    private OrderExecutionRequest buildRequestWithSymbolAndType(OrderType orderType, OrderSide side,
+                                                                int qty, BigDecimal lastPrice,
+                                                                BigDecimal limitPrice, String symbol) {
         OrderExecutionRequest req = new OrderExecutionRequest();
         req.setOrderId(ORDER_ID);
         req.setClientId(CLIENT_ID);
-        req.setSymbol("AAPL");
+        req.setSymbol(symbol);
         req.setSide(side);
         req.setOrderType(orderType);
         req.setQuantity(qty);
