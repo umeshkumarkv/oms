@@ -268,7 +268,7 @@ const OrderBlotterPage: React.FC = () => {
   const [searchText,     setSearchText]     = useState('')
   const [filterClientId, setFilterClientId] = useState('')
   const [filterStatuses, setFilterStatuses] = useState<OrderStatus[]>([])
-  const [filterTif,      setFilterTif]      = useState<'ALL' | 'DAY' | 'GTC'>('ALL')
+  const [filterTif,      setFilterTif]      = useState<'ALL' | 'DAY' | 'GTD'>('ALL')
   const [filterSide,     setFilterSide]     = useState<'ALL' | 'BUY' | 'SELL'>('ALL')
 
   const [page,     setPage]     = useState(1)
@@ -414,7 +414,7 @@ const OrderBlotterPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>TIF</span>
           <div style={s.toggleGrp}>
-            {(['ALL', 'DAY', 'GTC'] as const).map(t => (
+            {(['ALL', 'DAY', 'GTD'] as const).map(t => (
               <button key={t} style={s.toggleBtn(filterTif === t)} onClick={() => setFilterTif(t)}>{t}</button>
             ))}
           </div>
