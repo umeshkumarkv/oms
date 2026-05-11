@@ -58,9 +58,6 @@ class MarketDataServiceTest {
     @Mock
     private ValueOperations<String, Object> valueOperations;
 
-    @Mock
-    private PriceHistoryStore priceHistoryStore;
-
     @InjectMocks
     private MarketDataService marketDataService;
 
@@ -73,7 +70,6 @@ class MarketDataServiceTest {
         ReflectionTestUtils.setField(marketDataService, "timezone", "America/New_York");
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(valueOperations.get(anyString())).thenReturn(null); // cache miss by default
-        lenient().when(priceHistoryStore.getPriceHistory(anyString())).thenReturn(List.of());
         lenient().when(marketHolidayRepository.existsById(any(LocalDate.class))).thenReturn(false);
     }
 
@@ -191,21 +187,6 @@ class MarketDataServiceTest {
         InstrumentResponse result = marketDataService.getInstrument("AAPL");
 
         assertThat(result.getMarketStatus()).isIn("OPEN", "CLOSED");
-    }
-
-    @Test
-    void shouldEnrichResponseWithPriceHistoryFromStore() {
-        Instrument instrument = buildInstrument("AAPL", false);
-        InstrumentResponse base = buildBaseResponse("AAPL", false);
-        List<String> history = List.of("174.00", "174.50", "175.00");
-
-        when(instrumentRepository.findById("AAPL")).thenReturn(Optional.of(instrument));
-        when(instrumentMapper.toResponse(instrument)).thenReturn(base);
-        when(priceHistoryStore.getPriceHistory("AAPL")).thenReturn(history);
-
-        InstrumentResponse result = marketDataService.getInstrument("AAPL");
-
-        assertThat(result.getPriceHistory()).containsExactly("174.00", "174.50", "175.00");
     }
 
     @Test
@@ -380,18 +361,15 @@ class MarketDataServiceTest {
         instrument.setDayLow(new BigDecimal("174.50"));
         instrument.setVolume(100000L);
         InstrumentSummaryResponse base = buildBaseSummaryResponse("AAPL", false);
-        List<String> history = List.of("175.00", "175.50", "176.25");
 
         when(instrumentRepository.findAllByOrderBySymbolAsc()).thenReturn(List.of(instrument));
         when(instrumentSummaryMapper.toSummary(instrument)).thenReturn(base);
-        when(priceHistoryStore.getPriceHistory("AAPL")).thenReturn(history);
 
         List<InstrumentSummaryResponse> result = marketDataService.getInstruments();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
         assertThat(result.get(0).getMarketStatus()).isIn("OPEN", "CLOSED");
-        assertThat(result.get(0).getPriceHistory()).containsExactly("175.00", "175.50", "176.25");
         assertThat(new BigDecimal(result.get(0).getChange())).isEqualByComparingTo(new BigDecimal("1.25"));
         assertThat(new BigDecimal(result.get(0).getChangePct())).isEqualByComparingTo(new BigDecimal("0.71"));
     }

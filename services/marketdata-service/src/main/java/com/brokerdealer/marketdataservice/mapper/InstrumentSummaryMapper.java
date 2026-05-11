@@ -18,7 +18,6 @@ public interface InstrumentSummaryMapper {
     @Mapping(target = "dayLow",        expression = "java(instrument.getDayLow()        != null ? instrument.getDayLow().toPlainString()        : null)")
     @Mapping(target = "change",      ignore = true)
     @Mapping(target = "changePct",   ignore = true)
-    @Mapping(target = "priceHistory", ignore = true)
     @Mapping(target = "marketStatus", ignore = true)
     InstrumentSummaryResponse toSummary(Instrument instrument);
 }

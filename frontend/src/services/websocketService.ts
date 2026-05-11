@@ -6,6 +6,12 @@ export interface PriceTick {
   lastPrice: string
   previousClose: string
   dataTimestamp: string
+  // Fields added by SCRUM-82
+  change?: string
+  changePct?: string
+  volume?: number
+  dayHigh?: string
+  dayLow?: string
 }
 
 export interface MarketStatusEvent {
@@ -25,6 +31,8 @@ class MarketDataWebSocketService {
   private connectionHandlers: ConnectionHandler[] = []
   private connected = false
   private authToken: string | null = null
+  // Symbols to subscribe to once the connection is authenticated
+  private pendingSubscriptions: Set<string> = new Set()
 
   setToken(token: string | null): void {
     this.authToken = token
@@ -50,6 +58,11 @@ class MarketDataWebSocketService {
         if (msg.type === 'AUTH_OK') {
           this.connected = true
           this.connectionHandlers.forEach(h => h(true))
+          // Flush buffered subscriptions that arrived before AUTH_OK
+          this.pendingSubscriptions.forEach(symbol => {
+            this.ws!.send(JSON.stringify({ action: 'subscribe', symbol }))
+          })
+          this.pendingSubscriptions.clear()
         } else if (msg.type === 'MARKET_DATA_TICK') {
           this.tickHandlers.forEach(h => h(msg as PriceTick))
         } else if (msg.type === 'MARKET_OPEN' || msg.type === 'MARKET_CLOSE') {
@@ -67,7 +80,7 @@ class MarketDataWebSocketService {
         this.connected = false
         this.connectionHandlers.forEach(h => h(false))
       }
-      this.reconnectTimer = setTimeout(() => this.connect(), 5000)
+      this.reconnectTimer = setTimeout(() => this.connect(), 3000)
     }
 
     this.ws.onerror = () => {
@@ -87,6 +100,30 @@ class MarketDataWebSocketService {
 
   isConnected(): boolean {
     return this.connected
+  }
+
+  /**
+   * Subscribe to tick updates for a symbol.
+   * If the connection is not yet authenticated the request is queued and
+   * flushed automatically once AUTH_OK is received.
+   */
+  subscribe(symbol: string): void {
+    if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'subscribe', symbol }))
+    } else {
+      this.pendingSubscriptions.add(symbol)
+    }
+  }
+
+  /**
+   * Unsubscribe from tick updates for a symbol.
+   * Also removes the symbol from the pending queue if not yet sent.
+   */
+  unsubscribe(symbol: string): void {
+    this.pendingSubscriptions.delete(symbol)
+    if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'unsubscribe', symbol }))
+    }
   }
 
   onTick(handler: TickHandler): () => void {

@@ -44,7 +44,7 @@ class PriceTickServiceTest {
     private ScenarioService scenarioService;
 
     @Mock
-    private PriceHistoryStore priceHistoryStore;
+    private TickPersistenceService tickPersistenceService;
 
     @InjectMocks
     private PriceTickService priceTickService;
@@ -159,7 +159,7 @@ class PriceTickServiceTest {
     }
 
     @Test
-    void shouldAddPriceToHistoryStoreAfterTick() {
+    void shouldCallTickPersistenceServiceAfterTick() {
         Instrument instrument = buildInstrument("AAPL", new BigDecimal("175.00"));
         instrument.setDayHigh(new BigDecimal("180.00"));
         instrument.setDayLow(new BigDecimal("170.00"));
@@ -167,7 +167,12 @@ class PriceTickServiceTest {
 
         priceTickService.tickInstrument(instrument, false);
 
-        verify(priceHistoryStore).addPrice(eq("AAPL"), any(BigDecimal.class));
+        verify(tickPersistenceService).saveTick(
+                eq("AAPL"),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(BigDecimal.class),
+                any(Long.class));
     }
 
     @Test
@@ -177,10 +182,8 @@ class PriceTickServiceTest {
         instrument.setDayLow(new BigDecimal("170.00"));
         instrument.setVolume(1000L);
         instrument.setPreviousClose(new BigDecimal("174.00"));
-        List<String> history = List.of("174.00", "174.50", "175.00");
 
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-        when(priceHistoryStore.getPriceHistory("AAPL")).thenReturn(history);
 
         priceTickService.tickInstrument(instrument, false);
 
@@ -195,8 +198,6 @@ class PriceTickServiceTest {
         assertThat(payload).containsKey("dayHigh");
         assertThat(payload).containsKey("dayLow");
         assertThat(payload).containsKey("previousClose");
-        assertThat(payload).containsKey("priceHistory");
-        assertThat(payload.get("priceHistory")).isEqualTo(history);
     }
 
     @Test
@@ -238,47 +239,6 @@ class PriceTickServiceTest {
 
         verifyNoInteractions(instrumentRepository);
         verifyNoInteractions(redisTemplate);
-    }
-
-    // --- PriceHistoryStore unit tests ---
-
-    @Test
-    void shouldStoreUpToTwentyPricesInHistory() {
-        PriceHistoryStore store = new PriceHistoryStore();
-        for (int i = 1; i <= 25; i++) {
-            store.addPrice("AAPL", new BigDecimal(String.valueOf(i)));
-        }
-        List<String> history = store.getPriceHistory("AAPL");
-        assertThat(history).hasSize(PriceHistoryStore.MAX_HISTORY);
-        // oldest entries (1-5) should be evicted, last 20 should be 6-25
-        assertThat(history.get(0)).isEqualTo("6");
-        assertThat(history.get(history.size() - 1)).isEqualTo("25");
-    }
-
-    @Test
-    void shouldReturnEmptyListForSymbolWithNoHistory() {
-        PriceHistoryStore store = new PriceHistoryStore();
-        assertThat(store.getPriceHistory("UNKNOWN")).isEmpty();
-    }
-
-    @Test
-    void shouldReturnPricesInChronologicalOrder() {
-        PriceHistoryStore store = new PriceHistoryStore();
-        store.addPrice("AAPL", new BigDecimal("174.00"));
-        store.addPrice("AAPL", new BigDecimal("174.50"));
-        store.addPrice("AAPL", new BigDecimal("175.00"));
-
-        List<String> history = store.getPriceHistory("AAPL");
-
-        assertThat(history).containsExactly("174.00", "174.50", "175.00");
-    }
-
-    @Test
-    void shouldResetHistoryForSymbol() {
-        PriceHistoryStore store = new PriceHistoryStore();
-        store.addPrice("AAPL", new BigDecimal("175.00"));
-        store.reset("AAPL");
-        assertThat(store.getPriceHistory("AAPL")).isEmpty();
     }
 
     // --- helpers ---

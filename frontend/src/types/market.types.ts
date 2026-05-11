@@ -8,11 +8,14 @@ export interface Instrument {
   minQuantity: number
   maxQuantity: number
   dataTimestamp: string
-  // Only returned by GET /market/{symbol}
+  // Fields added by SCRUM-82
+  change?: string
+  changePct?: string
+  volume?: number
   dayHigh?: string
   dayLow?: string
   previousClose?: string
-  volume?: number
+  marketStatus?: string
 }
 
 export interface MarketHours {
@@ -26,4 +29,30 @@ export interface MarketHours {
 export interface Holiday {
   holidayDate: string  // YYYY-MM-DD
   holidayName: string
+}
+
+export interface MarketConfig {
+  pollingIntervalMs: number
+  marketOpen: boolean
+  marketHours: {
+    start: string
+    end: string
+    timezone: string
+  }
+  dataSource: 'WEBSOCKET' | 'POLLING'
+}
+
+export interface TickEntry {
+  time: string    // LocalDateTime ISO string e.g. "2026-05-08T09:30:01"
+  price: string
+  bid: string
+  ask: string
+  volume: number
+}
+
+export interface TickHistoryResponse {
+  symbol: string
+  from: string
+  to: string
+  ticks: TickEntry[]
 }

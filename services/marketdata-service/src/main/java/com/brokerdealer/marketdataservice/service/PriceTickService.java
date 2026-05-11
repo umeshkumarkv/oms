@@ -38,7 +38,7 @@ public class PriceTickService {
     private final MarketDataWebSocketHandler webSocketHandler;
     private final ObjectMapper objectMapper;
     private final ScenarioService scenarioService;
-    private final PriceHistoryStore priceHistoryStore;
+    private final TickPersistenceService tickPersistenceService;
 
     @Value("${market.simulation.bypass-market-hours:false}")
     private boolean bypassMarketHours;
@@ -113,9 +113,6 @@ public class PriceTickService {
         long volumeDelta = 500L + ThreadLocalRandom.current().nextLong(4501L);
         instrument.setVolume((instrument.getVolume() == null ? 0L : instrument.getVolume()) + volumeDelta);
 
-        // track price history (last 20 ticks)
-        priceHistoryStore.addPrice(instrument.getSymbol(), newPrice);
-
         instrumentRepository.save(instrument);
 
         // invalidate Redis cache so next read fetches fresh data
@@ -123,6 +120,13 @@ public class PriceTickService {
         log.debug("Ticked: symbol={} newPrice={}", instrument.getSymbol(), newPrice.toPlainString());
 
         broadcastTick(instrument);
+
+        tickPersistenceService.saveTick(
+                instrument.getSymbol(),
+                instrument.getLastPrice(),
+                instrument.getBidPrice(),
+                instrument.getAskPrice(),
+                instrument.getVolume());
     }
 
     private BigDecimal computeRandomWalkPrice(BigDecimal currentPrice) {
@@ -146,8 +150,6 @@ public class PriceTickService {
                             .setScale(2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            List<String> priceHistory = priceHistoryStore.getPriceHistory(instrument.getSymbol());
-
             Map<String, Object> payload = new HashMap<>();
             payload.put("type", "MARKET_DATA_TICK");
             payload.put("symbol", instrument.getSymbol());
@@ -162,7 +164,6 @@ public class PriceTickService {
             payload.put("dayLow",
                     instrument.getDayLow() != null ? instrument.getDayLow().toPlainString() : null);
             payload.put("previousClose", prevClose.toPlainString());
-            payload.put("priceHistory", priceHistory);
             payload.put("dataTimestamp", instrument.getDataTimestamp().toString());
 
             String json = objectMapper.writeValueAsString(payload);

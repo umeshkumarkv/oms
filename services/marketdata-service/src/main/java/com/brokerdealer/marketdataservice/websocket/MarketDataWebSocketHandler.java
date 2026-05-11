@@ -52,6 +52,10 @@ public class MarketDataWebSocketHandler extends TextWebSocketHandler {
         log.warn("WS transport error: sessionId={} error={}", session.getId(), exception.getMessage());
     }
 
+    public boolean hasActiveSessions() {
+        return !sessions.isEmpty();
+    }
+
     public void broadcast(String json) {
         if (sessions.isEmpty()) return;
         TextMessage message = new TextMessage(json);

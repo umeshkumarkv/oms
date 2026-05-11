@@ -2,6 +2,7 @@ package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
@@ -10,6 +11,7 @@ import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
+import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,13 +46,16 @@ public class MarketDataService {
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
+    @Value("${market.polling.interval-ms:5000}")
+    private long pollingIntervalMs;
+
     private final InstrumentRepository instrumentRepository;
     private final InstrumentMapper instrumentMapper;
     private final InstrumentSummaryMapper instrumentSummaryMapper;
     private final MarketHolidayRepository marketHolidayRepository;
     private final MarketHolidayMapper marketHolidayMapper;
     private final RedisTemplate<String, Object> redisTemplate;
-    private final PriceHistoryStore priceHistoryStore;
+    private final MarketDataWebSocketHandler webSocketHandler;
 
     public InstrumentResponse getInstrument(String symbol) {
         String normalised = symbol.toUpperCase();
@@ -68,8 +73,7 @@ public class MarketDataService {
                     InstrumentResponse base = instrumentMapper.toResponse(instrument);
                     return enrichInstrumentResponse(base,
                             instrument.getLastPrice(),
-                            instrument.getPreviousClose(),
-                            normalised);
+                            instrument.getPreviousClose());
                 })
                 .orElseThrow(() -> new SymbolNotFoundException("SYMBOL_NOT_FOUND",
                         "Symbol not found: " + normalised));
@@ -81,6 +85,21 @@ public class MarketDataService {
 
     public MarketHoursResponse getMarketHours() {
         return getMarketHoursAt(ZonedDateTime.now(ZoneId.of(timezone)));
+    }
+
+    public MarketConfigResponse getMarketConfig() {
+        MarketHoursResponse hours = getMarketHours();
+        String dataSource = webSocketHandler.hasActiveSessions() ? "WEBSOCKET" : "POLLING";
+        return MarketConfigResponse.builder()
+                .pollingIntervalMs(pollingIntervalMs)
+                .marketOpen(Boolean.TRUE.equals(hours.getMarketOpen()))
+                .marketHours(MarketConfigResponse.MarketHoursConfig.builder()
+                        .start(openTime)
+                        .end(closeTime)
+                        .timezone(timezone)
+                        .build())
+                .dataSource(dataSource)
+                .build();
     }
 
     MarketHoursResponse getMarketHoursAt(ZonedDateTime now) {
@@ -131,7 +150,6 @@ public class MarketDataService {
                     return enrichSummaryResponse(base,
                             instrument.getLastPrice(),
                             instrument.getPreviousClose(),
-                            instrument.getSymbol(),
                             status);
                 })
                 .toList();
@@ -154,22 +172,20 @@ public class MarketDataService {
     // --- private enrichment helpers ---
 
     private InstrumentResponse enrichInstrumentResponse(InstrumentResponse base,
-            BigDecimal lastPrice, BigDecimal previousClose, String symbol) {
+            BigDecimal lastPrice, BigDecimal previousClose) {
         String status = isMarketOpen(ZonedDateTime.now(ZoneId.of(timezone))) ? "OPEN" : "CLOSED";
         return base.toBuilder()
                 .change(computeChange(lastPrice, previousClose))
                 .changePct(computeChangePct(lastPrice, previousClose))
-                .priceHistory(priceHistoryStore.getPriceHistory(symbol))
                 .marketStatus(status)
                 .build();
     }
 
     private InstrumentSummaryResponse enrichSummaryResponse(InstrumentSummaryResponse base,
-            BigDecimal lastPrice, BigDecimal previousClose, String symbol, String marketStatus) {
+            BigDecimal lastPrice, BigDecimal previousClose, String marketStatus) {
         return base.toBuilder()
                 .change(computeChange(lastPrice, previousClose))
                 .changePct(computeChangePct(lastPrice, previousClose))
-                .priceHistory(priceHistoryStore.getPriceHistory(symbol))
                 .marketStatus(marketStatus)
                 .build();
     }

@@ -3,8 +3,6 @@ package com.brokerdealer.marketdataservice.dto.response;
 import lombok.Builder;
 import lombok.Value;
 
-import java.util.List;
-
 @Value
 @Builder(toBuilder = true)
 public class InstrumentSummaryResponse {
@@ -18,7 +16,6 @@ public class InstrumentSummaryResponse {
     String dayHigh;
     String dayLow;
     String previousClose;
-    List<String> priceHistory;
     String marketStatus;
     String dataTimestamp;
     Boolean tradable;

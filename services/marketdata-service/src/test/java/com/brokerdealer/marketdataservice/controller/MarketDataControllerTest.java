@@ -7,6 +7,8 @@ import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
+import com.brokerdealer.marketdataservice.service.TickService;
+import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -30,6 +32,12 @@ class MarketDataControllerTest {
     @MockBean
     private MarketDataService marketDataService;
 
+    @MockBean
+    private TickService tickService;
+
+    @MockBean
+    private MarketDataWebSocketHandler webSocketHandler;
+
     @Test
     void shouldReturn200WithAllRequiredFieldsWhenSymbolIsValid() throws Exception {
         InstrumentResponse response = InstrumentResponse.builder()
@@ -43,7 +51,6 @@ class MarketDataControllerTest {
                 .dayHigh("176.10")
                 .dayLow("174.80")
                 .previousClose("173.75")
-                .priceHistory(List.of("173.75", "174.00", "175.00"))
                 .marketStatus("OPEN")
                 .tradable(true)
                 .halted(false)
@@ -66,8 +73,6 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data.dayHigh").value("176.10"))
                 .andExpect(jsonPath("$.data.dayLow").value("174.80"))
                 .andExpect(jsonPath("$.data.previousClose").value("173.75"))
-                .andExpect(jsonPath("$.data.priceHistory").isArray())
-                .andExpect(jsonPath("$.data.priceHistory[0]").value("173.75"))
                 .andExpect(jsonPath("$.data.marketStatus").value("OPEN"))
                 .andExpect(jsonPath("$.data.tradable").value(true))
                 .andExpect(jsonPath("$.data.halted").value(false))
@@ -189,7 +194,6 @@ class MarketDataControllerTest {
                         .lastPrice("175.00").change("1.25").changePct("0.71")
                         .volume(4521000L).dayHigh("176.10").dayLow("174.80")
                         .previousClose("173.75").marketStatus("OPEN")
-                        .priceHistory(List.of("173.75", "175.00"))
                         .tradable(true).halted(false).build(),
                 InstrumentSummaryResponse.builder()
                         .symbol("HALT").bidPrice("49.90").askPrice("50.10")
@@ -211,7 +215,6 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data[0].dayLow").value("174.80"))
                 .andExpect(jsonPath("$.data[0].previousClose").value("173.75"))
                 .andExpect(jsonPath("$.data[0].marketStatus").value("OPEN"))
-                .andExpect(jsonPath("$.data[0].priceHistory").isArray())
                 .andExpect(jsonPath("$.data[0].tradable").value(true))
                 .andExpect(jsonPath("$.data[0].halted").value(false))
                 .andExpect(jsonPath("$.data[1].symbol").value("HALT"))

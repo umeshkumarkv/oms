@@ -7,3 +7,9 @@ node_modules/
 .idea/
 .mvn/
 k8s/secret.yaml
+
+# Frontend build output
+frontend/dist/
+
+# Claude Code local settings
+.claude/settings.local.json

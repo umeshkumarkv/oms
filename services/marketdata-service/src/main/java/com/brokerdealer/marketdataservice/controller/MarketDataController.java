@@ -2,9 +2,12 @@ package com.brokerdealer.marketdataservice.controller;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
+import com.brokerdealer.marketdataservice.dto.response.TickHistoryResponse;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
+import com.brokerdealer.marketdataservice.service.TickService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+
 @RestController
 @RequestMapping("/api/v1/market")
 @RequiredArgsConstructor
@@ -22,6 +26,7 @@ import java.util.UUID;
 public class MarketDataController {
 
     private final MarketDataService marketDataService;
+    private final TickService tickService;
 
     @GetMapping("/{symbol}")
     public ResponseEntity<Map<String, Object>> getInstrument(@PathVariable String symbol) {
@@ -48,6 +53,20 @@ public class MarketDataController {
     public ResponseEntity<Map<String, Object>> getInstruments() {
         log.debug("GET /api/v1/market/instruments");
         List<InstrumentSummaryResponse> data = marketDataService.getInstruments();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<Map<String, Object>> getMarketConfig() {
+        log.debug("GET /api/v1/market/config");
+        MarketConfigResponse data = marketDataService.getMarketConfig();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @GetMapping("/ticks/history")
+    public ResponseEntity<Map<String, Object>> getTickHistory(@RequestParam String symbol) {
+        log.debug("GET /api/v1/market/ticks/history?symbol={}", symbol);
+        TickHistoryResponse data = tickService.getHistory(symbol);
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 

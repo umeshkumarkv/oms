@@ -41,9 +41,11 @@ spring:
 
 market:
   hours:
-    open-time: "09:30:00"
-    close-time: "16:00:00"
+    open-time: "00:30:00"
+    close-time: "23:59:00"
     timezone: "America/New_York"
+  polling:
+    interval-ms: 5000
   simulation:
     bypass-market-hours: true
   scenarios:

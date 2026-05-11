@@ -25,7 +25,6 @@ public interface InstrumentMapper {
             expression = "java(instrument.getDataTimestamp() != null ? instrument.getDataTimestamp().toString() : null)")
     @Mapping(target = "change", ignore = true)
     @Mapping(target = "changePct", ignore = true)
-    @Mapping(target = "priceHistory", ignore = true)
     @Mapping(target = "marketStatus", ignore = true)
     InstrumentResponse toResponse(Instrument instrument);
 }

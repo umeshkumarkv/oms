@@ -6,6 +6,7 @@ import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
+import com.brokerdealer.marketdataservice.service.TickService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -27,6 +28,9 @@ class RoleAuthorizationFilterTest {
 
     @MockBean
     private MarketDataService marketDataService;
+
+    @MockBean
+    private TickService tickService;
 
     @MockBean
     private RoleGuard roleGuard;
