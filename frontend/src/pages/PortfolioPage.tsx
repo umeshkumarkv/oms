@@ -99,15 +99,11 @@ const PortfolioPage: React.FC = () => {
   const [client, setClient] = useState<Client | null>(null)
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [fills, setFills] = useState<FillActivity[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    getClients().then((list) => {
-      setClients(list)
-      if (list.length > 0) setSelectedClientId(list[0].clientId)
-    }).catch(() => { /* dropdown stays empty */ })
-  }, [])
+  // Tracks whether the selectedClientId effect should skip loadData because
+  // the initial load was already triggered directly from the getClients callback.
+  const skipNextLoadRef = useRef(false)
 
   const loadData = async (clientId: string, showLoading = true) => {
     if (!clientId) return
@@ -131,7 +127,30 @@ const PortfolioPage: React.FC = () => {
     }
   }
 
+  // Fetch client list and kick off portfolio load immediately — no extra render cycle.
   useEffect(() => {
+    getClients().then((list) => {
+      setClients(list)
+      if (list.length > 0) {
+        const firstId = list[0].clientId
+        skipNextLoadRef.current = true  // selectedClientId effect will skip loadData
+        setSelectedClientId(firstId)
+        loadData(firstId)               // start loading immediately
+      }
+    }).catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!selectedClientId) return
+
+    if (skipNextLoadRef.current) {
+      // Initial load already triggered — just wire up the polling interval
+      skipNextLoadRef.current = false
+      intervalRef.current = setInterval(() => loadData(selectedClientId, false), POLL_INTERVAL_MS)
+      return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+    }
+
+    // User changed client — reset stale data and reload
     setClient(null)
     setPortfolio(null)
     setFills([])
