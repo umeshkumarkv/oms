@@ -1,7 +1,10 @@
 package com.brokerdealer.orderservice.service;
 
 import com.brokerdealer.orderservice.domain.Order;
+import com.brokerdealer.orderservice.domain.OrderSide;
 import com.brokerdealer.orderservice.domain.OrderStatus;
+import com.brokerdealer.orderservice.domain.OrderType;
+import com.brokerdealer.orderservice.domain.TimeInForce;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
 import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.kafka.producer.OrderEventProducer;
@@ -52,6 +55,10 @@ class OrderStateMachineServiceTest {
                 .id(orderId)
                 .clientId(clientId)
                 .symbol("AAPL")
+                .side(OrderSide.BUY)
+                .orderType(OrderType.MARKET)
+                .timeInForce(TimeInForce.DAY)
+                .quantity(10)
                 .status(OrderStatus.NEW)
                 .build();
     }
