@@ -165,7 +165,8 @@ const OrderEntryPage: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    getPortfolio(clientId).then(setPortfolio).catch(() => setPortfolio(null))
+    setPortfolio(null)
+    if (clientId) getPortfolio(clientId).then(setPortfolio).catch(() => setPortfolio(null))
   }, [clientId])
 
   useEffect(() => {
