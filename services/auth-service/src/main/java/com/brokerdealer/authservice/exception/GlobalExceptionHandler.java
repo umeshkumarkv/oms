@@ -3,6 +3,7 @@ package com.brokerdealer.authservice.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -32,6 +33,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleForbiddenException(ForbiddenException ex) {
         log.warn("Forbidden: code={} message={}", ex.getErrorCode(), ex.getMessage());
         return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
+        log.warn("Access denied: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied — insufficient permissions", List.of());
     }
 
     @ExceptionHandler(InvalidTokenException.class)

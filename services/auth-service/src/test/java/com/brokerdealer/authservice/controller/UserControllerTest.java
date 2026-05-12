@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -43,6 +44,7 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn200WithUserListForADMIN() throws Exception {
         List<UserResponse> users = List.of(
                 buildUserResponse("trader.john", "TRADER", "ACTIVE"),
@@ -50,8 +52,7 @@ class UserControllerTest {
         );
         when(userService.listUsers(null, null)).thenReturn(users);
 
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "ADMIN"))
+        mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(2))
@@ -63,9 +64,9 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "TRADER")
     void shouldReturn403ForTRADERRole() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "TRADER"))
+        mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.meta.timestamp").isNotEmpty());
@@ -73,25 +74,8 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "VIEWER")
     void shouldReturn403ForVIEWERRole() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "VIEWER"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
-        verifyNoInteractions(userService);
-    }
-
-    @Test
-    void shouldReturn403ForOPERATIONSRole() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "OPERATIONS"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
-        verifyNoInteractions(userService);
-    }
-
-    @Test
-    void shouldReturn403WhenXUserRoleHeaderIsMissing() throws Exception {
         mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
@@ -99,6 +83,24 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "OPERATIONS")
+    void shouldReturn403ForOPERATIONSRole() throws Exception {
+        mockMvc.perform(get("/api/v1/users"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldReturn403WhenCallerIsNotAuthenticated() throws Exception {
+        mockMvc.perform(get("/api/v1/users"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturnOnlyTRADERUsersWhenRoleFilterApplied() throws Exception {
         List<UserResponse> traders = List.of(
                 buildUserResponse("trader.john", "TRADER", "ACTIVE"),
@@ -106,9 +108,7 @@ class UserControllerTest {
         );
         when(userService.listUsers(UserRole.TRADER, null)).thenReturn(traders);
 
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "ADMIN")
-                        .param("role", "TRADER"))
+        mockMvc.perform(get("/api/v1/users").param("role", "TRADER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.meta.total").value(2));
@@ -117,15 +117,14 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturnOnlyINACTIVEUsersWhenStatusFilterApplied() throws Exception {
         List<UserResponse> inactiveUsers = List.of(
                 buildUserResponse("old.trader", "TRADER", "INACTIVE")
         );
         when(userService.listUsers(null, UserStatus.INACTIVE)).thenReturn(inactiveUsers);
 
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "ADMIN")
-                        .param("status", "INACTIVE"))
+        mockMvc.perform(get("/api/v1/users").param("status", "INACTIVE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.meta.total").value(1));
@@ -134,6 +133,7 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturnResponseWithAllExpectedFields() throws Exception {
         UUID userId = UUID.randomUUID();
         UserResponse user = UserResponse.builder()
@@ -147,8 +147,7 @@ class UserControllerTest {
                 .build();
         when(userService.listUsers(null, null)).thenReturn(List.of(user));
 
-        mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "ADMIN"))
+        mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].userId").value(userId.toString()))
                 .andExpect(jsonPath("$.data[0].username").value("trader.john"))
@@ -160,11 +159,11 @@ class UserControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturnEmptyListWhenNoUsersMatchFilter() throws Exception {
         when(userService.listUsers(UserRole.VIEWER, UserStatus.INACTIVE)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/users")
-                        .header("X-User-Role", "ADMIN")
                         .param("role", "VIEWER")
                         .param("status", "INACTIVE"))
                 .andExpect(status().isOk())

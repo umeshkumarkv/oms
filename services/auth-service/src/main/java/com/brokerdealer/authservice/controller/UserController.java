@@ -3,11 +3,11 @@ package com.brokerdealer.authservice.controller;
 import com.brokerdealer.authservice.domain.UserRole;
 import com.brokerdealer.authservice.domain.UserStatus;
 import com.brokerdealer.authservice.dto.response.UserResponse;
-import com.brokerdealer.authservice.exception.ForbiddenException;
 import com.brokerdealer.authservice.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -24,15 +24,10 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> listUsers(
-            @RequestHeader(value = "X-User-Role", required = false) String userRole,
             @RequestParam(required = false) UserRole role,
             @RequestParam(required = false) UserStatus status) {
-
-        if (!"ADMIN".equals(userRole)) {
-            log.warn("Access denied to GET /api/v1/users: X-User-Role={}", userRole);
-            throw new ForbiddenException("FORBIDDEN", "Access denied — ADMIN role required");
-        }
 
         log.debug("GET /api/v1/users: role={} status={}", role, status);
 
