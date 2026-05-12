@@ -97,5 +97,5 @@ User:
 - On logout: insert token into Redis blacklist with key auth:blacklist:{token}, TTL = remaining expiry
 - API Gateway checks blacklist before forwarding — auth-service does not re-check on each call
 - Password hashing: BCryptPasswordEncoder with strength 10
-- Seed users: trader.john, trader.sarah (TRADER), ops.manager (OPERATIONS), admin.user (ADMIN)
+- Seed users: trader.john, trader.sarah (TRADER), ops.manager (OPERATIONS), risk.manager (ADMIN), viewer.user (VIEWER)
 - All seed user passwords: Demo@1234

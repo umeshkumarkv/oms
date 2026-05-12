@@ -8,7 +8,7 @@ const DEMO_ACCOUNTS = [
   { username: 'trader.john',  role: 'TRADER'     },
   { username: 'trader.sarah', role: 'TRADER'     },
   { username: 'ops.manager',  role: 'OPERATIONS' },
-  { username: 'admin.user',   role: 'ADMIN'      },
+  { username: 'risk.manager', role: 'ADMIN'      },
 ]
 
 const LoginPage: React.FC = () => {

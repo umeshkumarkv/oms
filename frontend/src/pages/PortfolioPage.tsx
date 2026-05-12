@@ -132,6 +132,9 @@ const PortfolioPage: React.FC = () => {
   }
 
   useEffect(() => {
+    setClient(null)
+    setPortfolio(null)
+    setFills([])
     loadData(selectedClientId)
     intervalRef.current = setInterval(() => loadData(selectedClientId, false), POLL_INTERVAL_MS)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
