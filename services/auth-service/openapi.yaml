@@ -55,6 +55,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/LogoutResponse'
 
+  /api/v1/users:
+    get:
+      summary: List all user accounts (ADMIN only)
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [TRADER, VIEWER, OPERATIONS, ADMIN]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+      responses:
+        '200':
+          description: List of all user accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '403':
+          description: Forbidden — ADMIN role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: FORBIDDEN
+                  message: Access denied — ADMIN role required
+                  details: []
+                meta:
+                  timestamp: "2026-04-16T09:30:00Z"
+                  requestId: "uuid"
+
   /api/v1/auth/me:
     get:
       summary: Get current authenticated user details
@@ -157,6 +198,58 @@ components:
         requestId:
           type: string
           format: uuid
+
+    UserListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserData'
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 5
+            page:
+              type: integer
+              example: 1
+            pageSize:
+              type: integer
+              example: 50
+            timestamp:
+              type: string
+              format: date-time
+            requestId:
+              type: string
+              format: uuid
+
+    UserData:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        username:
+          type: string
+          example: trader.john
+        displayName:
+          type: string
+          example: John Trader
+        role:
+          type: string
+          enum: [TRADER, VIEWER, OPERATIONS, ADMIN]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
 
     ErrorResponse:
       type: object

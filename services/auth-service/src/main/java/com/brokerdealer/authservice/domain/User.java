@@ -33,8 +33,14 @@ public class User {
     @Column(name = "status", nullable = false, length = 10)
     private UserStatus status;
 
+    @Column(name = "display_name")
+    private String displayName;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
 
     @PrePersist
     protected void onCreate() {
