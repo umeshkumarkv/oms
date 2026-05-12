@@ -20,6 +20,7 @@ import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
 import com.brokerdealer.orderservice.dto.response.OrderListResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
+import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
@@ -102,11 +103,13 @@ class OrderServiceTest {
         hoursResponse.setData(hoursData);
         when(marketDataServiceClient.getMarketHours()).thenReturn(hoursResponse);
 
-        // Default: client active
+        // Default: fully eligible client — ACTIVE, trading enabled, KYC verified with future expiry
         ClientResponse.ClientData clientData = new ClientResponse.ClientData();
         clientData.setClientId(clientId);
         clientData.setStatus("ACTIVE");
         clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         ClientResponse clientResponse = new ClientResponse();
         clientResponse.setData(clientData);
         when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
@@ -125,6 +128,9 @@ class OrderServiceTest {
 
         // Default: no holidays (so any future weekday is valid)
         when(marketDataServiceClient.getHolidays()).thenReturn(Collections.emptyList());
+
+        // Default: cash reservation succeeds
+        when(clientServiceClient.reserveCash(any(), any())).thenReturn(true);
 
         // Default: Redis returns nothing (cache miss)
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -450,6 +456,57 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
                 .isInstanceOf(ClientInactiveException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowClientNotEligibleExceptionWhenTradingIsDisabled() {
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(false);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(ClientNotEligibleException.class)
+                .hasMessageContaining("trading is disabled");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowClientNotEligibleExceptionWhenKycStatusIsExpired() {
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("EXPIRED");
+        clientData.setKycExpiryDate(LocalDate.now().minusYears(1));
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(ClientNotEligibleException.class)
+                .hasMessageContaining("KYC is not verified or has expired");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowClientNotEligibleExceptionWhenKycExpiryDateIsInThePast() {
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().minusDays(1));
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(ClientNotEligibleException.class)
+                .hasMessageContaining("KYC is not verified or has expired");
         verify(orderRepository, never()).save(any());
     }
 

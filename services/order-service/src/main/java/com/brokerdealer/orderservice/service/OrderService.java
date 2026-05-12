@@ -25,6 +25,7 @@ import com.brokerdealer.orderservice.dto.response.ResponseMeta;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
+import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
 import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
@@ -92,16 +93,27 @@ public class OrderService {
             throw new MarketClosedException();
         }
 
-        // Check 2+3: client exists and is active
+        // Check 2: client exists
         ClientResponse clientResponse = clientServiceClient.getClient(request.getClientId());
         if (clientResponse == null || clientResponse.getData() == null) {
             throw new ClientNotFoundException(request.getClientId().toString());
         }
+        // Check 3: client status must be ACTIVE
         if (!"ACTIVE".equals(clientResponse.getData().getStatus())) {
             throw new ClientInactiveException(request.getClientId().toString());
         }
+        // Check 4: trading must be enabled
+        if (!Boolean.TRUE.equals(clientResponse.getData().getTradingEnabled())) {
+            throw new ClientNotEligibleException("trading is disabled for this account");
+        }
+        // Check 5: KYC must be VERIFIED and not expired
+        String kycStatus = clientResponse.getData().getKycStatus();
+        LocalDate kycExpiry = clientResponse.getData().getKycExpiryDate();
+        if (!"VERIFIED".equals(kycStatus) || kycExpiry == null || !kycExpiry.isAfter(LocalDate.now())) {
+            throw new ClientNotEligibleException("KYC is not verified or has expired");
+        }
 
-        // Check 4+5: symbol exists, tradable, and not halted
+        // Check 6+7: symbol exists, tradable, and not halted
         InstrumentResponse instrumentResponse = marketDataServiceClient.getInstrument(request.getSymbol());
         if (instrumentResponse == null || instrumentResponse.getData() == null
                 || !Boolean.TRUE.equals(instrumentResponse.getData().getTradable())) {

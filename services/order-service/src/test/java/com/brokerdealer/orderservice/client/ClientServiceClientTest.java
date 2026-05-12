@@ -2,7 +2,6 @@ package com.brokerdealer.orderservice.client;
 
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
 import com.brokerdealer.orderservice.dto.client.ReserveCashRequest;
-import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -21,7 +21,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import org.springframework.http.HttpMethod;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -80,25 +79,27 @@ class ClientServiceClientTest {
 
     @Test
     void shouldCallPatchReservedCashWithCorrectPayload() {
-        when(restTemplate.patchForObject(anyString(), any(ReserveCashRequest.class), eq(Void.class)))
-                .thenReturn(null);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.PATCH), any(), eq(Void.class)))
+                .thenReturn(ResponseEntity.ok(null));
 
         clientServiceClient.reserveCash(clientId, new BigDecimal("1500.00"));
 
-        verify(restTemplate).patchForObject(
+        verify(restTemplate).exchange(
                 eq("http://localhost:8083/api/v1/clients/" + clientId + "/reserved-cash"),
-                any(ReserveCashRequest.class),
+                eq(HttpMethod.PATCH),
+                any(),
                 eq(Void.class));
     }
 
     @Test
-    void shouldThrowInsufficientBuyingPowerOn422() {
-        when(restTemplate.patchForObject(anyString(), any(), eq(Void.class)))
+    void shouldReturnFalseOn422() {
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.PATCH), any(), eq(Void.class)))
                 .thenThrow(HttpClientErrorException.create(
                         HttpStatus.UNPROCESSABLE_ENTITY, "Unprocessable Entity", null, null, null));
 
-        assertThatThrownBy(() -> clientServiceClient.reserveCash(clientId, new BigDecimal("999999.00")))
-                .isInstanceOf(InsufficientBuyingPowerException.class);
+        boolean result = clientServiceClient.reserveCash(clientId, new BigDecimal("999999.00"));
+
+        assertThat(result).isFalse();
     }
 
     @Test
