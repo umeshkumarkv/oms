@@ -47,6 +47,24 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(status, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(SymbolAlreadyInWatchlistException.class)
+    public ResponseEntity<Map<String, Object>> handleSymbolAlreadyInWatchlistException(SymbolAlreadyInWatchlistException ex) {
+        log.warn("Symbol already in watchlist: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(WatchlistLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleWatchlistLimitExceededException(WatchlistLimitExceededException ex) {
+        log.warn("Watchlist limit exceeded: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(SymbolNotInWatchlistException.class)
+    public ResponseEntity<Map<String, Object>> handleSymbolNotInWatchlistException(SymbolNotInWatchlistException ex) {
+        log.warn("Symbol not in watchlist: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
         log.warn("Validation error: code={} message={}", ex.getErrorCode(), ex.getMessage());

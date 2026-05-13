@@ -63,6 +63,126 @@ paths:
               schema:
                 $ref: '#/components/schemas/InstrumentListResponse'
 
+  /api/v1/watchlist:
+    get:
+      summary: Get current user's watchlist
+      operationId: getWatchlist
+      parameters:
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User watchlist entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/watchlist/{symbol}:
+    post:
+      summary: Add symbol to watchlist
+      operationId: addToWatchlist
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 20
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Symbol added to watchlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistEntryResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Symbol not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SYMBOL_NOT_FOUND
+                  message: Symbol not found
+        '409':
+          description: Symbol already in watchlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SYMBOL_ALREADY_IN_WATCHLIST
+                  message: Symbol is already in watchlist
+        '422':
+          description: Watchlist limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: WATCHLIST_LIMIT_EXCEEDED
+                  message: Watchlist limit of 50 symbols reached
+    delete:
+      summary: Remove symbol from watchlist
+      operationId: removeFromWatchlist
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Symbol removed from watchlist
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Symbol not in watchlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SYMBOL_NOT_IN_WATCHLIST
+                  message: Symbol is not in watchlist
+
 components:
   schemas:
     InstrumentDetail:

@@ -28,6 +28,10 @@ spring:
           uri: http://marketdata-service:8084
           predicates:
             - Path=/api/v1/market/**
+        - id: marketdata-service-watchlist
+          uri: http://marketdata-service:8084
+          predicates:
+            - Path=/api/v1/watchlist/**
         - id: risk-service
           uri: http://risk-service:8085
           predicates:
