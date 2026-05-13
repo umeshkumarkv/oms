@@ -42,7 +42,7 @@ public class User {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     @PrePersist
