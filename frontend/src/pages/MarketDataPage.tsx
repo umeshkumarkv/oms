@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Calendar, Clock, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getInstruments, getMarketConfig, getTickHistory } from '../api/marketApi'
 import { Instrument, MarketConfig, TickEntry } from '../types/market.types'
@@ -25,6 +26,41 @@ const pctBg = (pct: number): string =>
 const arrow = (pct: number): string =>
   pct > 0 ? '▲' : pct < 0 ? '▼' : '—'
 
+/** Format "09:30:00" → "9:30 AM", "16:00:00" → "4:00 PM" */
+const fmtMarketTime = (t: string): string => {
+  const [h, m] = t.split(':').map(Number)
+  const period = h >= 12 ? 'PM' : 'AM'
+  const hour   = h % 12 || 12
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`
+}
+
+/** Return the most recent weekday (Mon–Fri). Rolls back Sat→Fri, Sun→Fri. */
+const mostRecentTradingDay = (): Date => {
+  const d = new Date()
+  const day = d.getDay()
+  if (day === 6) d.setDate(d.getDate() - 1) // Sat → Fri
+  if (day === 0) d.setDate(d.getDate() - 2) // Sun → Fri
+  return d
+}
+
+/** Show today if it's a weekday, otherwise most recent trading day. */
+const displayDate = (): string => {
+  const d = mostRecentTradingDay()
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    timeZone: 'America/New_York',
+  }).format(d)
+}
+
+/** Extract short timezone abbreviation, e.g. "America/New_York" → "EDT" / "EST" */
+const fmtTz = (tz: string): string => {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
+      .formatToParts(new Date())
+      .find(p => p.type === 'timeZoneName')?.value ?? tz
+  } catch { return tz }
+}
+
 const fmtET = (iso: string) =>
   new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -49,6 +85,22 @@ const GlobalStyle = () => (
     .mkt-row { cursor: pointer; transition: background 0.12s; }
     .mkt-row:hover { background: #f8fafc !important; }
     .mkt-row.selected { background: #f0f7ff !important; }
+
+    .mkt-table thead th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      box-shadow: 2px 0 6px -2px rgba(15,23,42,0.10);
+    }
+    .mkt-table .mkt-row td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: #fff;
+      box-shadow: 2px 0 6px -2px rgba(15,23,42,0.08);
+    }
+    .mkt-table .mkt-row:hover td:first-child { background: #f8fafc; }
+    .mkt-table .mkt-row.selected td:first-child { background: #f0f7ff; }
 
     .mkt-order-btn {
       width: 100%; padding: 11px;
@@ -121,6 +173,7 @@ const s = {
   } as React.CSSProperties),
 
   note:        { fontSize: '12px', color: '#94a3b8', fontWeight: 500 } as React.CSSProperties,
+  dividerBar:  { fontSize: '12px', color: '#e2e8f0', userSelect: 'none' as const } as React.CSSProperties,
   warnBanner:  {
     display: 'flex', alignItems: 'center', gap: '8px',
     padding: '10px 16px', background: '#fffbeb',
@@ -137,7 +190,7 @@ const s = {
   grid:        { display: 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', alignItems: 'start' } as React.CSSProperties,
 
   section:     { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'hidden' } as React.CSSProperties,
-  sHead:       { padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  sHead:       { padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', left: 0 } as React.CSSProperties,
   sTitleRow:   { display: 'flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
   sTitle:      { margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' } as React.CSSProperties,
   sCount:      { fontSize: '11px', fontWeight: 600, color: '#64748b', background: '#f1f5f9', borderRadius: '20px', padding: '1px 8px' } as React.CSSProperties,
@@ -211,7 +264,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
       </div>
     </div>
 
-    <table style={s.table}>
+    <table style={s.table} className="mkt-table">
       <thead>
         <tr>
           <th style={s.th}>Symbol</th>
@@ -638,9 +691,22 @@ const MarketDataPage: React.FC = () => {
             {wsLive ? 'Live' : `Polling ${(config?.pollingIntervalMs ?? 5000) / 1000}s`}
           </span>
           {config && (
-            <span style={s.note}>
-              {config.marketHours.start} – {config.marketHours.end} {config.marketHours.timezone}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ ...s.note, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={12} strokeWidth={2} />
+                {displayDate()}
+              </span>
+              <span style={s.dividerBar}>|</span>
+              <span style={{ ...s.note, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Clock size={12} strokeWidth={2} />
+                {fmtMarketTime(config.marketHours.start)} – {fmtMarketTime(config.marketHours.end)}
+              </span>
+              <span style={s.dividerBar}>|</span>
+              <span style={{ ...s.note, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <MapPin size={12} strokeWidth={2} />
+                {fmtTz(config.marketHours.timezone)}
+              </span>
+            </div>
           )}
         </div>
       </div>
