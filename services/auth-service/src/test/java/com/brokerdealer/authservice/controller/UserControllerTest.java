@@ -4,12 +4,17 @@ import com.brokerdealer.authservice.config.SecurityConfig;
 import com.brokerdealer.authservice.domain.UserRole;
 import com.brokerdealer.authservice.domain.UserStatus;
 import com.brokerdealer.authservice.dto.response.UserResponse;
+import com.brokerdealer.authservice.dto.response.UserStatusResponse;
+import com.brokerdealer.authservice.exception.CannotDeactivateSelfException;
+import com.brokerdealer.authservice.exception.UserNotFoundException;
+import com.brokerdealer.authservice.exception.UsernameTakenException;
 import com.brokerdealer.authservice.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,8 +22,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
@@ -42,6 +49,8 @@ class UserControllerTest {
                 .lastLoginAt(null)
                 .build();
     }
+
+    // ─── GET /api/v1/users ───────────────────────────────────────────────────
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -170,5 +179,264 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(0))
                 .andExpect(jsonPath("$.meta.total").value(0));
+    }
+
+    // ─── POST /api/v1/users ──────────────────────────────────────────────────
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn201WithEnvelopeOnCreate() throws Exception {
+        UUID newUserId = UUID.randomUUID();
+        UserResponse created = UserResponse.builder()
+                .userId(newUserId)
+                .username("new.trader")
+                .displayName("New Trader")
+                .role("TRADER")
+                .status("ACTIVE")
+                .createdAt(Instant.parse("2026-05-01T10:00:00Z"))
+                .lastLoginAt(null)
+                .build();
+        when(userService.createUser(any())).thenReturn(created);
+
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "displayName": "New Trader",
+                                  "role": "TRADER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.userId").value(newUserId.toString()))
+                .andExpect(jsonPath("$.data.username").value("new.trader"))
+                .andExpect(jsonPath("$.data.role").value("TRADER"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn409WhenUsernameTaken() throws Exception {
+        when(userService.createUser(any()))
+                .thenThrow(new UsernameTakenException("USERNAME_TAKEN", "Username already taken: new.trader"));
+
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "displayName": "New Trader",
+                                  "role": "TRADER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("USERNAME_TAKEN"))
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenUsernameBlank() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "",
+                                  "displayName": "New Trader",
+                                  "role": "TRADER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenPasswordTooShort() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "displayName": "New Trader",
+                                  "role": "TRADER",
+                                  "password": "short"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenRoleInvalid() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "displayName": "New Trader",
+                                  "role": "SUPERUSER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenDisplayNameMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "role": "TRADER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "TRADER")
+    void shouldReturn403ForTRADEROnPostUsers() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "displayName": "New Trader",
+                                  "role": "TRADER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "VIEWER")
+    void shouldReturn403ForVIEWEROnPostUsers() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "new.trader",
+                                  "displayName": "New Trader",
+                                  "role": "TRADER",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        verifyNoInteractions(userService);
+    }
+
+    // ─── PATCH /api/v1/users/{userId}/status ────────────────────────────────
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn200WithStatusAndUpdatedAt() throws Exception {
+        UUID targetId = UUID.randomUUID();
+        Instant updatedAt = Instant.parse("2026-05-13T10:00:00Z");
+        UserStatusResponse response = UserStatusResponse.builder()
+                .userId(targetId)
+                .status("INACTIVE")
+                .updatedAt(updatedAt)
+                .build();
+        when(userService.updateUserStatus(eq(targetId), any(), any())).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/users/{userId}/status", targetId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Id", UUID.randomUUID().toString())
+                        .content("{\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userId").value(targetId.toString()))
+                .andExpect(jsonPath("$.data.status").value("INACTIVE"))
+                .andExpect(jsonPath("$.data.updatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn404WhenUserIdNotFound() throws Exception {
+        UUID unknownId = UUID.randomUUID();
+        when(userService.updateUserStatus(eq(unknownId), any(), any()))
+                .thenThrow(new UserNotFoundException("USER_NOT_FOUND", "User not found: " + unknownId));
+
+        mockMvc.perform(patch("/api/v1/users/{userId}/status", unknownId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn403WhenSelfDeactivation() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        when(userService.updateUserStatus(eq(adminId), eq(adminId), any()))
+                .thenThrow(new CannotDeactivateSelfException("CANNOT_DEACTIVATE_SELF",
+                        "Admin cannot deactivate their own account"));
+
+        mockMvc.perform(patch("/api/v1/users/{userId}/status", adminId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Id", adminId.toString())
+                        .content("{\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("CANNOT_DEACTIVATE_SELF"));
+    }
+
+    @Test
+    @WithMockUser(roles = "TRADER")
+    void shouldReturn403ForTRADEROnPatchStatus() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/{userId}/status", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenStatusMissing() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/{userId}/status", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn200WhenActivatingUser() throws Exception {
+        UUID targetId = UUID.randomUUID();
+        UserStatusResponse response = UserStatusResponse.builder()
+                .userId(targetId)
+                .status("ACTIVE")
+                .updatedAt(Instant.parse("2026-05-13T11:00:00Z"))
+                .build();
+        when(userService.updateUserStatus(eq(targetId), any(), any())).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/users/{userId}/status", targetId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }
 }
