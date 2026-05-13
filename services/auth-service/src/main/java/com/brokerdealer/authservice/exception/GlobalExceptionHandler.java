@@ -3,6 +3,7 @@ package com.brokerdealer.authservice.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -35,6 +36,24 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(UsernameTakenException.class)
+    public ResponseEntity<Map<String, Object>> handleUsernameTakenException(UsernameTakenException ex) {
+        log.warn("Username taken: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFoundException(UserNotFoundException ex) {
+        log.warn("User not found: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(CannotDeactivateSelfException.class)
+    public ResponseEntity<Map<String, Object>> handleCannotDeactivateSelfException(CannotDeactivateSelfException ex) {
+        log.warn("Self-deactivation blocked: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
         log.warn("Access denied: {}", ex.getMessage());
@@ -45,6 +64,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleInvalidTokenException(InvalidTokenException ex) {
         log.warn("Token error: code={} message={}", ex.getErrorCode(), ex.getMessage());
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        log.warn("Unreadable request body: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Invalid request body", List.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
