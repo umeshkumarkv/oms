@@ -52,6 +52,7 @@ The gateway does not expose its own business endpoints. It proxies all routes.
 | Predicate Path        | Upstream Service     | Port | JWT Required |
 |-----------------------|----------------------|------|--------------|
 | /api/v1/auth/**       | auth-service         | 8081 | No (login)   |
+| /api/v1/users/**      | auth-service         | 8081 | Yes          |
 | /api/v1/orders/**     | order-service        | 8082 | Yes          |
 | /api/v1/clients/**    | client-service       | 8083 | Yes          |
 | /api/v1/market/**     | marketdata-service   | 8084 | Yes          |
