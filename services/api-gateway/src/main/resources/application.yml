@@ -12,6 +12,10 @@ spring:
           uri: http://auth-service:8081
           predicates:
             - Path=/api/v1/auth/**
+        - id: auth-service-users
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/v1/users/**
         - id: order-service
           uri: http://order-service:8082
           predicates:

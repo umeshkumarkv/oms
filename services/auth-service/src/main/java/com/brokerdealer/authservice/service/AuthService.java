@@ -48,6 +48,9 @@ public class AuthService {
             throw new AuthException("ACCOUNT_INACTIVE", "Account is inactive");
         }
 
+        user.setLastLoginAt(Instant.now());
+        userRepository.save(user);
+
         String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole());
         Instant expiresAt = Instant.now().plusSeconds(30 * 60L);
 
