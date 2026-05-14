@@ -129,7 +129,7 @@ describe('Sidebar role-based visibility', () => {
   })
 })
 
-const renderRouteAsRole = (role: string, path: string, pageLabel: string) => {
+const renderRouteAsRole = (role: string, path: string, _pageLabel: string) => {
   mockAuthContext(makeUser(role))
   return render(
     <MemoryRouter initialEntries={[path]}>
