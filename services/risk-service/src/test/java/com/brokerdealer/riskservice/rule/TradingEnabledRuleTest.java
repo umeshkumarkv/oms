@@ -47,12 +47,19 @@ class TradingEnabledRuleTest {
     }
 
     @Test
-    void shouldPassWhenRuleIsDisabled() {
+    void shouldReportDisabledStatusCorrectly() {
         TradingEnabledRule rule = new TradingEnabledRule(false);
         assertThat(rule.isEnabled()).isFalse();
-        // Disabled rules are skipped by RiskEvaluationService — evaluate still works defensively
+    }
+
+    @Test
+    void shouldStillRejectWhenEvaluateCalledDirectlyOnDisabledRule() {
+        // Disabled rules are skipped by RiskEvaluationService, but if evaluate() is called
+        // directly the rule logic still functions correctly
+        TradingEnabledRule rule = new TradingEnabledRule(false);
         RiskResult result = rule.evaluate(requestWith(false), context);
-        assertThat(result.getResult()).isEqualTo("REJECTED"); // rule logic still rejects if called
+        assertThat(result.getResult()).isEqualTo("REJECTED");
+        assertThat(result.getReason()).contains("TRADING_DISABLED");
     }
 
     @Test
