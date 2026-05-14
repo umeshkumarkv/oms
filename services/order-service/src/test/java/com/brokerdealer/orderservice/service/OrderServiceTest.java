@@ -9,6 +9,7 @@ import com.brokerdealer.orderservice.domain.OrderSide;
 import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.domain.OrderType;
 import com.brokerdealer.orderservice.domain.TimeInForce;
+import com.brokerdealer.orderservice.domain.OrderSide;
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
 import com.brokerdealer.orderservice.dto.execution.ExecutionItem;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
@@ -110,9 +111,21 @@ class OrderServiceTest {
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setBuyingPower("95000.00");
+        clientData.setMaxOpenOrders(10);
+        clientData.setHoldings(Collections.emptyList());
         ClientResponse clientResponse = new ClientResponse();
         clientResponse.setData(clientData);
         when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        // Default: no open opposite orders (hasCrossingOpenOrder = false)
+        when(orderRepository.findByClientIdAndSymbolAndSideAndStatusIn(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        // Default: 0 daily orders
+        when(orderRepository.countDailyOrdersByClientId(any(), any())).thenReturn(0L);
+        // Default: no order history → avgOrderQty=0, avgOrderValue=0
+        when(orderRepository.computeAvgMetricsByClientId(any(), any()))
+                .thenReturn(new Object[]{null, null});
 
         // Default: symbol tradable, not halted
         InstrumentResponse.InstrumentData instrData = new InstrumentResponse.InstrumentData();
@@ -688,6 +701,172 @@ class OrderServiceTest {
         assertThat(response.getData().getFills()).isEmpty();
         assertThat(response.getData().getFilledQuantity()).isEqualTo(0);
         assertThat(response.getData().getAvgFillPrice()).isNull();
+    }
+
+    // --- SCRUM-119: Portfolio snapshot enrichment fields ---
+
+    @Test
+    void shouldPopulateEnrichmentFieldsForValidBuyOrder() {
+        ClientResponse.HoldingData holding = new ClientResponse.HoldingData();
+        holding.setSymbol("AAPL");
+        holding.setQuantity(100);
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setBuyingPower("95000.00");
+        clientData.setMaxOpenOrders(10);
+        clientData.setHoldings(List.of(holding));
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+        when(orderRepository.countDailyOrdersByClientId(any(), any())).thenReturn(3L);
+        when(orderRepository.computeAvgMetricsByClientId(any(), any()))
+                .thenReturn(new Object[]{5.0, new java.math.BigDecimal("750.00")});
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        RiskEvaluationRequestedEvent event = captor.getValue();
+
+        assertThat(event.getBuyingPower()).isEqualTo("95000.00");
+        assertThat(event.getHoldingsForSymbol()).isEqualTo(100);
+        assertThat(event.getKycStatus()).isEqualTo("VERIFIED");
+        assertThat(event.getTradingEnabled()).isTrue();
+        assertThat(event.getLastPrice()).isEqualTo("150.00");
+        assertThat(event.getDailyOrderCount()).isEqualTo(3);
+        assertThat(event.getMaxDailyOrders()).isEqualTo(10);
+        assertThat(event.getAvgOrderQty()).isEqualTo("5.0000");
+        assertThat(event.getAvgOrderValue()).isEqualTo("750.0000");
+    }
+
+    @Test
+    void shouldSetHoldingsForSymbolToZeroWhenClientHasNoHoldings() {
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setBuyingPower("50000.00");
+        clientData.setMaxOpenOrders(5);
+        clientData.setHoldings(Collections.emptyList());
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getHoldingsForSymbol()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldSetHoldingsForSymbolToZeroWhenHoldingsListIsNull() {
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setBuyingPower("50000.00");
+        clientData.setHoldings(null);
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getHoldingsForSymbol()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldSetHasCrossingOpenOrderTrueWhenOppositeExistsAtCrossingPrice() {
+        Order openSellOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .clientId(clientId)
+                .symbol("AAPL")
+                .side(OrderSide.SELL)
+                .orderType(OrderType.LIMIT)
+                .limitPrice(new BigDecimal("149.00"))
+                .status(OrderStatus.NEW)
+                .build();
+        when(orderRepository.findByClientIdAndSymbolAndSideAndStatusIn(any(), any(), any(), any()))
+                .thenReturn(List.of(openSellOrder));
+
+        orderService.submitOrder(limitBuyRequest(), userId); // limitPrice=150.00 > sell 149.00 → crosses
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getHasCrossingOpenOrder()).isTrue();
+    }
+
+    @Test
+    void shouldSetHasCrossingOpenOrderFalseWhenNoOppositeOrders() {
+        when(orderRepository.findByClientIdAndSymbolAndSideAndStatusIn(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        orderService.submitOrder(limitBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getHasCrossingOpenOrder()).isFalse();
+    }
+
+    @Test
+    void shouldDefaultAvgMetricsToZeroStringWhenNoOrderHistory() {
+        when(orderRepository.computeAvgMetricsByClientId(any(), any()))
+                .thenReturn(new Object[]{null, null});
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getAvgOrderQty()).isEqualTo("0.0000");
+        assertThat(captor.getValue().getAvgOrderValue()).isEqualTo("0.0000");
+    }
+
+    @Test
+    void shouldPopulateDailyOrderCountFromRepository() {
+        when(orderRepository.countDailyOrdersByClientId(any(), any())).thenReturn(5L);
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getDailyOrderCount()).isEqualTo(5);
+    }
+
+    @Test
+    void shouldSetLastPriceFromInstrumentResponse() {
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getLastPrice()).isEqualTo("150.00");
+    }
+
+    @Test
+    void shouldSetBuyingPowerToZeroStringWhenPortfolioReturnNullBuyingPower() {
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setBuyingPower(null);
+        clientData.setHoldings(Collections.emptyList());
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
+        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
+        assertThat(captor.getValue().getBuyingPower()).isEqualTo("0");
     }
 
     // --- GET /orders ---

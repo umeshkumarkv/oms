@@ -52,7 +52,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -66,6 +68,9 @@ public class OrderService {
     private static final int GTD_DEFAULT_EXPIRY_DAYS = 180;
     private static final ZoneId ET_ZONE = ZoneId.of("America/New_York");
     private static final LocalTime MARKET_CLOSE_TIME = LocalTime.of(16, 0);
+    private static final List<OrderStatus> OPEN_STATUSES = List.of(
+            OrderStatus.NEW, OrderStatus.VALIDATED, OrderStatus.RISK_CHECK_PASSED,
+            OrderStatus.ACCEPTED, OrderStatus.SENT_TO_EXECUTION, OrderStatus.PARTIALLY_FILLED);
 
     private static final int MAX_PAGE_SIZE = 200;
     private static final String ORDER_CACHE_KEY_PREFIX = "order:state:";
@@ -157,6 +162,44 @@ public class OrderService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
+        // --- Compute portfolio snapshot fields for risk.evaluation.requested (SCRUM-119) ---
+        OrderSide requestedSide = OrderSide.valueOf(request.getSide());
+        OrderSide oppositeSide = requestedSide == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY;
+        List<Order> oppositeOrders = orderRepository.findByClientIdAndSymbolAndSideAndStatusIn(
+                request.getClientId(), request.getSymbol(), oppositeSide, OPEN_STATUSES);
+        // capture limitPrice in an effectively final variable for use in the lambda
+        final BigDecimal crossingPrice = limitPrice;
+        boolean hasCrossingOpenOrder = oppositeOrders.stream().anyMatch(o -> {
+            if (crossingPrice == null) return true;
+            if (o.getLimitPrice() == null) return true;
+            return requestedSide == OrderSide.BUY
+                    ? o.getLimitPrice().compareTo(crossingPrice) <= 0
+                    : o.getLimitPrice().compareTo(crossingPrice) >= 0;
+        });
+
+        Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
+        int dailyOrderCount = (int) orderRepository.countDailyOrdersByClientId(
+                request.getClientId(), startOfDay);
+
+        Instant cutoff = Instant.now().minus(90, ChronoUnit.DAYS);
+        Object[] metrics = orderRepository.computeAvgMetricsByClientId(request.getClientId(), cutoff);
+        BigDecimal avgOrderQty = metrics[0] != null
+                ? BigDecimal.valueOf(((Number) metrics[0]).doubleValue()).setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4);
+        BigDecimal avgOrderValue = metrics[1] != null
+                ? BigDecimal.valueOf(((Number) metrics[1]).doubleValue()).setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4);
+
+        String buyingPower = clientResponse.getData().getBuyingPower() != null
+                ? clientResponse.getData().getBuyingPower() : "0";
+        List<ClientResponse.HoldingData> holdings = clientResponse.getData().getHoldings();
+        int holdingsForSymbol = (holdings == null) ? 0 : holdings.stream()
+                .filter(h -> h.getSymbol().equals(request.getSymbol()))
+                .mapToInt(ClientResponse.HoldingData::getQuantity)
+                .findFirst()
+                .orElse(0);
+        Integer maxDailyOrders = clientResponse.getData().getMaxOpenOrders();
+
         // --- Reserve cash for BUY orders before persisting ---
         if (OrderSide.valueOf(request.getSide()) == OrderSide.BUY) {
             boolean reserved = clientServiceClient.reserveCash(request.getClientId(), orderValue);
@@ -212,6 +255,18 @@ public class OrderService {
                 .timeInForce(savedOrder.getTimeInForce().name())
                 .orderValue(orderValue.toPlainString())
                 .marginCallActive(clientResponse.getData().getMarginCallActive())
+                .buyingPower(buyingPower)
+                .holdingsForSymbol(holdingsForSymbol)
+                .kycStatus(clientResponse.getData().getKycStatus())
+                .kycExpiryDate(clientResponse.getData().getKycExpiryDate() != null
+                        ? clientResponse.getData().getKycExpiryDate().toString() : null)
+                .tradingEnabled(clientResponse.getData().getTradingEnabled())
+                .lastPrice(instrumentResponse.getData().getLastPrice())
+                .hasCrossingOpenOrder(hasCrossingOpenOrder)
+                .dailyOrderCount(dailyOrderCount)
+                .maxDailyOrders(maxDailyOrders)
+                .avgOrderQty(avgOrderQty.toPlainString())
+                .avgOrderValue(avgOrderValue.toPlainString())
                 .build());
 
         String expiresAt = null;
