@@ -201,6 +201,11 @@ const OrderEntryPage: React.FC = () => {
   const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
   const heldQty    = holding ? holding.quantity : 0
 
+  const sellHoldingsError: string | null =
+    side === 'SELL' && portfolio !== null && !isNaN(qty) && qty > 0 && qty > heldQty
+      ? `Sell quantity cannot exceed available holding of ${heldQty} units`
+      : null
+
   const filterWeekdays = (date: Date): boolean => date.getDay() !== 0 && date.getDay() !== 6
 
   const isWeekendOrHoliday = (dateStr: string): boolean => {
@@ -211,11 +216,12 @@ const OrderEntryPage: React.FC = () => {
   }
 
   const checks = {
-    symbol:     symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
-    quantity:   !isNaN(qty) && qty > 0,
-    limitPrice: orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0),
-    gtdDate:    tif === 'DAY' || (gtdDate !== null && gtdDateStr >= tomorrowStr() && !isWeekendOrHoliday(gtdDateStr)),
-    notHalted:  !quote || !quote.halted,
+    symbol:       symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
+    quantity:     !isNaN(qty) && qty > 0,
+    limitPrice:   orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0),
+    gtdDate:      tif === 'DAY' || (gtdDate !== null && gtdDateStr >= tomorrowStr() && !isWeekendOrHoliday(gtdDateStr)),
+    notHalted:    !quote || !quote.halted,
+    sellHoldings: side !== 'SELL' || portfolio === null || isNaN(qty) || heldQty >= qty,
   }
 
   const allChecksPass = Object.values(checks).every(Boolean)
@@ -400,13 +406,15 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Quantity</label>
             <input
-              style={fieldErrors.quantity ? s.inputError : s.input}
+              style={fieldErrors.quantity || sellHoldingsError ? s.inputError : s.input}
               type="number" min="1" step="1"
               placeholder="Number of shares"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
             />
-            {fieldErrors.quantity && <div style={s.errorText}>{fieldErrors.quantity}</div>}
+            {(fieldErrors.quantity || sellHoldingsError) && (
+              <div style={s.errorText}>{fieldErrors.quantity ?? sellHoldingsError}</div>
+            )}
           </div>
 
           {/* Limit Price */}
@@ -535,17 +543,23 @@ const OrderEntryPage: React.FC = () => {
                 )}
               </>
             )}
+            {side === 'SELL' && !portfolio && clientId && (
+              <div style={{ ...s.errorText, marginTop: '4px' }}>
+                Portfolio data unavailable — holding check skipped
+              </div>
+            )}
           </div>
 
           {/* Validation */}
           <div style={s.card}>
             <h2 style={s.cardTitle}>Validation</h2>
             {[
-              { label: 'Symbol entered',                                                                                    pass: checks.symbol     },
-              { label: 'Quantity > 0',                                                                                      pass: checks.quantity   },
-              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                       pass: checks.limitPrice },
-              { label: tif === 'GTD'   ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',              pass: checks.gtdDate    },
-              { label: 'Symbol not halted',                                                                                 pass: checks.notHalted  },
+              { label: 'Symbol entered',                                                                                                                    pass: checks.symbol       },
+              { label: 'Quantity > 0',                                                                                                                      pass: checks.quantity     },
+              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                                                       pass: checks.limitPrice   },
+              { label: tif === 'GTD' ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',                                                pass: checks.gtdDate      },
+              { label: 'Symbol not halted',                                                                                                                 pass: checks.notHalted    },
+              { label: side !== 'SELL' ? 'Holdings check — N/A for BUY' : `Sufficient holdings (holding: ${heldQty.toLocaleString()} ${symbol || '—'})`,  pass: checks.sellHoldings },
             ].map(({ label, pass }) => (
               <div key={label} style={s.checkRow}>
                 {pass
