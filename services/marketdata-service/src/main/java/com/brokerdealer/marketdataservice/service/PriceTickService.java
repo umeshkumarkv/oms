@@ -130,8 +130,9 @@ public class PriceTickService {
     }
 
     private BigDecimal computeRandomWalkPrice(BigDecimal currentPrice) {
-        boolean up = ThreadLocalRandom.current().nextInt(100) < 52;
-        BigDecimal changePct = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(5), 3);
+        boolean up = ThreadLocalRandom.current().nextInt(100) < 50;
+        // 0.0001–0.0010 per tick (0.01%–0.10%) — realistic intraday random walk
+        BigDecimal changePct = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(9), 4);
         BigDecimal change = currentPrice.multiply(changePct).setScale(4, RoundingMode.HALF_UP);
         BigDecimal newPrice = up ? currentPrice.add(change) : currentPrice.subtract(change);
         return newPrice.compareTo(MIN_PRICE) < 0 ? MIN_PRICE : newPrice;
