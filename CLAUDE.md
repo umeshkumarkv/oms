@@ -195,7 +195,7 @@ levels pass. This is non-negotiable.
 
 ### Level 1 — Syntactic (order-service internal — no external calls)
 - All required fields present and non-null
-- side — must be BUY or SELL
+- side — must be BUY, SELL, or SHORT_SELL
 - orderType — must be MARKET or LIMIT
 - timeInForce — must be DAY or GTC
 - quantity — must be Integer greater than 0
@@ -226,11 +226,11 @@ In this exact order:
 17. BUY — fat finger price deviation <= 10% from lastPrice
 18. BUY — fat finger notional value <= 1000000
 19. BUY — fat finger quantity spike <= 10x avgOrderQty
-20. SELL — holdings >= quantity for symbol
-21. SELL — holdings > 0 (no short selling)
-22. SELL — dailyOrderCount < maxDailyOrderCount
-23. SELL — dailyOrderValue + orderValue <= dailyOrderLimit
-24. SELL — fat finger checks same as BUY
+20. SELL only — holdings >= quantity for symbol
+21. SELL only — holdings > 0
+22. SELL and SHORT_SELL — dailyOrderCount < maxDailyOrderCount
+23. SELL and SHORT_SELL — dailyOrderValue + orderValue <= dailyOrderLimit
+24. SELL and SHORT_SELL — fat finger checks same as BUY
 Fail → 422 Unprocessable Entity with specific error code
 
 ### After both levels pass:
@@ -331,7 +331,6 @@ Interface contract:
 - Timezone: always America/New_York — never UTC for market hours
 - Order cancellation by user: OUT OF SCOPE for POC
 - Order modification: OUT OF SCOPE for POC
-- Short selling: OUT OF SCOPE for POC
 
 ---
 
@@ -735,7 +734,6 @@ Both apply. Neither overrides the other.
 - Order cancellation by user
 - Order modification
 - Pre and post market trading
-- Short selling
 - Margin trading
 - Corporate actions
 - Mobile application
@@ -746,9 +744,9 @@ Both apply. Neither overrides the other.
 
 | Field          | Value                                               |
 |----------------|-----------------------------------------------------|
-| Version        | 1.0                                                 |
+| Version        | 1.1                                                 |
 | Owner          | Umesh Kumar KV — Principal Architect                |
-| Last Updated   | April 2026                                          |
+| Last Updated   | May 2026 — SHORT_SELL added to scope (SCRUM-105)    |
 | GitHub         | github.com/umeshkumarkv/broker-dealer               |
 | Confluence     | BD-POC > AI SDLC Standards > CLAUDE.md              |
 | Update Rule    | Update this file before introducing any new pattern |

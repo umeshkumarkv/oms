@@ -46,6 +46,9 @@ public class MarketDataService {
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
+    @Value("${market.simulation.bypass-market-hours:false}")
+    private boolean bypassMarketHours;
+
     @Value("${market.polling.interval-ms:5000}")
     private long pollingIntervalMs;
 
@@ -156,6 +159,9 @@ public class MarketDataService {
     }
 
     public boolean isMarketOpen(ZonedDateTime now) {
+        if (bypassMarketHours) {
+            return true;
+        }
         DayOfWeek day = now.getDayOfWeek();
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
             return false;

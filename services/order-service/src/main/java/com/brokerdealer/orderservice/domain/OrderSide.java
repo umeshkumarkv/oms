@@ -2,5 +2,6 @@ package com.brokerdealer.orderservice.domain;
 
 public enum OrderSide {
     BUY,
-    SELL
+    SELL,
+    SHORT_SELL
 }

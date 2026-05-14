@@ -34,14 +34,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: VALIDATION_ERROR
-                  message: quantity must be greater than 0
-                  details:
-                    - field: quantity
+              examples:
+                VALIDATION_ERROR:
+                  value:
+                    error:
                       code: VALIDATION_ERROR
                       message: quantity must be greater than 0
+                      details:
+                        - field: quantity
+                          code: VALIDATION_ERROR
+                          message: quantity must be greater than 0
+                INVALID_ORDER_SIDE:
+                  value:
+                    error:
+                      code: INVALID_ORDER_SIDE
+                      message: "Invalid side: must be BUY, SELL, or SHORT_SELL"
+                      details: []
         '422':
           description: Level 2 semantic validation failure
           content:
@@ -183,7 +191,7 @@ components:
           pattern: '^[A-Z0-9]+$'
         side:
           type: string
-          enum: [BUY, SELL]
+          enum: [BUY, SELL, SHORT_SELL]
         orderType:
           type: string
           enum: [MARKET, LIMIT]
@@ -237,7 +245,7 @@ components:
           type: string
         side:
           type: string
-          enum: [BUY, SELL]
+          enum: [BUY, SELL, SHORT_SELL]
         orderType:
           type: string
           enum: [MARKET, LIMIT]

@@ -88,7 +88,7 @@ Order:
 - clientOrderId: String (client-supplied, stored not used internally)
 - clientId: UUID (non-null)
 - symbol: String (max 20 chars, alphanumeric only)
-- side: OrderSide enum (BUY / SELL)
+- side: OrderSide enum (BUY / SELL / SHORT_SELL)
 - orderType: OrderType enum (MARKET / LIMIT)
 - timeInForce: TimeInForce enum (DAY / GTC)
 - quantity: Integer (> 0)
@@ -111,7 +111,8 @@ Order:
 - Never skip Level 2 validation before persisting anything
 - Never allow backward state transitions
 - Never execute a trade without RISK_CHECK_PASSED state
-- Never allow short selling (SELL quantity > holdings)
+- Never skip holdings check for SELL orders (Level 2 checks #20-21)
+- SHORT_SELL orders intentionally bypass holdings checks #20-21 — this is by design (SCRUM-123)
 - Never allow LIMIT orders without limitPrice
 - Never allow MARKET orders with limitPrice
 
