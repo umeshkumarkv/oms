@@ -21,7 +21,7 @@ public class RiskEvaluationRequestedEvent {
     private String orderType;        // "MARKET" | "LIMIT"
     private Integer quantity;
     private String limitPrice;       // BigDecimal as String, null for MARKET orders
-    private String timeInForce;      // "DAY" | "GTD"
+    private String timeInForce;      // "DAY" | "GTC"
     private String orderValue;       // BigDecimal as String: limitPrice*qty or lastPrice*qty
     private Boolean marginCallActive;
 
