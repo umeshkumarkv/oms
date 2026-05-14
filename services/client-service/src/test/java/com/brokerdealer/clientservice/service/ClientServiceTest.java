@@ -147,6 +147,7 @@ class ClientServiceTest {
                 .kycStatus(KycStatus.VERIFIED)
                 .kycExpiryDate(LocalDate.of(2027, 12, 31))
                 .marginCallActive(false)
+                .maxOpenOrders(10)
                 .cashBalance(cashBalance)
                 .reservedCash(reservedCash)
                 .dailyOrderCount(0)
@@ -176,6 +177,13 @@ class ClientServiceTest {
 
         PortfolioResponse result = clientService.getPortfolio(id);
 
+        assertThat(result.getClientId()).isEqualTo(id);
+        assertThat(result.getName()).isEqualTo("Test Client");
+        assertThat(result.getStatus()).isEqualTo(ClientStatus.ACTIVE);
+        assertThat(result.getTradingEnabled()).isTrue();
+        assertThat(result.getKycStatus()).isEqualTo(KycStatus.VERIFIED);
+        assertThat(result.getMarginCallActive()).isFalse();
+        assertThat(result.getMaxOpenOrders()).isEqualTo(10);
         assertThat(result.getCashBalance()).isEqualTo("100000.00");
         assertThat(result.getReservedCash()).isEqualTo("5000.00");
         assertThat(result.getBuyingPower()).isEqualTo("95000.00");

@@ -125,7 +125,7 @@ class OrderServiceTest {
         when(orderRepository.countDailyOrdersByClientId(any(), any())).thenReturn(0L);
         // Default: no order history → avgOrderQty=0, avgOrderValue=0
         when(orderRepository.computeAvgMetricsByClientId(any(), any()))
-                .thenReturn(new Object[]{null, null});
+                .thenReturn(Collections.singletonList(new Object[]{null, null}));
 
         // Default: symbol tradable, not halted
         InstrumentResponse.InstrumentData instrData = new InstrumentResponse.InstrumentData();
@@ -725,7 +725,7 @@ class OrderServiceTest {
         when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
         when(orderRepository.countDailyOrdersByClientId(any(), any())).thenReturn(3L);
         when(orderRepository.computeAvgMetricsByClientId(any(), any()))
-                .thenReturn(new Object[]{5.0, new java.math.BigDecimal("750.00")});
+                .thenReturn(Collections.singletonList(new Object[]{5.0, new java.math.BigDecimal("750.00")}));
 
         orderService.submitOrder(marketBuyRequest(), userId);
 
@@ -821,7 +821,7 @@ class OrderServiceTest {
     @Test
     void shouldDefaultAvgMetricsToZeroStringWhenNoOrderHistory() {
         when(orderRepository.computeAvgMetricsByClientId(any(), any()))
-                .thenReturn(new Object[]{null, null});
+                .thenReturn(Collections.singletonList(new Object[]{null, null}));
 
         orderService.submitOrder(marketBuyRequest(), userId);
 

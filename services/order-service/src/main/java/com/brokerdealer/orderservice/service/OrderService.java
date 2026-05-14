@@ -183,7 +183,8 @@ public class OrderService {
                 request.getClientId(), startOfDay);
 
         Instant cutoff = Instant.now().minus(90, ChronoUnit.DAYS);
-        Object[] metrics = orderRepository.computeAvgMetricsByClientId(request.getClientId(), cutoff);
+        List<Object[]> metricsList = orderRepository.computeAvgMetricsByClientId(request.getClientId(), cutoff);
+        Object[] metrics = metricsList.isEmpty() ? new Object[]{null, null} : metricsList.get(0);
         BigDecimal avgOrderQty = metrics[0] != null
                 ? BigDecimal.valueOf(((Number) metrics[0]).doubleValue()).setScale(4, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(4);

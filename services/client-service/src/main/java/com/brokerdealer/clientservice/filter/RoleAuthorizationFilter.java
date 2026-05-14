@@ -82,8 +82,8 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         }
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/clients")) {
             // ADMIN cannot access portfolio data per BRD Section 12.2
-            // SYSTEM role (internal service-to-service) cannot access portfolio data
-            if (path.contains("/portfolio") && ("ADMIN".equals(role) || "SYSTEM".equals(role))) {
+            // SYSTEM (order-service service-to-service) requires portfolio for L2 validation — allowed
+            if (path.contains("/portfolio") && "ADMIN".equals(role)) {
                 return false;
             }
             return true;

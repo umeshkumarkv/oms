@@ -37,5 +37,5 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     // Average quantity and average order value over the last 90 days for a client
     @Query("SELECT AVG(CAST(o.quantity AS java.lang.Double)), AVG(o.orderValue) " +
            "FROM Order o WHERE o.clientId = :clientId AND o.createdAt >= :cutoff")
-    Object[] computeAvgMetricsByClientId(@Param("clientId") UUID clientId, @Param("cutoff") Instant cutoff);
+    List<Object[]> computeAvgMetricsByClientId(@Param("clientId") UUID clientId, @Param("cutoff") Instant cutoff);
 }

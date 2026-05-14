@@ -66,6 +66,14 @@ public class ClientService {
                 .toList();
 
         return PortfolioResponse.builder()
+                .clientId(client.getId())
+                .name(client.getName())
+                .status(client.getStatus())
+                .tradingEnabled(client.getTradingEnabled())
+                .kycStatus(client.getKycStatus())
+                .kycExpiryDate(client.getKycExpiryDate())
+                .marginCallActive(client.getMarginCallActive())
+                .maxOpenOrders(client.getMaxOpenOrders())
                 .cashBalance(client.getCashBalance().setScale(2, RoundingMode.HALF_UP).toPlainString())
                 .reservedCash(client.getReservedCash().setScale(2, RoundingMode.HALF_UP).toPlainString())
                 .buyingPower(buyingPower.setScale(2, RoundingMode.HALF_UP).toPlainString())
