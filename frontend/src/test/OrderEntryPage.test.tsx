@@ -190,7 +190,7 @@ const setSymbol = (value: string) => {
 describe('OrderEntryPage — sell quantity vs holdings validation', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('shouldShowSellHoldingsError_whenQtyExceedsHolding', async () => {
+  it('shouldShowSellHoldingsErrorWhenQtyExceedsHolding', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -207,7 +207,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     )
   })
 
-  it('shouldHideSellHoldingsError_whenQtyWithinHolding', async () => {
+  it('shouldHideSellHoldingsErrorWhenQtyWithinHolding', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -222,7 +222,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
   })
 
-  it('shouldNotShowSellHoldingsError_forBuyOrders', async () => {
+  it('shouldNotShowSellHoldingsErrorForBuyOrders', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -236,7 +236,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
   })
 
-  it('shouldDisableSubmit_whenSellQtyExceedsHolding', async () => {
+  it('shouldDisableSubmitWhenSellQtyExceedsHolding', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -251,7 +251,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     expect(screen.getByText('Submit Order')).toBeDisabled()
   })
 
-  it('shouldShowSellHoldingsErrorImmediately_withoutBlur', async () => {
+  it('shouldShowSellHoldingsErrorImmediatelyWithoutBlur', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -267,12 +267,12 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     expect(screen.getByText('Sell quantity cannot exceed available holding of 100 units')).toBeInTheDocument()
   })
 
-  it('shouldShowValidationCheckRow_holdingsNaForBuy', async () => {
+  it('shouldShowValidationCheckRowHoldingsNaForBuy', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Holdings check — N/A for BUY')).toBeInTheDocument())
   })
 
-  it('shouldShowSellHoldingsCheckRow_whenSideIsSell', async () => {
+  it('shouldShowSellHoldingsCheckRowWhenSideIsSell', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -286,7 +286,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     )
   })
 
-  it('shouldShowSellHoldingsFailRow_whenQtyExceedsHolding', async () => {
+  it('shouldShowSellHoldingsFailRowWhenQtyExceedsHolding', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
 
@@ -303,7 +303,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     )
   })
 
-  it('shouldShowPortfolioUnavailableWarning_whenPortfolioFailsAndSideSell', async () => {
+  it('shouldShowPortfolioUnavailableWarningWhenPortfolioFailsAndSideSell', async () => {
     const { getPortfolio } = await import('../api/clientApi')
     vi.mocked(getPortfolio).mockRejectedValueOnce(new Error('Network error'))
 
@@ -318,7 +318,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     )
   })
 
-  it('shouldPassBuyOrderUnaffected_afterSellValidationAdded', async () => {
+  it('shouldPassBuyOrderUnaffectedAfterSellValidationAdded', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
     // BUY is default — no sell validation check should interfere
