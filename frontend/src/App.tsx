@@ -55,17 +55,20 @@ const AppRoutes: React.FC = () => (
     <Route element={<ProtectedRoute />}>
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/orders" element={<OrderBlotterPage />} />
+        {/* TRADER, OPERATIONS, VIEWER only — ADMIN redirected to /dashboard */}
+        <Route element={<ProtectedRoute allowedRoles={['TRADER', 'OPERATIONS', 'VIEWER']} />}>
+          <Route path="/orders" element={<OrderBlotterPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/audit" element={<AuditTrailPage />} />
+          <Route path="/market" element={<MarketDataPage />} />
+        </Route>
 
         {/* TRADER only — all other authenticated roles redirected to /dashboard */}
         <Route element={<ProtectedRoute allowedRoles={['TRADER']} />}>
           <Route path="/orders/new" element={<OrderEntryPage />} />
         </Route>
 
-        <Route path="/portfolio" element={<PortfolioPage />} />
-        <Route path="/audit" element={<AuditTrailPage />} />
         <Route path="/admin" element={<AdminPanelPage />} />
-        <Route path="/market" element={<MarketDataPage />} />
       </Route>
     </Route>
   </Routes>

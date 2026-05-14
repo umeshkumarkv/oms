@@ -107,4 +107,84 @@ describe('Sidebar role-based visibility', () => {
     expect(screen.queryByText('New Order')).not.toBeInTheDocument()
     expect(screen.getByText('Admin Panel')).toBeInTheDocument()
   })
+
+  it('shouldShowOnlyDashboardAndAdminPanelForAdmin', () => {
+    renderSidebar('ADMIN')
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Admin Panel')).toBeInTheDocument()
+    expect(screen.queryByText('Order Blotter')).not.toBeInTheDocument()
+    expect(screen.queryByText('Market Data')).not.toBeInTheDocument()
+    expect(screen.queryByText('Portfolio')).not.toBeInTheDocument()
+    expect(screen.queryByText('Audit Trail')).not.toBeInTheDocument()
+  })
+
+  it('shouldShowFullSidebarForTrader', () => {
+    renderSidebar('TRADER')
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Order Blotter')).toBeInTheDocument()
+    expect(screen.getByText('Market Data')).toBeInTheDocument()
+    expect(screen.getByText('Portfolio')).toBeInTheDocument()
+    expect(screen.getByText('Audit Trail')).toBeInTheDocument()
+    expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument()
+  })
+})
+
+const renderRouteAsRole = (role: string, path: string, _pageLabel: string) => {
+  mockAuthContext(makeUser(role))
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route element={<ProtectedRoute allowedRoles={['TRADER', 'OPERATIONS', 'VIEWER']} />}>
+          <Route path="/orders" element={<div>Order Blotter Page</div>} />
+          <Route path="/portfolio" element={<div>Portfolio Page</div>} />
+          <Route path="/audit" element={<div>Audit Trail Page</div>} />
+          <Route path="/market" element={<div>Market Data Page</div>} />
+        </Route>
+        <Route path="/" element={<div>Login Page</div>} />
+        <Route path="/dashboard" element={<div>Dashboard Page</div>} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
+
+describe('Route guards for ADMIN role', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shouldRedirectAdminFromOrders', () => {
+    renderRouteAsRole('ADMIN', '/orders', 'Order Blotter Page')
+    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.queryByText('Order Blotter Page')).not.toBeInTheDocument()
+  })
+
+  it('shouldRedirectAdminFromPortfolio', () => {
+    renderRouteAsRole('ADMIN', '/portfolio', 'Portfolio Page')
+    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.queryByText('Portfolio Page')).not.toBeInTheDocument()
+  })
+
+  it('shouldRedirectAdminFromAudit', () => {
+    renderRouteAsRole('ADMIN', '/audit', 'Audit Trail Page')
+    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.queryByText('Audit Trail Page')).not.toBeInTheDocument()
+  })
+
+  it('shouldRedirectAdminFromMarket', () => {
+    renderRouteAsRole('ADMIN', '/market', 'Market Data Page')
+    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.queryByText('Market Data Page')).not.toBeInTheDocument()
+  })
+
+  it('shouldAllowTraderOnOrders', () => {
+    renderRouteAsRole('TRADER', '/orders', 'Order Blotter Page')
+    expect(screen.getByText('Order Blotter Page')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard Page')).not.toBeInTheDocument()
+  })
+
+  it('shouldAllowOperationsOnOrders', () => {
+    renderRouteAsRole('OPERATIONS', '/orders', 'Order Blotter Page')
+    expect(screen.getByText('Order Blotter Page')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard Page')).not.toBeInTheDocument()
+  })
 })
