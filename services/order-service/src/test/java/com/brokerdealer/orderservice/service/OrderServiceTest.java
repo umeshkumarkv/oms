@@ -9,7 +9,6 @@ import com.brokerdealer.orderservice.domain.OrderSide;
 import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.domain.OrderType;
 import com.brokerdealer.orderservice.domain.TimeInForce;
-import com.brokerdealer.orderservice.domain.OrderSide;
 import com.brokerdealer.orderservice.dto.client.ClientResponse;
 import com.brokerdealer.orderservice.dto.execution.ExecutionItem;
 import com.brokerdealer.orderservice.dto.kafka.OrderStateChangedEvent;
@@ -24,6 +23,7 @@ import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
+import com.brokerdealer.orderservice.exception.InsufficientHoldingsException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
 import com.brokerdealer.orderservice.exception.OrderNotFoundException;
@@ -591,6 +591,8 @@ class OrderServiceTest {
 
     @Test
     void shouldSkipCashReservationForSellOrder() {
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(10));
+
         SubmitOrderRequest request = marketBuyRequest();
         request.setSide("SELL");
 
@@ -869,6 +871,74 @@ class OrderServiceTest {
         assertThat(captor.getValue().getBuyingPower()).isEqualTo("0");
     }
 
+    // --- SCRUM-123: SHORT_SELL validation ---
+
+    @Test
+    void shouldAcceptShortSellOrderWhenHoldingsAreZero() {
+        // default setUp has empty holdings — SHORT_SELL must skip checks #20-21
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SHORT_SELL");
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        assertThat(response.getData().getOrderId()).isNotNull();
+        assertThat(response.getData().getStatus()).isEqualTo(OrderStatus.NEW.name());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldSkipHoldingsCheckForShortSellOrders() {
+        // Explicit: holdings < quantity yet SHORT_SELL must succeed
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(0));
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SHORT_SELL");
+        request.setQuantity(100);
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        assertThat(response.getData().getStatus()).isEqualTo(OrderStatus.NEW.name());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldNotReserveCashForShortSellOrders() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SHORT_SELL");
+
+        orderService.submitOrder(request, userId);
+
+        verify(clientServiceClient, never()).reserveCash(any(), any());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldRejectOrderWithInvalidSide() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("INVALID_SIDE");
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(ValidationException.class)
+                .satisfies(ex -> assertThat(((ValidationException) ex).getErrorCode()).isEqualTo("INVALID_ORDER_SIDE"))
+                .hasMessageContaining("Invalid side");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowInsufficientHoldingsForSellOrderWithInsufficientHoldings() {
+        // SELL holdings check must still apply — SELL with holdings < quantity → 422
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(5));
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+        request.setQuantity(10); // more than the 5 shares held
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(InsufficientHoldingsException.class);
+        verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
+    }
+
     // --- GET /orders ---
 
     @Test
@@ -954,5 +1024,23 @@ class OrderServiceTest {
             date = date.plusDays(1);
         }
         return date;
+    }
+
+    private ClientResponse clientResponseWithHoldings(int quantity) {
+        ClientResponse.HoldingData holding = new ClientResponse.HoldingData();
+        holding.setSymbol("AAPL");
+        holding.setQuantity(quantity);
+        ClientResponse.ClientData clientData = new ClientResponse.ClientData();
+        clientData.setClientId(clientId);
+        clientData.setStatus("ACTIVE");
+        clientData.setTradingEnabled(true);
+        clientData.setKycStatus("VERIFIED");
+        clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setBuyingPower("95000.00");
+        clientData.setMaxOpenOrders(10);
+        clientData.setHoldings(quantity > 0 ? List.of(holding) : Collections.emptyList());
+        ClientResponse clientResponse = new ClientResponse();
+        clientResponse.setData(clientData);
+        return clientResponse;
     }
 }

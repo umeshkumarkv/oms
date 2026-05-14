@@ -27,6 +27,7 @@ import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
 import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
+import com.brokerdealer.orderservice.exception.InsufficientHoldingsException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.InvalidExpiryDateException;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
@@ -200,6 +201,16 @@ public class OrderService {
                 .orElse(0);
         Integer maxDailyOrders = clientResponse.getData().getMaxOpenOrders();
 
+        // --- L2 checks #20-21: holdings validation — SELL only, SHORT_SELL intentionally bypasses ---
+        if (requestedSide == OrderSide.SELL) {
+            if (holdingsForSymbol <= 0) {
+                throw new InsufficientHoldingsException();
+            }
+            if (holdingsForSymbol < request.getQuantity()) {
+                throw new InsufficientHoldingsException();
+            }
+        }
+
         // --- Reserve cash for BUY orders before persisting ---
         if (OrderSide.valueOf(request.getSide()) == OrderSide.BUY) {
             boolean reserved = clientServiceClient.reserveCash(request.getClientId(), orderValue);
@@ -297,7 +308,7 @@ public class OrderService {
         try {
             OrderSide.valueOf(request.getSide());
         } catch (IllegalArgumentException e) {
-            throw new ValidationException("VALIDATION_ERROR", "Invalid side: must be BUY or SELL");
+            throw new ValidationException("INVALID_ORDER_SIDE", "Invalid side: must be BUY, SELL, or SHORT_SELL");
         }
 
         // Validate orderType
