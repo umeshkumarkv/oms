@@ -32,7 +32,7 @@ public class ClientServiceClient {
 
     @CircuitBreaker(name = "client-service", fallbackMethod = "getClientFallback")
     public ClientResponse getClient(UUID clientId) {
-        String url = clientServiceUrl + "/api/v1/clients/" + clientId;
+        String url = clientServiceUrl + "/api/v1/clients/" + clientId + "/portfolio";
         log.debug("Calling client-service: GET {}", url);
         try {
             HttpHeaders headers = new HttpHeaders();
