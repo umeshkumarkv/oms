@@ -37,7 +37,7 @@ public class RiskEvaluationService {
     private List<RiskRule> rules;
 
     @PostConstruct
-    void loadRules() {
+    public void loadRules() {
         List<RiskRuleConfig> configs = riskRuleConfigRepository.findAllByOrderByPriorityAsc();
         rules = configs.stream()
                 .map(this::buildRule)
