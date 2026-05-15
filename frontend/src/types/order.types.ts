@@ -1,4 +1,4 @@
-export type OrderSide = 'BUY' | 'SELL'
+export type OrderSide = 'BUY' | 'SELL' | 'SHORT_SELL'
 export type OrderType = 'MARKET' | 'LIMIT'
 export type TimeInForce = 'DAY' | 'GTD'
 export type OrderStatus =
