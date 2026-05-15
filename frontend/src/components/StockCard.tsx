@@ -108,7 +108,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
 
   // positive prop overrides internal direction; when omitted defaults to green
   const isPositive = positive !== undefined ? positive : (prices[prices.length - 1] >= prices[0])
-  const lineColor  = isPositive ? '#10b981' : '#ef4444'
+  const lineColor  = isPositive ? 'var(--color-success-vivid)' : 'var(--color-error-vivid)'
 
   // Polyline & fill polygon
   const pts     = data.map((d, i) => `${xScale(i).toFixed(1)},${yScale(d.price).toFixed(1)}`).join(' ')
@@ -154,8 +154,8 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={lineColor} stopOpacity="0.22" />
-            <stop offset="100%" stopColor={lineColor} stopOpacity="0"    />
+            <stop offset="0%"   style={{ stopColor: lineColor }} stopOpacity="0.22" />
+            <stop offset="100%" style={{ stopColor: lineColor }} stopOpacity="0"    />
           </linearGradient>
           <clipPath id={clipId}>
             <rect x={ML} y={MT} width={chartW} height={chartH} />
@@ -173,7 +173,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
         <polyline
           points={pts}
           fill="none"
-          stroke={lineColor}
+          style={{ stroke: lineColor }}
           strokeWidth={1.5}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -186,7 +186,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
             key={i}
             x={width - MR + 7}
             y={yScale(tick)}
-            fill="#94a3b8"
+            style={{ fill: 'var(--color-text-muted)' }}
             fontSize={9}
             dominantBaseline="middle"
             fontFamily="'Menlo', 'Consolas', monospace"
@@ -201,7 +201,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
             key={i}
             x={xScale(i)}
             y={H_CHART + 14}
-            fill="#94a3b8"
+            style={{ fill: 'var(--color-text-muted)' }}
             fontSize={9}
             textAnchor="middle"
             fontFamily="'Inter', system-ui, sans-serif"
@@ -215,7 +215,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
           <line
             x1={hover.x} y1={MT}
             x2={hover.x} y2={H_CHART}
-            stroke="#94a3b8"
+            style={{ stroke: 'var(--color-text-muted)' }}
             strokeWidth={1}
             strokeDasharray="3,3"
           />
@@ -227,8 +227,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
             cx={hover.x}
             cy={hover.y}
             r={3}
-            fill={lineColor}
-            stroke="#fff"
+            style={{ fill: lineColor, stroke: 'var(--color-surface)' }}
             strokeWidth={1.5}
           />
         )}
@@ -236,8 +235,8 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
         {/* Live pulsing dot at the latest data point */}
         {live && !hover && (
           <>
-            <circle cx={lastX} cy={lastY} r={5} fill={lineColor} opacity={0.2} />
-            <circle cx={lastX} cy={lastY} r={3} fill={lineColor} stroke="#fff" strokeWidth={1.5} className="sc-live-dot" />
+            <circle cx={lastX} cy={lastY} r={5} style={{ fill: lineColor }} opacity={0.2} />
+            <circle cx={lastX} cy={lastY} r={3} style={{ fill: lineColor, stroke: 'var(--color-surface)' }} strokeWidth={1.5} className="sc-live-dot" />
           </>
         )}
       </svg>
@@ -249,8 +248,8 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
             position: 'absolute',
             left: tooltipLeft,
             top: tooltipTop,
-            background: '#1e293b',
-            color: '#f8fafc',
+            background: 'var(--color-nav)',
+            color: 'var(--color-bg)',
             padding: '4px 8px',
             borderRadius: '4px',
             fontSize: '11px',
@@ -262,7 +261,7 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
           }}
         >
           <div style={{ color: lineColor }}>${hover.point.price.toFixed(2)}</div>
-          <div style={{ color: '#94a3b8', fontWeight: 400, fontSize: '10px' }}>{hover.point.time}</div>
+          <div style={{ color: 'var(--color-text-muted)', fontWeight: 400, fontSize: '10px' }}>{hover.point.time}</div>
         </div>
       )}
     </div>
@@ -280,14 +279,14 @@ const StockCard: React.FC<StockCardProps> = ({
 }) => {
   const chartData = data ?? generateIntraday(lastPrice)
   const isPositive = change >= 0
-  const changeColor = isPositive ? '#10b981' : '#ef4444'
-  const changeBg    = isPositive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)'
+  const changeColor = isPositive ? 'var(--color-success-vivid)' : 'var(--color-error-vivid)'
+  const changeBg    = isPositive ? 'var(--color-success-bg)' : 'var(--color-error-bg)'
   const arrow       = isPositive ? '▲' : '▼'
 
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--color-surface)',
         borderRadius: '12px',
         boxShadow: '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',
         overflow: 'hidden',
@@ -308,7 +307,7 @@ const StockCard: React.FC<StockCardProps> = ({
             style={{
               fontSize: '14px',
               fontWeight: 700,
-              color: '#0f172a',
+              color: 'var(--color-text-primary)',
               letterSpacing: '-0.01em',
             }}
           >
@@ -318,7 +317,7 @@ const StockCard: React.FC<StockCardProps> = ({
             style={{
               fontSize: '22px',
               fontWeight: 800,
-              color: '#0f172a',
+              color: 'var(--color-text-primary)',
               letterSpacing: '-0.02em',
               fontVariantNumeric: 'tabular-nums',
               marginTop: '2px',

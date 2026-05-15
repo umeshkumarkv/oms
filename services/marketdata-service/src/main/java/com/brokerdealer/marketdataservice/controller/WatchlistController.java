@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/watchlist")
+@RequestMapping("/api/v1/watchlists")
 @RequiredArgsConstructor
 @Slf4j
 public class WatchlistController {

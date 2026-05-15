@@ -19,10 +19,10 @@ const spread = (bid: number, ask: number): string =>
   (ask - bid).toFixed(4)
 
 const pctColor = (pct: number): string =>
-  pct > 0 ? '#10b981' : pct < 0 ? '#ef4444' : '#64748b'
+  pct > 0 ? 'var(--color-success-vivid)' : pct < 0 ? 'var(--color-error-vivid)' : 'var(--color-text-secondary)'
 
 const pctBg = (pct: number): string =>
-  pct > 0 ? 'rgba(16,185,129,0.08)' : pct < 0 ? 'rgba(239,68,68,0.08)' : 'transparent'
+  pct > 0 ? 'var(--color-success-bg)' : pct < 0 ? 'var(--color-error-bg)' : 'transparent'
 
 const arrow = (pct: number): string =>
   pct > 0 ? '▲' : pct < 0 ? '▼' : '—'
@@ -64,10 +64,10 @@ function candlesFromTicks(ticks: TickEntry[]): IntradayPoint[] {
 const GlobalStyle = () => (
   <style>{`
     .mkt-row { cursor: pointer; transition: background 0.12s; }
-    .mkt-row:hover { background: #f8fafc !important; }
-    .mkt-row.selected { background: #f0f7ff !important; }
-    .wl-rm:hover { color: #ef4444 !important; background: #fee2e2 !important; }
-    .wl-drop-item:hover { background: #f8fafc; }
+    .mkt-row:hover { background: var(--color-bg) !important; }
+    .mkt-row.selected { background: var(--color-row-selected) !important; }
+    .wl-rm:hover { color: var(--color-error-vivid) !important; background: var(--color-error-bg) !important; }
+    .wl-drop-item:hover { background: var(--color-bg); }
 
     .mkt-table thead th:first-child {
       position: sticky;
@@ -79,15 +79,15 @@ const GlobalStyle = () => (
       position: sticky;
       left: 0;
       z-index: 1;
-      background: #fff;
+      background: var(--color-surface);
       box-shadow: 2px 0 6px -2px rgba(15,23,42,0.08);
     }
-    .mkt-table .mkt-row:hover td:first-child { background: #f8fafc; }
-    .mkt-table .mkt-row.selected td:first-child { background: #f0f7ff; }
+    .mkt-table .mkt-row:hover td:first-child { background: var(--color-bg); }
+    .mkt-table .mkt-row.selected td:first-child { background: var(--color-row-selected); }
 
     .mkt-order-btn {
       width: 100%; padding: 11px;
-      background: #2563eb; color: #fff;
+      background: var(--color-buy); color: var(--color-surface);
       border: none; border-radius: 8px;
       font-size: 13px; font-weight: 600;
       cursor: pointer; font-family: inherit;
@@ -96,12 +96,12 @@ const GlobalStyle = () => (
       letter-spacing: 0.01em;
     }
     .mkt-order-btn:hover:not(:disabled) {
-      background: #1d4ed8;
+      background: var(--color-buy);
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(37,99,235,0.35);
     }
     .mkt-order-btn:disabled {
-      background: #e2e8f0; color: #94a3b8;
+      background: var(--color-border); color: var(--color-text-muted);
       cursor: not-allowed; box-shadow: none;
     }
 
@@ -116,7 +116,7 @@ const GlobalStyle = () => (
     }
 
     .mkt-chart-skeleton {
-      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background: linear-gradient(90deg, var(--color-border-light) 25%, var(--color-border) 50%, var(--color-border-light) 75%);
       background-size: 800px 100%;
       animation: mkt-shimmer 1.4s ease-in-out infinite;
       border-radius: 6px;
@@ -124,30 +124,30 @@ const GlobalStyle = () => (
     }
 
     /* ── Filter segmented control ── */
-    .mkt-seg { display: inline-flex; padding: 3px; background: #f1f5f9; border-radius: 8px; gap: 1px; }
+    .mkt-seg { display: inline-flex; padding: 3px; background: var(--color-border-light); border-radius: 8px; gap: 1px; }
     .mkt-seg button {
-      background: transparent; border: none; color: #64748b;
+      background: transparent; border: none; color: var(--color-text-secondary);
       font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 6px;
       cursor: pointer; font-family: inherit; letter-spacing: 0.01em;
       transition: background 0.12s, color 0.12s, box-shadow 0.12s;
       display: inline-flex; align-items: center; gap: 5px;
     }
-    .mkt-seg button:hover { color: #0f172a; }
+    .mkt-seg button:hover { color: var(--color-text-primary); }
     .mkt-seg button.active {
-      background: #fff; color: #0f172a;
+      background: var(--color-surface); color: var(--color-text-primary);
       box-shadow: 0 1px 2px rgba(15,23,42,0.06);
     }
     .mkt-seg .seg-count {
-      font-size: 10px; font-weight: 700; color: #94a3b8;
-      background: #fff; border-radius: 999px; padding: 0 5px; min-width: 16px; text-align: center;
+      font-size: 10px; font-weight: 700; color: var(--color-text-muted);
+      background: var(--color-surface); border-radius: 999px; padding: 0 5px; min-width: 16px; text-align: center;
     }
-    .mkt-seg button.active .seg-count { color: #2563eb; background: #eff6ff; }
+    .mkt-seg button.active .seg-count { color: var(--color-buy); background: var(--color-selection-bg); }
 
     /* ── Search shortcut key ── */
     .mkt-kbd {
       position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-      font-size: 10px; color: #64748b; background: #fff;
-      border: 1px solid #e2e8f0; border-radius: 4px; padding: 1px 5px;
+      font-size: 10px; color: var(--color-text-secondary); background: var(--color-surface);
+      border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 5px;
       font-family: 'Menlo','Consolas',monospace; font-weight: 600;
       pointer-events: none;
     }
@@ -157,7 +157,7 @@ const GlobalStyle = () => (
     .mkt-sym-avatar {
       width: 26px; height: 26px; border-radius: 6px;
       display: inline-flex; align-items: center; justify-content: center;
-      font-size: 10px; font-weight: 700; color: #fff;
+      font-size: 10px; font-weight: 700; color: var(--color-surface);
       letter-spacing: -0.01em; flex-shrink: 0;
       font-family: 'Inter', system-ui, sans-serif;
     }
@@ -167,76 +167,75 @@ const GlobalStyle = () => (
 const FF = "'Inter', system-ui, sans-serif"
 
 const s = {
-  page:        { fontFamily: FF, padding: '24px 28px', background: '#f1f5f9', minHeight: '100vh' } as React.CSSProperties,
+  page:        { fontFamily: FF, padding: '24px 28px', background: 'var(--color-border-light)', minHeight: '100vh' } as React.CSSProperties,
   header:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' } as React.CSSProperties,
   titleWrap:   { display: 'flex', alignItems: 'center', gap: '10px' } as React.CSSProperties,
-  title:       { margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' } as React.CSSProperties,
+  title:       { margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
   headerRight: { display: 'flex', alignItems: 'center', gap: '10px' } as React.CSSProperties,
 
   pill: (open: boolean) => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
     padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-    background: open ? '#dcfce7' : '#f1f5f9',
-    color:      open ? '#15803d' : '#64748b',
-    border:    `1px solid ${open ? '#86efac' : '#e2e8f0'}`,
+    background: open ? 'var(--color-success-bg)' : 'var(--color-border-light)',
+    color:      open ? 'var(--color-success-text)' : 'var(--color-text-secondary)',
+    border:    `1px solid ${open ? 'var(--color-success-border)' : 'var(--color-border)'}`,
     letterSpacing: '0.03em',
   } as React.CSSProperties),
 
   wsPill: (live: boolean) => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
     padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-    background: live ? '#eff6ff' : '#fffbeb',
-    color:      live ? '#2563eb' : '#b45309',
-    border:    `1px solid ${live ? '#bfdbfe' : '#fde68a'}`,
+    background: live ? 'var(--color-selection-bg)' : 'var(--color-warning-bg-soft)',
+    color:      live ? 'var(--color-buy)' : 'var(--color-warning-dark)',
+    border:    `1px solid ${live ? 'var(--color-selection-border)' : 'var(--color-warning-border-light)'}`,
   } as React.CSSProperties),
 
   pillDot: (color: string) => ({
     width: '6px', height: '6px', borderRadius: '50%', background: color, display: 'inline-block',
   } as React.CSSProperties),
 
-
   warnBanner:  {
     display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '10px 16px', background: '#fffbeb',
-    color: '#92400e', borderRadius: '8px', marginBottom: '16px',
-    fontSize: '12px', fontWeight: 500, border: '1px solid #fde68a',
+    padding: '10px 16px', background: 'var(--color-warning-bg-soft)',
+    color: 'var(--color-warning-text)', borderRadius: '8px', marginBottom: '16px',
+    fontSize: '12px', fontWeight: 500, border: '1px solid var(--color-warning-border-light)',
   } as React.CSSProperties,
   closedBanner: {
     display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '8px 14px', background: '#f8fafc',
-    color: '#64748b', borderRadius: '6px', marginBottom: '12px',
-    fontSize: '12px', fontWeight: 500, border: '1px solid #e2e8f0',
+    padding: '8px 14px', background: 'var(--color-bg)',
+    color: 'var(--color-text-secondary)', borderRadius: '6px', marginBottom: '12px',
+    fontSize: '12px', fontWeight: 500, border: '1px solid var(--color-border)',
   } as React.CSSProperties,
 
   grid:        { display: 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', alignItems: 'start' } as React.CSSProperties,
 
-  section:     { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'hidden' } as React.CSSProperties,
-  sHead:       { padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', left: 0 } as React.CSSProperties,
+  section:     { background: 'var(--color-surface)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'hidden' } as React.CSSProperties,
+  sHead:       { padding: '14px 20px', borderBottom: '1px solid var(--color-border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', left: 0 } as React.CSSProperties,
   sTitleRow:   { display: 'flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
-  sTitle:      { margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' } as React.CSSProperties,
-  sCount:      { fontSize: '11px', fontWeight: 600, color: '#64748b', background: '#f1f5f9', borderRadius: '20px', padding: '1px 8px' } as React.CSSProperties,
+  sTitle:      { margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
+  sCount:      { fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', background: 'var(--color-border-light)', borderRadius: '20px', padding: '1px 8px' } as React.CSSProperties,
 
   table:    { width: '100%', borderCollapse: 'collapse' as const, fontSize: '12.5px' } as React.CSSProperties,
-  th:       { padding: '9px 14px', textAlign: 'left' as const, fontSize: '10.5px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.06em', borderBottom: '1px solid #f1f5f9', background: '#fafafa', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  thRight:  { padding: '9px 14px', textAlign: 'right' as const, fontSize: '10.5px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.06em', borderBottom: '1px solid #f1f5f9', background: '#fafafa', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  td:       { padding: '10px 14px', borderBottom: '1px solid #f8fafc', color: '#334155', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  tdRight:  { padding: '10px 14px', borderBottom: '1px solid #f8fafc', color: '#334155', textAlign: 'right' as const, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  tdMono:   { padding: '10px 14px', borderBottom: '1px solid #f8fafc', color: '#334155', textAlign: 'right' as const, whiteSpace: 'nowrap' as const, fontVariantNumeric: 'tabular-nums' as const, fontFamily: "'Menlo','Consolas',monospace" } as React.CSSProperties,
-  symbolCell:  { fontWeight: 700, color: '#0f172a', fontSize: '13px', letterSpacing: '-0.01em' } as React.CSSProperties,
-  haltPill:    { display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: '#fee2e2', color: '#b91c1c', letterSpacing: '0.03em' } as React.CSSProperties,
-  activePill:  { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: '#dcfce7', color: '#15803d', letterSpacing: '0.03em' } as React.CSSProperties,
-  closedPill:  { display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: '#f1f5f9', color: '#64748b', letterSpacing: '0.03em' } as React.CSSProperties,
-  skeleton:    { background: 'linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)', backgroundSize: '200% 100%', borderRadius: '4px', height: '13px', animation: 'mkt-skeleton 1.4s ease-in-out infinite' } as React.CSSProperties,
+  th:       { padding: '9px 14px', textAlign: 'left' as const, fontSize: '10.5px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-surface-muted)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  thRight:  { padding: '9px 14px', textAlign: 'right' as const, fontSize: '10.5px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-surface-muted)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  td:       { padding: '10px 14px', borderBottom: '1px solid var(--color-bg)', color: 'var(--color-text-body)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tdRight:  { padding: '10px 14px', borderBottom: '1px solid var(--color-bg)', color: 'var(--color-text-body)', textAlign: 'right' as const, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tdMono:   { padding: '10px 14px', borderBottom: '1px solid var(--color-bg)', color: 'var(--color-text-body)', textAlign: 'right' as const, whiteSpace: 'nowrap' as const, fontVariantNumeric: 'tabular-nums' as const, fontFamily: "'Menlo','Consolas',monospace" } as React.CSSProperties,
+  symbolCell:  { fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '13px', letterSpacing: '-0.01em' } as React.CSSProperties,
+  haltPill:    { display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: 'var(--color-error-bg)', color: 'var(--color-error-text)', letterSpacing: '0.03em' } as React.CSSProperties,
+  activePill:  { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: 'var(--color-success-bg)', color: 'var(--color-success-text)', letterSpacing: '0.03em' } as React.CSSProperties,
+  closedPill:  { display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: 'var(--color-border-light)', color: 'var(--color-text-secondary)', letterSpacing: '0.03em' } as React.CSSProperties,
+  skeleton:    { background: 'linear-gradient(90deg, var(--color-border-light) 25%, var(--color-border) 50%, var(--color-border-light) 75%)', backgroundSize: '200% 100%', borderRadius: '4px', height: '13px', animation: 'mkt-skeleton 1.4s ease-in-out infinite' } as React.CSSProperties,
 
-  card:        { background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflow: 'hidden' } as React.CSSProperties,
-  cardHeader:  { padding: '16px 20px 0', borderBottom: '1px solid #f1f5f9' } as React.CSSProperties,
+  card:        { background: 'var(--color-surface)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflow: 'hidden' } as React.CSSProperties,
+  cardHeader:  { padding: '16px 20px 0', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
   noSelect:    { padding: '56px 24px', textAlign: 'center' as const } as React.CSSProperties,
   noSelectIcon:{ fontSize: '32px', marginBottom: '10px', opacity: 0.4 } as React.CSSProperties,
-  noSelectTxt: { fontSize: '13px', color: '#94a3b8', fontWeight: 500 } as React.CSSProperties,
+  noSelectTxt: { fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 500 } as React.CSSProperties,
   qHeaderTop:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '14px' } as React.CSSProperties,
-  qSymbol:     { fontSize: '20px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' } as React.CSSProperties,
+  qSymbol:     { fontSize: '20px', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' } as React.CSSProperties,
   qPriceRow:   { display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '4px' } as React.CSSProperties,
-  qPrice:      { fontSize: '32px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' as const } as React.CSSProperties,
+  qPrice:      { fontSize: '32px', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' as const } as React.CSSProperties,
   qChange:     (pct: number) => ({
     display: 'inline-flex', alignItems: 'center', gap: '4px',
     fontSize: '12px', fontWeight: 600, color: pctColor(pct),
@@ -244,33 +243,33 @@ const s = {
   } as React.CSSProperties),
   cardBody:    { padding: '16px 20px' } as React.CSSProperties,
   bidAskRow:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' } as React.CSSProperties,
-  bidBox:      { background: '#f0fdf4', borderRadius: '8px', padding: '10px 12px', border: '1px solid #bbf7d0' } as React.CSSProperties,
-  askBox:      { background: '#fff5f5', borderRadius: '8px', padding: '10px 12px', border: '1px solid #fecaca' } as React.CSSProperties,
-  baLabel:     { fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: '#94a3b8', marginBottom: '2px' } as React.CSSProperties,
+  bidBox:      { background: 'var(--color-bid-bg)', borderRadius: '8px', padding: '10px 12px', border: '1px solid var(--color-bid-border)' } as React.CSSProperties,
+  askBox:      { background: 'var(--color-ask-bg)', borderRadius: '8px', padding: '10px 12px', border: '1px solid var(--color-ask-border)' } as React.CSSProperties,
+  baLabel:     { fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: 'var(--color-text-muted)', marginBottom: '2px' } as React.CSSProperties,
   baValue:     (color: string) => ({ fontSize: '18px', fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' as const, letterSpacing: '-0.01em' } as React.CSSProperties),
-  spreadRow:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', padding: '8px 12px', background: '#fafafa', borderRadius: '8px' } as React.CSSProperties,
-  spreadLabel: { fontSize: '11px', color: '#94a3b8', fontWeight: 600 } as React.CSSProperties,
-  spreadVal:   { fontSize: '13px', fontWeight: 700, color: '#334155', fontVariantNumeric: 'tabular-nums' as const } as React.CSSProperties,
-  divider:     { height: '1px', background: '#f1f5f9', margin: '14px 0' } as React.CSSProperties,
+  spreadRow:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', padding: '8px 12px', background: 'var(--color-surface-muted)', borderRadius: '8px' } as React.CSSProperties,
+  spreadLabel: { fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 } as React.CSSProperties,
+  spreadVal:   { fontSize: '13px', fontWeight: 700, color: 'var(--color-text-body)', fontVariantNumeric: 'tabular-nums' as const } as React.CSSProperties,
+  divider:     { height: '1px', background: 'var(--color-border-light)', margin: '14px 0' } as React.CSSProperties,
   tsRow:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
-  tsLabel:     { fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em' } as React.CSSProperties,
-  tsValue:     { fontSize: '12px', fontWeight: 600, color: '#0f172a' } as React.CSSProperties,
+  tsLabel:     { fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em' } as React.CSSProperties,
+  tsValue:     { fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' } as React.CSSProperties,
   statusBadge: (halted: boolean, tradable: boolean) => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
     padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
-    background: halted ? '#fee2e2' : tradable ? '#dcfce7' : '#f1f5f9',
-    color:      halted ? '#b91c1c' : tradable ? '#15803d' : '#64748b',
+    background: halted ? 'var(--color-error-bg)' : tradable ? 'var(--color-success-bg)' : 'var(--color-border-light)',
+    color:      halted ? 'var(--color-error-text)' : tradable ? 'var(--color-success-text)' : 'var(--color-text-secondary)',
   } as React.CSSProperties),
 
   wlSearchWrap:  { position: 'relative' as const, flex: 1 } as React.CSSProperties,
-  wlInput:       { width: '100%', boxSizing: 'border-box' as const, paddingLeft: '28px', paddingRight: '46px', paddingTop: '6px', paddingBottom: '6px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', outline: 'none', background: '#fafafa', color: '#0f172a', fontFamily: FF } as React.CSSProperties,
-  wlInputFull:   { width: '100%', boxSizing: 'border-box' as const, paddingLeft: '28px', paddingRight: '46px', paddingTop: '6px', paddingBottom: '6px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', outline: 'none', background: '#f1f5f9', color: '#94a3b8', fontFamily: FF, cursor: 'not-allowed' as const } as React.CSSProperties,
-  wlResultsPanel: { borderTop: '1px solid #f1f5f9', borderBottom: '2px solid #e2e8f0', maxHeight: '200px', overflowY: 'auto' as const, background: '#fff' } as React.CSSProperties,
-  wlDropItem:    { padding: '8px 12px', fontSize: '12px', cursor: 'pointer', color: '#0f172a', fontWeight: 600, borderBottom: '1px solid #f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
-  wlErrorBanner: { margin: '8px 0 0', padding: '7px 12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '6px', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
-  wlFullBanner:  { margin: '8px 0 0', padding: '7px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '12px', fontWeight: 500 } as React.CSSProperties,
-  wlEmpty:       { padding: '48px 24px', textAlign: 'center' as const, color: '#94a3b8', fontSize: '13px', fontWeight: 500 } as React.CSSProperties,
-  removeBtn:     { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', borderRadius: '4px', transition: 'color 0.1s, background 0.1s', lineHeight: 0 } as React.CSSProperties,
+  wlInput:       { width: '100%', boxSizing: 'border-box' as const, paddingLeft: '28px', paddingRight: '46px', paddingTop: '6px', paddingBottom: '6px', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'var(--color-surface-muted)', color: 'var(--color-text-primary)', fontFamily: FF } as React.CSSProperties,
+  wlInputFull:   { width: '100%', boxSizing: 'border-box' as const, paddingLeft: '28px', paddingRight: '46px', paddingTop: '6px', paddingBottom: '6px', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'var(--color-border-light)', color: 'var(--color-text-muted)', fontFamily: FF, cursor: 'not-allowed' as const } as React.CSSProperties,
+  wlResultsPanel: { borderTop: '1px solid var(--color-border-light)', borderBottom: '2px solid var(--color-border)', maxHeight: '200px', overflowY: 'auto' as const, background: 'var(--color-surface)' } as React.CSSProperties,
+  wlDropItem:    { padding: '8px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-text-primary)', fontWeight: 600, borderBottom: '1px solid var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  wlErrorBanner: { margin: '8px 0 0', padding: '7px 12px', background: 'var(--color-error-bg)', color: 'var(--color-error-text)', borderRadius: '6px', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  wlFullBanner:  { margin: '8px 0 0', padding: '7px 12px', background: 'var(--color-warning-bg)', color: 'var(--color-warning-text)', borderRadius: '6px', fontSize: '12px', fontWeight: 500 } as React.CSSProperties,
+  wlEmpty:       { padding: '48px 24px', textAlign: 'center' as const, color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 500 } as React.CSSProperties,
+  removeBtn:     { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', borderRadius: '4px', transition: 'color 0.1s, background 0.1s', lineHeight: 0 } as React.CSSProperties,
 }
 
 // ── WatchlistPanel ─────────────────────────────────────────────────────────

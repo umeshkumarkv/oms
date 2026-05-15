@@ -40,7 +40,7 @@ class WatchlistControllerTest {
     private static final String USER_ID = UUID.randomUUID().toString();
     private static final String ADDED_AT = Instant.now().toString();
 
-    // --- GET /api/v1/watchlist ---
+    // --- GET /api/v1/watchlists ---
 
     @Test
     void shouldReturn200WithWatchlistEntriesForCurrentUser() throws Exception {
@@ -50,7 +50,7 @@ class WatchlistControllerTest {
         );
         when(watchlistService.getWatchlist(USER_ID)).thenReturn(entries);
 
-        mockMvc.perform(get("/api/v1/watchlist")
+        mockMvc.perform(get("/api/v1/watchlists")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
@@ -64,7 +64,7 @@ class WatchlistControllerTest {
     void shouldReturn200WithEmptyListWhenWatchlistIsEmpty() throws Exception {
         when(watchlistService.getWatchlist(USER_ID)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/watchlist")
+        mockMvc.perform(get("/api/v1/watchlists")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
@@ -77,13 +77,13 @@ class WatchlistControllerTest {
         when(watchlistService.getWatchlist(null))
                 .thenThrow(new AccessForbiddenException("UNAUTHORIZED", "Authentication required"));
 
-        mockMvc.perform(get("/api/v1/watchlist"))
+        mockMvc.perform(get("/api/v1/watchlists"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.meta.timestamp").exists());
     }
 
-    // --- POST /api/v1/watchlist/{symbol} ---
+    // --- POST /api/v1/watchlists/{symbol} ---
 
     @Test
     void shouldReturn201WhenSymbolAddedToWatchlist() throws Exception {
@@ -91,7 +91,7 @@ class WatchlistControllerTest {
                 .symbol("AAPL").addedAt(ADDED_AT).build();
         when(watchlistService.addToWatchlist(USER_ID, "AAPL")).thenReturn(entry);
 
-        mockMvc.perform(post("/api/v1/watchlist/AAPL")
+        mockMvc.perform(post("/api/v1/watchlists/AAPL")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.symbol").value("AAPL"))
@@ -105,7 +105,7 @@ class WatchlistControllerTest {
         when(watchlistService.addToWatchlist(USER_ID, "UNKNOWN"))
                 .thenThrow(new SymbolNotFoundException("SYMBOL_NOT_FOUND", "Symbol not found: UNKNOWN"));
 
-        mockMvc.perform(post("/api/v1/watchlist/UNKNOWN")
+        mockMvc.perform(post("/api/v1/watchlists/UNKNOWN")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("SYMBOL_NOT_FOUND"))
@@ -118,7 +118,7 @@ class WatchlistControllerTest {
                 .thenThrow(new SymbolAlreadyInWatchlistException("SYMBOL_ALREADY_IN_WATCHLIST",
                         "Symbol is already in watchlist: AAPL"));
 
-        mockMvc.perform(post("/api/v1/watchlist/AAPL")
+        mockMvc.perform(post("/api/v1/watchlists/AAPL")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("SYMBOL_ALREADY_IN_WATCHLIST"))
@@ -131,18 +131,18 @@ class WatchlistControllerTest {
                 .thenThrow(new WatchlistLimitExceededException("WATCHLIST_LIMIT_EXCEEDED",
                         "Watchlist limit of 50 symbols reached"));
 
-        mockMvc.perform(post("/api/v1/watchlist/NVDA")
+        mockMvc.perform(post("/api/v1/watchlists/NVDA")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error.code").value("WATCHLIST_LIMIT_EXCEEDED"))
                 .andExpect(jsonPath("$.meta.timestamp").exists());
     }
 
-    // --- DELETE /api/v1/watchlist/{symbol} ---
+    // --- DELETE /api/v1/watchlists/{symbol} ---
 
     @Test
     void shouldReturn204WhenSymbolRemovedFromWatchlist() throws Exception {
-        mockMvc.perform(delete("/api/v1/watchlist/AAPL")
+        mockMvc.perform(delete("/api/v1/watchlists/AAPL")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isNoContent());
     }
@@ -153,7 +153,7 @@ class WatchlistControllerTest {
                 "Symbol is not in watchlist: TSLA"))
                 .when(watchlistService).removeFromWatchlist(USER_ID, "TSLA");
 
-        mockMvc.perform(delete("/api/v1/watchlist/TSLA")
+        mockMvc.perform(delete("/api/v1/watchlists/TSLA")
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("SYMBOL_NOT_IN_WATCHLIST"))

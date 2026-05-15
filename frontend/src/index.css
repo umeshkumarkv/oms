@@ -17,11 +17,35 @@
   --color-sell-bg:        #fce7f3;
   --color-success:        #059669;
   --color-success-bg:     #d1fae5;
+  --color-success-text:   #15803d;   /* green-700 — text on success bg */
+  --color-success-border: #86efac;   /* green-300 — market open pill border */
+  --color-success-vivid:  #10b981;   /* emerald-500 — chart positive / pct change */
   --color-warning:        #d97706;
   --color-warning-bg:     #fef3c7;
+  --color-warning-bg-soft: #fffbeb;  /* amber-50 — subtle warning banner */
   --color-warning-border: #fcd34d;
+  --color-warning-border-light: #fde68a; /* amber-200 — soft warning border */
+  --color-warning-text:   #92400e;   /* amber-800 — text on warning bg */
+  --color-warning-dark:   #b45309;   /* amber-700 — ws offline / secondary warning */
   --color-error:          #dc2626;
   --color-error-bg:       #fee2e2;
+  --color-error-text:     #b91c1c;   /* red-700 — text on error bg */
+  --color-error-vivid:    #ef4444;   /* red-500 — chart negative / pct change */
+
+  /* Surface variants */
+  --color-surface-muted:  #fafafa;   /* near-white — table header bg, spread row */
+  --color-row-selected:   #f0f7ff;   /* blue-50 — selected table row highlight */
+  --color-selection-bg:   #eff6ff;   /* blue-50 — active count badge bg */
+  --color-selection-border: #bfdbfe; /* blue-200 — active/ws pill border */
+
+  /* Bid / Ask price boxes */
+  --color-bid-bg:         #f0fdf4;   /* green-50 */
+  --color-bid-border:     #bbf7d0;   /* green-200 */
+  --color-ask-bg:         #fff5f5;   /* red-50 */
+  --color-ask-border:     #fecaca;   /* red-200 */
+
+  /* Body text */
+  --color-text-body:      #334155;   /* slate-700 — table cell default text */
 
   /* Text */
   --color-text-primary:   #0f172a;
