@@ -14,8 +14,7 @@ import java.math.RoundingMode;
 @Slf4j
 public class PriceDeviationCheckRule implements RiskRule {
 
-    private static final BigDecimal THRESHOLD = new BigDecimal("0.10");
-
+    private final BigDecimal threshold;
     private final boolean enabled;
 
     @Override
@@ -50,11 +49,11 @@ public class PriceDeviationCheckRule implements RiskRule {
         BigDecimal deviation = limitPrice.subtract(lastPrice).abs()
                 .divide(lastPrice, 10, RoundingMode.HALF_UP);
 
-        if (deviation.compareTo(THRESHOLD) > 0) {
-            log.warn("PRICE_DEVIATION_CHECK triggered: orderId={} deviation={}", context.getOrderId(), deviation);
+        if (deviation.compareTo(threshold) > 0) {
+            log.warn("PRICE_DEVIATION_CHECK triggered: orderId={}", context.getOrderId());
             return RiskResult.warned(getRuleCode(),
                     "PRICE_DEVIATION: limitPrice deviates " + deviation.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
-                    + "% from lastPrice (threshold 10%)");
+                    + "% from lastPrice (threshold " + threshold.multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%)");
         }
         return RiskResult.passed();
     }

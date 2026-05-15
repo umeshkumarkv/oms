@@ -75,7 +75,7 @@ public class RiskEvaluationService {
                 return result;
             }
             if ("WARNED".equals(result.getResult())) {
-                log.warn("Risk warning: orderId={} rule={} reason={}", request.getOrderId(), result.getFailedRule(), result.getReason());
+                log.warn("Risk warning: orderId={} rule={}", request.getOrderId(), result.getFailedRule());
                 warnings.add(RiskWarning.builder()
                         .orderId(request.getOrderId())
                         .ruleCode(result.getFailedRule())
@@ -107,7 +107,7 @@ public class RiskEvaluationService {
             case "RULE_KYC_VERIFIED"       -> new KycVerifiedRule(config.getEnabled());
             case "RULE_SUFFICIENT_CASH"    -> new SufficientCashRule(config.getEnabled());
             case "RULE_SUFFICIENT_HOLDINGS"  -> new SufficientHoldingsRule(config.getEnabled());
-            case "PRICE_DEVIATION_CHECK"     -> new PriceDeviationCheckRule(config.getEnabled());
+            case "PRICE_DEVIATION_CHECK"     -> new PriceDeviationCheckRule(config.getThresholdValue(), config.getEnabled());
             case "NOTIONAL_VALUE_CHECK"      -> new NotionalValueCheckRule(config.getThresholdValue(), config.getEnabled());
             case "ORDER_QTY_SPIKE_CHECK"     -> new OrderQtySpikeCheckRule(config.getThresholdValue(), config.getEnabled());
             case "ORDER_VALUE_SPIKE_CHECK"   -> new OrderValueSpikeCheckRule(config.getThresholdValue(), config.getEnabled());

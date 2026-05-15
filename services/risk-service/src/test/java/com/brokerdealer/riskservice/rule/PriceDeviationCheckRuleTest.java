@@ -5,6 +5,7 @@ import com.brokerdealer.riskservice.dto.RiskContext;
 import com.brokerdealer.riskservice.dto.RiskEvaluationRequest;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,7 @@ class PriceDeviationCheckRuleTest {
     @Test
     void shouldWarnWhenLimitPriceDeviatesMoreThan10Percent() {
         // 166 vs 150: deviation = 16/150 = 10.67% > 10%
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         RiskResult result = rule.evaluate(limitRequest("166.00", "150.00"), context);
 
         assertThat(result.getResult()).isEqualTo("WARNED");
@@ -38,7 +39,7 @@ class PriceDeviationCheckRuleTest {
     @Test
     void shouldPassWhenLimitPriceDeviatesLessThan10Percent() {
         // 155 vs 150: deviation = 5/150 = 3.33% < 10%
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         RiskResult result = rule.evaluate(limitRequest("155.00", "150.00"), context);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
@@ -47,7 +48,7 @@ class PriceDeviationCheckRuleTest {
     @Test
     void shouldPassWhenLimitPriceDeviatesExactlyAtThreshold() {
         // 165 vs 150: deviation = 15/150 = 0.10 exactly — compareTo(0.10) = 0, not > 0 → PASSED
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         RiskResult result = rule.evaluate(limitRequest("165.00", "150.00"), context);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
@@ -55,7 +56,7 @@ class PriceDeviationCheckRuleTest {
 
     @Test
     void shouldSkipWhenOrderTypeIsMarket() {
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         RiskEvaluationRequest req = new RiskEvaluationRequest();
         req.setOrderType("MARKET");
         req.setLastPrice("150.00");
@@ -67,7 +68,7 @@ class PriceDeviationCheckRuleTest {
 
     @Test
     void shouldSkipWhenLimitPriceIsNull() {
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         RiskEvaluationRequest req = new RiskEvaluationRequest();
         req.setOrderType("LIMIT");
         req.setLimitPrice(null);
@@ -80,7 +81,7 @@ class PriceDeviationCheckRuleTest {
 
     @Test
     void shouldSkipWhenLastPriceIsNull() {
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         RiskResult result = rule.evaluate(limitRequest("155.00", null), context);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
@@ -88,13 +89,13 @@ class PriceDeviationCheckRuleTest {
 
     @Test
     void shouldReturnCorrectRuleCode() {
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(true);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), true);
         assertThat(rule.getRuleCode()).isEqualTo("PRICE_DEVIATION_CHECK");
     }
 
     @Test
     void shouldReportDisabledCorrectly() {
-        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(false);
+        PriceDeviationCheckRule rule = new PriceDeviationCheckRule(new BigDecimal("0.10"), false);
         assertThat(rule.isEnabled()).isFalse();
     }
 }
