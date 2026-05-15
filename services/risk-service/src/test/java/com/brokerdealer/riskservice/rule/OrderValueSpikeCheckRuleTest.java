@@ -63,6 +63,15 @@ class OrderValueSpikeCheckRuleTest {
     }
 
     @Test
+    void shouldSkipWhenAvgOrderValueIsZero() {
+        // avgOrderValue=0 means no history — should skip to avoid always-warn on first order
+        OrderValueSpikeCheckRule rule = new OrderValueSpikeCheckRule(MULTIPLIER, true);
+        RiskResult result = rule.evaluate(request("10000.00", "0.00"), context);
+
+        assertThat(result.getResult()).isEqualTo("PASSED");
+    }
+
+    @Test
     void shouldReturnCorrectRuleCode() {
         OrderValueSpikeCheckRule rule = new OrderValueSpikeCheckRule(MULTIPLIER, true);
         assertThat(rule.getRuleCode()).isEqualTo("ORDER_VALUE_SPIKE_CHECK");

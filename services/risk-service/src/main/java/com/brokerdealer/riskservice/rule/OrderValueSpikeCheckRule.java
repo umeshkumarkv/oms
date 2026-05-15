@@ -35,7 +35,13 @@ public class OrderValueSpikeCheckRule implements RiskRule {
 
         BigDecimal orderValue    = new BigDecimal(request.getOrderValue());
         BigDecimal avgOrderValue = new BigDecimal(request.getAvgOrderValue());
-        BigDecimal spike         = avgOrderValue.multiply(multiplier);
+
+        if (avgOrderValue.compareTo(BigDecimal.ZERO) == 0) {
+            log.debug("ORDER_VALUE_SPIKE_CHECK skipped: avgOrderValue is zero (no history); orderId={}", context.getOrderId());
+            return RiskResult.passed();
+        }
+
+        BigDecimal spike = avgOrderValue.multiply(multiplier);
 
         if (orderValue.compareTo(spike) > 0) {
             log.warn("ORDER_VALUE_SPIKE_CHECK triggered: orderId={}", context.getOrderId());
