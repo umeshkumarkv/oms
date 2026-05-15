@@ -16,4 +16,8 @@ public class RiskResult {
     public static RiskResult rejected(String ruleCode, String reason) {
         return new RiskResult("REJECTED", ruleCode, reason);
     }
+
+    public static RiskResult warned(String ruleCode, String reason) {
+        return new RiskResult("WARNED", ruleCode, reason);
+    }
 }

@@ -28,4 +28,11 @@ public class RiskEvaluationRequest {
 
     // --- Stateful check fields (SCRUM-121) ---
     private Boolean hasCrossingOpenOrder; // true if an open opposite-side order at crossing price exists
+
+    // --- Fat-finger / WARN rule fields (SCRUM-122) ---
+    private String  lastPrice;       // BigDecimal as String; null for MARKET orders
+    private Integer avgOrderQty;     // 0 if no history — triggers skip in ORDER_QTY_SPIKE_CHECK
+    private String  avgOrderValue;   // BigDecimal as String; null if no history
+    private Integer dailyOrderCount; // orders placed by this client today
+    private Integer maxDailyOrders;  // per-client daily limit
 }
