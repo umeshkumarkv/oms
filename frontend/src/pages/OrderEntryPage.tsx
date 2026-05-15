@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useIdleTimer } from '../hooks/useIdleTimer'
+import { useOrderEntryBidAsk } from '../hooks/useOrderEntryBidAsk'
 import { getHolidays, getInstrument, getInstruments } from '../api/marketApi'
 import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
@@ -89,6 +90,9 @@ const s = {
   datepickerWrapper:      { border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
   datepickerWrapperError: { border: '1.5px solid var(--color-error)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
 
+  // Real-time stale indicator (SCRUM-108)
+  staleBadge: { display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'var(--color-warning-bg)', color: 'var(--color-warning)', borderRadius: 'var(--radius-sm)', fontSize: '10px', fontWeight: 700, marginLeft: '6px' } as React.CSSProperties,
+
   // Idle timer banners
   warningBanner: { padding: '12px 16px', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 600, marginBottom: '16px' } as React.CSSProperties,
   expiredBanner: { padding: '16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', marginBottom: '16px' } as React.CSSProperties,
@@ -137,6 +141,9 @@ const OrderEntryPage: React.FC = () => {
   const [showModal,    setShowModal]    = useState(false)
 
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Real-time Bid/Ask (SCRUM-108) ────────────────────────────────────────────
+  const { bid: liveBid, ask: liveAsk, isStale } = useOrderEntryBidAsk(symbol)
 
   // ── Idle timer ────────────────────────────────────────────────────────────────
   const { secondsRemaining, isExpired, resetTimer } = useIdleTimer(60)
@@ -652,12 +659,23 @@ const OrderEntryPage: React.FC = () => {
                 <div style={s.quotePrice}>${quote.lastPrice}</div>
                 <div style={s.quoteMeta}>
                   {[
-                    { label: 'Bid',     value: `$${quote.bidPrice}`           },
-                    { label: 'Ask',     value: `$${quote.askPrice}`           },
-                    { label: 'Min Qty', value: quote.minQuantity?.toLocaleString() ?? '—' },
-                    { label: 'Max Qty', value: quote.maxQuantity?.toLocaleString() ?? '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={s.quoteItem}>
+                    {
+                      id:    'bid',
+                      label: (
+                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          Bid
+                          {isStale && symbol && (
+                            <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                          )}
+                        </span>
+                      ),
+                      value: `$${liveBid ?? quote.bidPrice}`,
+                    },
+                    { id: 'ask',    label: 'Ask',     value: `$${liveAsk ?? quote.askPrice}` },
+                    { id: 'minqty', label: 'Min Qty', value: quote.minQuantity?.toLocaleString() ?? '—' },
+                    { id: 'maxqty', label: 'Max Qty', value: quote.maxQuantity?.toLocaleString() ?? '—' },
+                  ].map(({ id, label, value }) => (
+                    <div key={id} style={s.quoteItem}>
                       <div style={s.quoteItemLabel}>{label}</div>
                       <div style={s.quoteItemVal}>{value}</div>
                     </div>

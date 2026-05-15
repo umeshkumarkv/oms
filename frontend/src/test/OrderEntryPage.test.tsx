@@ -12,6 +12,12 @@ vi.mock('../hooks/useIdleTimer', () => ({
   })),
 }))
 
+// ── Mock useOrderEntryBidAsk (SCRUM-108) — default: no live data, not stale ───
+const mockUseOrderEntryBidAsk = vi.fn((_symbol: string) => ({ bid: null as string | null, ask: null as string | null, isStale: false }))
+vi.mock('../hooks/useOrderEntryBidAsk', () => ({
+  useOrderEntryBidAsk: (symbol: string) => mockUseOrderEntryBidAsk(symbol),
+}))
+
 // ── Mock API modules ──────────────────────────────────────────────────────────
 vi.mock('../api/marketApi', () => ({
   getInstruments: vi.fn().mockResolvedValue([
@@ -473,5 +479,64 @@ describe('OrderEntryPage — idle timer', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
+  })
+})
+
+// ── Real-time Bid/Ask — SCRUM-108 ─────────────────────────────────────────────
+
+const aaplQuote = {
+  symbol: 'AAPL', bidPrice: '174.50', askPrice: '175.50',
+  lastPrice: '175.00', tradable: true, halted: false,
+  minQuantity: 1, maxQuantity: 10000,
+  dataTimestamp: '2026-05-15T10:00:00Z',
+}
+
+const renderAndLoadQuote = async () => {
+  const { getInstrument } = await import('../api/marketApi')
+  vi.mocked(getInstrument).mockResolvedValue(aaplQuote)
+  renderPage()
+  await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+  await act(async () => {
+    fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+  })
+  // Wait for debounce (400ms) and async quote resolution
+  await waitFor(() => screen.getByText('$175.00'), { timeout: 1500 })
+}
+
+describe('OrderEntryPage — real-time Bid/Ask (SCRUM-108)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, isStale: false })
+  })
+
+  it('shouldHideStaleBadgeWhenIsStaleFalse', async () => {
+    await renderAndLoadQuote()
+    expect(screen.queryByLabelText('Price data is stale')).toBeNull()
+    expect(screen.queryByText('⚠ Stale')).toBeNull()
+  })
+
+  it('shouldShowStaleBadgeInBidLabelWhenIsStaleTrueAndSymbolEntered', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, isStale: true })
+    await renderAndLoadQuote()
+    expect(screen.getByLabelText('Price data is stale')).toBeInTheDocument()
+  })
+
+  it('shouldDisplayLiveBidPriceFromHookInMarketQuoteCard', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: '174.99', ask: null, isStale: false })
+    await renderAndLoadQuote()
+    expect(screen.getByText('$174.99')).toBeInTheDocument()
+  })
+
+  it('shouldDisplayLiveAskPriceFromHookInMarketQuoteCard', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: '175.01', isStale: false })
+    await renderAndLoadQuote()
+    expect(screen.getByText('$175.01')).toBeInTheDocument()
+  })
+
+  it('shouldFallBackToRestQuoteBidAskWhenHookReturnsNullBidAsk', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, isStale: false })
+    await renderAndLoadQuote()
+    expect(screen.getByText('$174.50')).toBeInTheDocument()
+    expect(screen.getByText('$175.50')).toBeInTheDocument()
   })
 })
