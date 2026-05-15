@@ -5,7 +5,7 @@ import { getOrderAudit } from '../api/auditApi'
 import { getClients } from '../api/clientApi'
 import { AuditRecord } from '../types/audit.types'
 import { Client } from '../types/client.types'
-import { Execution, OrderStatus, OrderSummary } from '../types/order.types'
+import { Execution, OrderSide, OrderStatus, OrderSummary } from '../types/order.types'
 
 const ALL_STATUSES: OrderStatus[] = [
   'NEW', 'VALIDATED', 'RISK_CHECK_PASSED', 'RISK_REJECTED',
@@ -163,14 +163,14 @@ const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
   )
 }
 
-const SideBadge: React.FC<{ side: 'BUY' | 'SELL' }> = ({ side }) => (
+const SideBadge: React.FC<{ side: OrderSide }> = ({ side }) => (
   <span style={{
     display: 'inline-block', padding: '2px 7px', borderRadius: 'var(--radius-sm)',
     fontSize: '11px', fontWeight: 700,
-    background: side === 'BUY' ? 'var(--color-buy-bg)' : 'var(--color-sell-bg)',
-    color:      side === 'BUY' ? 'var(--color-buy)'    : 'var(--color-sell)',
+    background: side === 'BUY' ? 'var(--color-buy-bg)' : side === 'SHORT_SELL' ? 'var(--color-warning-bg)' : 'var(--color-sell-bg)',
+    color:      side === 'BUY' ? 'var(--color-buy)'    : side === 'SHORT_SELL' ? 'var(--color-warning)'    : 'var(--color-sell)',
   }}>
-    {side}
+    {side === 'SHORT_SELL' ? 'Short Sell' : side}
   </span>
 )
 
@@ -270,7 +270,7 @@ const OrderBlotterPage: React.FC = () => {
   const [filterClientId, setFilterClientId] = useState('')
   const [filterStatuses, setFilterStatuses] = useState<OrderStatus[]>([])
   const [filterTif,      setFilterTif]      = useState<'ALL' | 'DAY' | 'GTD'>('ALL')
-  const [filterSide,     setFilterSide]     = useState<'ALL' | 'BUY' | 'SELL'>('ALL')
+  const [filterSide,     setFilterSide]     = useState<'ALL' | 'BUY' | 'SELL' | 'SHORT_SELL'>('ALL')
 
   const [page,     setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(25)
@@ -399,7 +399,7 @@ const OrderBlotterPage: React.FC = () => {
     setFilterStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
 
   // Drawer side accent
-  const drawerAccent = selectedOrder?.side === 'BUY' ? 'var(--color-buy)' : 'var(--color-sell)'
+  const drawerAccent = selectedOrder?.side === 'BUY' ? 'var(--color-buy)' : selectedOrder?.side === 'SHORT_SELL' ? 'var(--color-warning)' : 'var(--color-sell)'
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -448,8 +448,8 @@ const OrderBlotterPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Side</span>
           <div style={s.toggleGrp}>
-            {(['ALL', 'BUY', 'SELL'] as const).map(side => (
-              <button key={side} style={s.toggleBtn(filterSide === side)} onClick={() => setFilterSide(side)}>{side}</button>
+            {(['ALL', 'BUY', 'SELL', 'SHORT_SELL'] as const).map(side => (
+              <button key={side} style={s.toggleBtn(filterSide === side)} onClick={() => setFilterSide(side)}>{side === 'SHORT_SELL' ? 'SHORT SELL' : side}</button>
             ))}
           </div>
         </div>

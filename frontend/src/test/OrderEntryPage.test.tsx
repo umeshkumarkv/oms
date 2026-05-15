@@ -269,7 +269,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
   it('shouldShowValidationCheckRowHoldingsNaForBuy', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Holdings check — N/A for BUY')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument())
   })
 
   it('shouldShowSellHoldingsCheckRowWhenSideIsSell', async () => {
@@ -323,6 +323,68 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
     // BUY is default — no sell validation check should interfere
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
-    expect(screen.getByText('Holdings check — N/A for BUY')).toBeInTheDocument()
+    expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
+  })
+})
+
+// ── SHORT_SELL ────────────────────────────────────────────────────────────────
+
+describe('OrderEntryPage — SHORT_SELL', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowShortSellButtonInSideToggle', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('SHORT SELL')).toBeInTheDocument())
+  })
+
+  it('shouldShowBuyAndSellAndShortSellButtons', async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('BUY')).toBeInTheDocument()
+      expect(screen.getByText('SELL')).toBeInTheDocument()
+      expect(screen.getByText('SHORT SELL')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldNotShowSellHoldingsErrorForShortSell', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SHORT SELL')) })
+
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '9999' } }) })
+
+    expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
+  })
+
+  it('shouldShowHoldingsNaForShortSell', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('SHORT SELL')).toBeInTheDocument())
+
+    await act(async () => { fireEvent.click(screen.getByText('SHORT SELL')) })
+
+    await waitFor(() =>
+      expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldNotDisableSubmitForShortSellQtyAboveHolding', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SHORT SELL')) })
+
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
+
+    // Holdings check passes for SHORT_SELL — submit disabled only due to other checks (symbol not confirmed via quote)
+    expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
   })
 })

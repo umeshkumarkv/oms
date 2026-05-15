@@ -288,12 +288,14 @@ const OrderEntryPage: React.FC = () => {
   }
 
   // Side-aware accent color
-  const sideAccent = side === 'BUY' ? 'var(--color-buy)' : 'var(--color-sell)'
+  const sideAccent = side === 'BUY' ? 'var(--color-buy)' : side === 'SHORT_SELL' ? 'var(--color-warning)' : 'var(--color-sell)'
   const submitBg   = submitting || !allChecksPass
     ? '#9ca3af'
     : side === 'BUY'
       ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
-      : 'linear-gradient(135deg, #db2777, #be185d)'
+      : side === 'SHORT_SELL'
+        ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+        : 'linear-gradient(135deg, #db2777, #be185d)'
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -388,8 +390,9 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Side</label>
             <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(side === 'BUY',  '#2563eb')} onClick={() => setSide('BUY')}>BUY</button>
-              <button style={s.toggleBtn(side === 'SELL', '#be185d')} onClick={() => setSide('SELL')}>SELL</button>
+              <button style={s.toggleBtn(side === 'BUY',        '#2563eb')} onClick={() => setSide('BUY')}>BUY</button>
+              <button style={s.toggleBtn(side === 'SELL',       '#be185d')} onClick={() => setSide('SELL')}>SELL</button>
+              <button style={s.toggleBtn(side === 'SHORT_SELL', '#d97706')} onClick={() => setSide('SHORT_SELL')}>SHORT SELL</button>
             </div>
           </div>
 
@@ -559,7 +562,7 @@ const OrderEntryPage: React.FC = () => {
               { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                                                       pass: checks.limitPrice   },
               { label: tif === 'GTD' ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',                                                pass: checks.gtdDate      },
               { label: 'Symbol not halted',                                                                                                                 pass: checks.notHalted    },
-              { label: side !== 'SELL' ? 'Holdings check — N/A for BUY' : `Sufficient holdings (holding: ${heldQty.toLocaleString()} ${symbol || '—'})`,  pass: checks.sellHoldings },
+              { label: side !== 'SELL' ? 'Holdings check — N/A for BUY / SHORT_SELL' : `Sufficient holdings (holding: ${heldQty.toLocaleString()} ${symbol || '—'})`,  pass: checks.sellHoldings },
             ].map(({ label, pass }) => (
               <div key={label} style={s.checkRow}>
                 {pass
