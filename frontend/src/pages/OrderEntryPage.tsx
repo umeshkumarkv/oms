@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle, XCircle } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
+import { useIdleTimer } from '../hooks/useIdleTimer'
 import { getHolidays, getInstrument, getInstruments } from '../api/marketApi'
 import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
@@ -87,6 +88,13 @@ const s = {
   // GTD date picker wrapper
   datepickerWrapper:      { border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
   datepickerWrapperError: { border: '1.5px solid var(--color-error)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
+
+  // Idle timer banners
+  warningBanner: { padding: '12px 16px', background: 'var(--color-warning-bg)', border: '1px solid #fcd34d', borderRadius: 'var(--radius-md)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 600, marginBottom: '16px' } as React.CSSProperties,
+  expiredBanner: { padding: '16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', marginBottom: '16px' } as React.CSSProperties,
+  expiredTitle:  { margin: '0 0 6px', fontSize: '14px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
+  expiredMsg:    { margin: '0 0 12px', fontSize: '13px', color: '#b91c1c' } as React.CSSProperties,
+  restartBtn:    { padding: '8px 18px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600, fontSize: '13px' } as React.CSSProperties,
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -129,6 +137,29 @@ const OrderEntryPage: React.FC = () => {
   const [showModal,    setShowModal]    = useState(false)
 
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Idle timer ────────────────────────────────────────────────────────────────
+  const { secondsRemaining, isExpired, resetTimer } = useIdleTimer(60)
+
+  const handleInteraction = useCallback(() => {
+    resetTimer()
+  }, [resetTimer])
+
+  // Reset form fields when window expires
+  useEffect(() => {
+    if (!isExpired) return
+    setSymbol('')
+    setSymbolInput('')
+    setQuantity('')
+    setLimitPrice('')
+    setTif('DAY')
+    setGtdDate(null)
+    setFieldErrors({})
+    setSubmitError(null)
+    setQuote(null)
+    setSide('BUY')
+    setOrderType('LIMIT')
+  }, [isExpired])
 
   // Computed values for the GTD date picker
   const tomorrow: Date = useMemo(() => {
@@ -326,8 +357,29 @@ const OrderEntryPage: React.FC = () => {
       <div style={s.grid}>
 
         {/* ── Left: Order Entry Form ── */}
-        <div style={s.card}>
+        <div
+          style={s.card}
+          onKeyDown={handleInteraction}
+          onClick={handleInteraction}
+          onChange={handleInteraction}
+        >
           <h2 style={s.cardTitle}>Order Details</h2>
+
+          {/* Idle timer — countdown warning */}
+          {secondsRemaining <= 15 && !isExpired && (
+            <div style={s.warningBanner} role="alert" aria-live="polite">
+              ⚠ Order window will expire in {secondsRemaining} second{secondsRemaining !== 1 ? 's' : ''}
+            </div>
+          )}
+
+          {/* Idle timer — expired overlay */}
+          {isExpired && (
+            <div style={s.expiredBanner} role="alert">
+              <p style={s.expiredTitle}>Order Window Expired</p>
+              <p style={s.expiredMsg}>This order window has expired. Unsaved data has been cleared.</p>
+              <button style={s.restartBtn} onClick={() => resetTimer()}>Start New Order</button>
+            </div>
+          )}
 
           {submitError && submitError.type === 'MARKET_CLOSED' && (
             <div style={s.errorBanner}>Market is currently closed. {submitError.message}</div>
@@ -339,7 +391,7 @@ const OrderEntryPage: React.FC = () => {
           {/* Client */}
           <div style={s.fieldGroup}>
             <label style={s.label}>Client</label>
-            <select style={s.select} value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            <select style={s.select} value={clientId} onChange={(e) => setClientId(e.target.value)} disabled={isExpired}>
               {clients.length === 0
                 ? <option value="">Loading clients…</option>
                 : clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)
@@ -360,6 +412,7 @@ const OrderEntryPage: React.FC = () => {
                 setSymbol(v)
               }}
               autoComplete="off"
+              disabled={isExpired}
             />
             {suggestions.length > 0 && symbolInput && symbolInput !== symbol && (
               <div style={{
@@ -390,9 +443,9 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Side</label>
             <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(side === 'BUY',        '#2563eb')} onClick={() => setSide('BUY')}>BUY</button>
-              <button style={s.toggleBtn(side === 'SELL',       '#be185d')} onClick={() => setSide('SELL')}>SELL</button>
-              <button style={s.toggleBtn(side === 'SHORT_SELL', '#d97706')} onClick={() => setSide('SHORT_SELL')}>SHORT SELL</button>
+              <button style={s.toggleBtn(side === 'BUY',        '#2563eb')} onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
+              <button style={s.toggleBtn(side === 'SELL',       '#be185d')} onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
+              <button style={s.toggleBtn(side === 'SHORT_SELL', '#d97706')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
             </div>
           </div>
 
@@ -400,8 +453,8 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Order Type</label>
             <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')}>MARKET</button>
-              <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}>LIMIT</button>
+              <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired}>MARKET</button>
+              <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired}>LIMIT</button>
             </div>
           </div>
 
@@ -414,6 +467,7 @@ const OrderEntryPage: React.FC = () => {
               placeholder="Number of shares"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
+              disabled={isExpired}
             />
             {(fieldErrors.quantity || sellHoldingsError) && (
               <div style={s.errorText}>{fieldErrors.quantity ?? sellHoldingsError}</div>
@@ -430,6 +484,7 @@ const OrderEntryPage: React.FC = () => {
                 placeholder="0.00"
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
+                disabled={isExpired}
               />
               {fieldErrors.limitPrice && <div style={s.errorText}>{fieldErrors.limitPrice}</div>}
             </div>
@@ -442,10 +497,12 @@ const OrderEntryPage: React.FC = () => {
               <button
                 style={s.toggleBtn(tif === 'DAY')}
                 onClick={() => { setTif('DAY'); setGtdDate(null) }}
+                disabled={isExpired}
               >DAY</button>
               <button
                 style={s.toggleBtn(tif === 'GTD')}
                 onClick={() => setTif('GTD')}
+                disabled={isExpired}
               >GTD</button>
             </div>
           </div>
@@ -480,11 +537,11 @@ const OrderEntryPage: React.FC = () => {
               borderRadius: 'var(--radius-md)', border: 'none',
               background: submitBg, color: '#fff',
               fontSize: '15px', fontWeight: 700,
-              cursor: submitting || !allChecksPass ? 'not-allowed' : 'pointer',
+              cursor: submitting || !allChecksPass || isExpired ? 'not-allowed' : 'pointer',
               marginTop: '8px', transition: 'opacity 0.2s',
             }}
             onClick={handleSubmit}
-            disabled={submitting || !allChecksPass}
+            disabled={submitting || !allChecksPass || isExpired}
           >
             {submitting ? (
               <>

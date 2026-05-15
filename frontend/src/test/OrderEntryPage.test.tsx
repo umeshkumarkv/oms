@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import OrderEntryPage from '../pages/OrderEntryPage'
+import { useIdleTimer } from '../hooks/useIdleTimer'
+
+vi.mock('../hooks/useIdleTimer', () => ({
+  useIdleTimer: vi.fn(() => ({
+    secondsRemaining: 60,
+    isExpired: false,
+    resetTimer: vi.fn(),
+  })),
+}))
 
 // ── Mock API modules ──────────────────────────────────────────────────────────
 vi.mock('../api/marketApi', () => ({
@@ -386,5 +395,83 @@ describe('OrderEntryPage — SHORT_SELL', () => {
 
     // Holdings check passes for SHORT_SELL — submit disabled only due to other checks (symbol not confirmed via quote)
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
+  })
+})
+
+// ── Idle timer — countdown and expiry ─────────────────────────────────────────
+// useIdleTimer is mocked — the hook's own timer logic is tested in useIdleTimer.test.ts.
+// These tests verify that OrderEntryPage renders the correct UI for each timer state.
+
+describe('OrderEntryPage — idle timer', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldNotShowCountdownWarningWhenSecondsAbove15', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    expect(screen.queryByText(/Order window will expire in/)).toBeNull()
+  })
+
+  it('shouldShowCountdownWarningWhenSecondsAt15OrBelow', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 14, isExpired: false, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('⚠ Order window will expire in 14 seconds')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowSingularSecondsWhenOneSecondRemaining', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 1, isExpired: false, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('⚠ Order window will expire in 1 second')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldNotShowCountdownWarningExactlyAt15Seconds', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 15, isExpired: false, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    expect(screen.getByText('⚠ Order window will expire in 15 seconds')).toBeInTheDocument()
+  })
+
+  it('shouldDisableSubmitButtonWhenWindowExpired', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Submit Order')).toBeDisabled()
+    )
+  })
+
+  it('shouldShowExpiredBannerWhenWindowExpired', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Order Window Expired')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowStartNewOrderButtonWhenExpired', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Start New Order')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldCallResetTimerOnUserInteraction', async () => {
+    const resetTimer = vi.fn()
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('e.g. AAPL'), { key: 'a' }) })
+    expect(resetTimer).toHaveBeenCalled()
+  })
+
+  it('shouldNotShowWarningBannerWhenNotExpiredAndAbove15Seconds', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 16, isExpired: false, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 })
