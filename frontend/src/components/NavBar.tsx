@@ -32,9 +32,9 @@ const getTradingDate = (holidaySet: Set<string>): Date => {
 }
 
 const fmtTradingDate = (d: Date): string =>
-  new Intl.DateTimeFormat('en-US', {
+  new Intl.DateTimeFormat('en-GB', {
     timeZone: 'America/New_York',
-    month: 'short', day: 'numeric', year: 'numeric',
+    day: '2-digit', month: 'short', year: 'numeric',
   }).format(d)
 
 const getInitials = (name: string): string => {
@@ -69,6 +69,29 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
         // Fallback: skip holiday check, just roll back weekends
         setTradingDate(fmtTradingDate(getTradingDate(new Set())))
       })
+  }, [])
+
+  // Refresh trading date at ET midnight so the display rolls over without a page refresh
+  useEffect(() => {
+    const msUntilETMidnight = (): number => {
+      const etStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
+      const etNow = new Date(etStr)
+      const midnight = new Date(etNow)
+      midnight.setHours(24, 0, 0, 0)
+      return midnight.getTime() - etNow.getTime()
+    }
+    let tid: ReturnType<typeof setTimeout>
+    const refresh = () => {
+      getHolidays()
+        .then(hs => {
+          const set = new Set(hs.map(h => h.holidayDate))
+          setTradingDate(fmtTradingDate(getTradingDate(set)))
+        })
+        .catch(() => setTradingDate(fmtTradingDate(getTradingDate(new Set()))))
+      tid = setTimeout(refresh, msUntilETMidnight())
+    }
+    tid = setTimeout(refresh, msUntilETMidnight())
+    return () => clearTimeout(tid)
   }, [])
 
   const displayName = authUser?.displayName ?? ''
@@ -168,7 +191,12 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
           {market.label}
         </span>
 
-        {/* Trading date */}
+        {/* Notification bell */}
+        <span title="Notifications" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+          <Bell size={16} strokeWidth={1.75} style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
+        </span>
+
+        {/* Trading date — adjacent to trader name */}
         {tradingDate && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
@@ -181,11 +209,6 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
             {tradingDate}
           </span>
         )}
-
-        {/* Notification bell */}
-        <span title="Notifications" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-          <Bell size={16} strokeWidth={1.75} style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
-        </span>
 
         {/* User initials avatar + name + role */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
