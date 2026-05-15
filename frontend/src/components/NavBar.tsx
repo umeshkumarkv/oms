@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Bell, Menu, TrendingUp, X } from 'lucide-react'
+import { Bell, Calendar, Menu, TrendingUp, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { getHolidays } from '../api/marketApi'
 
 const getMarketStatus = (): { open: boolean; label: string } => {
   const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
@@ -10,6 +11,31 @@ const getMarketStatus = (): { open: boolean; label: string } => {
   const open = day >= 1 && day <= 5 && mins >= 9 * 60 + 30 && mins < 16 * 60
   return { open, label: open ? 'OPEN' : 'CLOSED' }
 }
+
+/** Format a Date as "YYYY-MM-DD" in ET for holiday lookup. */
+const toEtDateStr = (d: Date): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+
+/** Walk back day by day until we land on a weekday that is not a holiday. */
+const getTradingDate = (holidaySet: Set<string>): Date => {
+  // Use ET "now" as the starting point
+  const etStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
+  const candidate = new Date(etStr)
+  for (let i = 0; i < 10; i++) {
+    const day = candidate.getDay()
+    const str = toEtDateStr(candidate)
+    if (day !== 0 && day !== 6 && !holidaySet.has(str)) break
+    candidate.setDate(candidate.getDate() - 1)
+  }
+  return candidate
+}
+
+const fmtTradingDate = (d: Date): string =>
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short', day: 'numeric', year: 'numeric',
+  }).format(d)
 
 const getInitials = (name: string): string => {
   const parts = name.trim().split(/\s+/)
@@ -23,12 +49,26 @@ interface NavBarProps {
 }
 
 const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
-  const [market, setMarket] = useState(getMarketStatus())
+  const [market,       setMarket]       = useState(getMarketStatus())
+  const [tradingDate,  setTradingDate]  = useState<string>('')
   const { user: authUser, logout } = useAuth()
 
   useEffect(() => {
     const id = setInterval(() => setMarket(getMarketStatus()), 60_000)
     return () => clearInterval(id)
+  }, [])
+
+  // Fetch holidays once to compute the correct trading date
+  useEffect(() => {
+    getHolidays()
+      .then(holidays => {
+        const set = new Set(holidays.map(h => h.holidayDate))
+        setTradingDate(fmtTradingDate(getTradingDate(set)))
+      })
+      .catch(() => {
+        // Fallback: skip holiday check, just roll back weekends
+        setTradingDate(fmtTradingDate(getTradingDate(new Set())))
+      })
   }, [])
 
   const displayName = authUser?.displayName ?? ''
@@ -127,6 +167,20 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
           />
           {market.label}
         </span>
+
+        {/* Trading date */}
+        {tradingDate && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontSize: '11px', fontWeight: 600,
+            color: 'rgba(255,255,255,0.5)',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.01em',
+          }}>
+            <Calendar size={13} strokeWidth={1.75} />
+            {tradingDate}
+          </span>
+        )}
 
         {/* Notification bell */}
         <span title="Notifications" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>

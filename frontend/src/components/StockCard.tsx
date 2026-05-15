@@ -65,7 +65,17 @@ interface HoverState {
 
 // ── Intraday SVG chart ────────────────────────────────────────────────────────
 
-export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; positive?: boolean }> = ({ data, symbol, positive }) => {
+const LiveDotStyle = () => (
+  <style>{`
+    @keyframes sc-live-pulse {
+      0%, 100% { r: 3; opacity: 1; }
+      50%       { r: 5; opacity: 0.4; }
+    }
+    .sc-live-dot { animation: sc-live-pulse 1.4s ease-in-out infinite; }
+  `}</style>
+)
+
+export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; positive?: boolean; live?: boolean }> = ({ data, symbol, positive, live = false }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth]   = useState(320)
   const [hover, setHover]   = useState<HoverState | null>(null)
@@ -129,8 +139,12 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
     ? Math.max(hover.y - 32, MT)
     : 0
 
+  const lastX = xScale(data.length - 1)
+  const lastY = yScale(data[data.length - 1].price)
+
   return (
     <div ref={containerRef} style={{ position: 'relative', userSelect: 'none' }}>
+      {live && <LiveDotStyle />}
       <svg
         width={width}
         height={SVG_H}
@@ -217,6 +231,14 @@ export const IntradayChart: React.FC<{ data: IntradayPoint[]; symbol: string; po
             stroke="#fff"
             strokeWidth={1.5}
           />
+        )}
+
+        {/* Live pulsing dot at the latest data point */}
+        {live && !hover && (
+          <>
+            <circle cx={lastX} cy={lastY} r={5} fill={lineColor} opacity={0.2} />
+            <circle cx={lastX} cy={lastY} r={3} fill={lineColor} stroke="#fff" strokeWidth={1.5} className="sc-live-dot" />
+          </>
         )}
       </svg>
 

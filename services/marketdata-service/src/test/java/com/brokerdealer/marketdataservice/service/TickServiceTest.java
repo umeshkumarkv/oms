@@ -14,7 +14,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -37,8 +36,7 @@ class TickServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(tickService, "openTime",  "09:30:00");
-        ReflectionTestUtils.setField(tickService, "timezone",  "America/New_York");
+        ReflectionTestUtils.setField(tickService, "timezone", "America/New_York");
     }
 
     @Test
@@ -111,7 +109,7 @@ class TickServiceTest {
     }
 
     @Test
-    void shouldQueryFromMarketOpenToCurrentMinute() {
+    void shouldQueryFromMidnightEtToCurrentMinute() {
         when(tickRepository.findHistory(eq("AAPL"), any(Instant.class), any(Instant.class)))
                 .thenReturn(List.of());
 
@@ -124,13 +122,13 @@ class TickServiceTest {
         Instant from = fromCaptor.getValue();
         Instant to   = toCaptor.getValue();
 
-        // 'to' must be truncated to minute
+        // 'to' must be truncated to minute and from must be before to
         assertThat(to).isEqualTo(to.truncatedTo(ChronoUnit.MINUTES));
+        assertThat(from).isBefore(to);
 
-        // 'from' must equal today's market open (09:30 ET) as a UTC Instant
-        ZoneId  et            = ZoneId.of("America/New_York");
-        Instant expectedFrom  = ZonedDateTime.now(et).toLocalDate()
-                .atTime(LocalTime.parse("09:30:00")).atZone(et).toInstant();
+        // 'from' must equal today midnight ET as a UTC Instant
+        ZoneId  et           = ZoneId.of("America/New_York");
+        Instant expectedFrom = ZonedDateTime.now(et).toLocalDate().atStartOfDay(et).toInstant();
         assertThat(from).isEqualTo(expectedFrom);
     }
 

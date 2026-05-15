@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Clock, MapPin } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getInstruments, getMarketConfig, getTickHistory } from '../api/marketApi'
+import { getInstruments, getInstrument, getMarketConfig, getTickHistory } from '../api/marketApi'
+import { getWatchlist, addToWatchlist, removeFromWatchlist } from '../api/watchlistApi'
 import { Instrument, MarketConfig, TickEntry } from '../types/market.types'
 import { marketDataWs } from '../services/websocketService'
 import { getCurrentUser } from '../api/authApi'
-import { IntradayChart, generateIntraday, IntradayPoint } from '../components/StockCard'
+import { IntradayChart, IntradayPoint } from '../components/StockCard'
 import { useMarketSocket, TickData } from '../hooks/useMarketSocket'
 import { isMarketOpen } from '../utils/marketHours'
 
@@ -26,46 +27,26 @@ const pctBg = (pct: number): string =>
 const arrow = (pct: number): string =>
   pct > 0 ? '▲' : pct < 0 ? '▼' : '—'
 
-/** Format "09:30:00" → "9:30 AM", "16:00:00" → "4:00 PM" */
-const fmtMarketTime = (t: string): string => {
-  const [h, m] = t.split(':').map(Number)
-  const period = h >= 12 ? 'PM' : 'AM'
-  const hour   = h % 12 || 12
-  return `${hour}:${String(m).padStart(2, '0')} ${period}`
-}
-
-/** Return the most recent weekday (Mon–Fri). Rolls back Sat→Fri, Sun→Fri. */
-const mostRecentTradingDay = (): Date => {
-  const d = new Date()
-  const day = d.getDay()
-  if (day === 6) d.setDate(d.getDate() - 1) // Sat → Fri
-  if (day === 0) d.setDate(d.getDate() - 2) // Sun → Fri
-  return d
-}
-
-/** Show today if it's a weekday, otherwise most recent trading day. */
-const displayDate = (): string => {
-  const d = mostRecentTradingDay()
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    timeZone: 'America/New_York',
-  }).format(d)
-}
-
-/** Extract short timezone abbreviation, e.g. "America/New_York" → "EDT" / "EST" */
-const fmtTz = (tz: string): string => {
-  try {
-    return new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
-      .formatToParts(new Date())
-      .find(p => p.type === 'timeZoneName')?.value ?? tz
-  } catch { return tz }
-}
 
 const fmtET = (iso: string) =>
   new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(new Date(iso)) + ' ET'
+
+/** Deterministic, vivid colour per ticker — no logo files required.
+ *  Hashes the symbol string into a fixed palette so the same symbol
+ *  always renders with the same colour across the app. */
+const SYMBOL_PALETTE = [
+  '#0b1220', '#0a6cbd', '#1877f2', '#4338ca', '#7c3aed',
+  '#c026d3', '#db2777', '#dc2626', '#ea580c', '#d97706',
+  '#65a30d', '#0a8a4a', '#0891b2', '#0e7490', '#475569',
+]
+const getSymbolColor = (symbol: string): string => {
+  let h = 0
+  for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) >>> 0
+  return SYMBOL_PALETTE[h % SYMBOL_PALETTE.length]
+}
 
 /** Build one IntradayPoint per minute from tick history (last price of each minute).
  *  tick.time is already "HH:mm" in ET, as formatted by TickService. */
@@ -85,6 +66,8 @@ const GlobalStyle = () => (
     .mkt-row { cursor: pointer; transition: background 0.12s; }
     .mkt-row:hover { background: #f8fafc !important; }
     .mkt-row.selected { background: #f0f7ff !important; }
+    .wl-rm:hover { color: #ef4444 !important; background: #fee2e2 !important; }
+    .wl-drop-item:hover { background: #f8fafc; }
 
     .mkt-table thead th:first-child {
       position: sticky;
@@ -139,6 +122,45 @@ const GlobalStyle = () => (
       border-radius: 6px;
       height: 130px;
     }
+
+    /* ── Filter segmented control ── */
+    .mkt-seg { display: inline-flex; padding: 3px; background: #f1f5f9; border-radius: 8px; gap: 1px; }
+    .mkt-seg button {
+      background: transparent; border: none; color: #64748b;
+      font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 6px;
+      cursor: pointer; font-family: inherit; letter-spacing: 0.01em;
+      transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .mkt-seg button:hover { color: #0f172a; }
+    .mkt-seg button.active {
+      background: #fff; color: #0f172a;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+    }
+    .mkt-seg .seg-count {
+      font-size: 10px; font-weight: 700; color: #94a3b8;
+      background: #fff; border-radius: 999px; padding: 0 5px; min-width: 16px; text-align: center;
+    }
+    .mkt-seg button.active .seg-count { color: #2563eb; background: #eff6ff; }
+
+    /* ── Search shortcut key ── */
+    .mkt-kbd {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      font-size: 10px; color: #64748b; background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 4px; padding: 1px 5px;
+      font-family: 'Menlo','Consolas',monospace; font-weight: 600;
+      pointer-events: none;
+    }
+
+    /* ── Symbol avatar ── */
+    .mkt-sym-wrap { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+    .mkt-sym-avatar {
+      width: 26px; height: 26px; border-radius: 6px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #fff;
+      letter-spacing: -0.01em; flex-shrink: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
   `}</style>
 )
 
@@ -172,8 +194,7 @@ const s = {
     width: '6px', height: '6px', borderRadius: '50%', background: color, display: 'inline-block',
   } as React.CSSProperties),
 
-  note:        { fontSize: '12px', color: '#94a3b8', fontWeight: 500 } as React.CSSProperties,
-  dividerBar:  { fontSize: '12px', color: '#e2e8f0', userSelect: 'none' as const } as React.CSSProperties,
+
   warnBanner:  {
     display: 'flex', alignItems: 'center', gap: '8px',
     padding: '10px 16px', background: '#fffbeb',
@@ -240,138 +261,398 @@ const s = {
     background: halted ? '#fee2e2' : tradable ? '#dcfce7' : '#f1f5f9',
     color:      halted ? '#b91c1c' : tradable ? '#15803d' : '#64748b',
   } as React.CSSProperties),
+
+  wlSearchWrap:  { position: 'relative' as const, flex: 1 } as React.CSSProperties,
+  wlInput:       { width: '100%', boxSizing: 'border-box' as const, paddingLeft: '28px', paddingRight: '46px', paddingTop: '6px', paddingBottom: '6px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', outline: 'none', background: '#fafafa', color: '#0f172a', fontFamily: FF } as React.CSSProperties,
+  wlInputFull:   { width: '100%', boxSizing: 'border-box' as const, paddingLeft: '28px', paddingRight: '46px', paddingTop: '6px', paddingBottom: '6px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', outline: 'none', background: '#f1f5f9', color: '#94a3b8', fontFamily: FF, cursor: 'not-allowed' as const } as React.CSSProperties,
+  wlResultsPanel: { borderTop: '1px solid #f1f5f9', borderBottom: '2px solid #e2e8f0', maxHeight: '200px', overflowY: 'auto' as const, background: '#fff' } as React.CSSProperties,
+  wlDropItem:    { padding: '8px 12px', fontSize: '12px', cursor: 'pointer', color: '#0f172a', fontWeight: 600, borderBottom: '1px solid #f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  wlErrorBanner: { margin: '8px 0 0', padding: '7px 12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '6px', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  wlFullBanner:  { margin: '8px 0 0', padding: '7px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '12px', fontWeight: 500 } as React.CSSProperties,
+  wlEmpty:       { padding: '48px 24px', textAlign: 'center' as const, color: '#94a3b8', fontSize: '13px', fontWeight: 500 } as React.CSSProperties,
+  removeBtn:     { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', borderRadius: '4px', transition: 'color 0.1s, background 0.1s', lineHeight: 0 } as React.CSSProperties,
 }
 
 // ── WatchlistPanel ─────────────────────────────────────────────────────────
 
+type WatchlistFilter = 'all' | 'gainers' | 'losers' | 'halted'
+
 interface WatchlistPanelProps {
-  instruments: Instrument[]
-  loading:     boolean
-  selected:    string | null
-  ticks:       Record<string, TickData>
-  marketOpen:  boolean
-  onSelect:    (symbol: string) => void
+  instruments:    Instrument[]
+  allInstruments: Instrument[]
+  loading:        boolean
+  selected:       string | null
+  ticks:          Record<string, TickData>
+  marketOpen:     boolean
+  onSelect:       (symbol: string) => void
+  wlSymbols:      Set<string>
+  wlSymbolsSize:  number
+  onAdd:          (symbol: string) => Promise<void>
+  onRemove:       (symbol: string) => Promise<void>
+  wlApiMissing?:  boolean
 }
 
 const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
-  instruments, loading, selected, ticks, marketOpen, onSelect,
-}) => (
-  <div style={s.section}>
-    <div style={s.sHead}>
-      <div style={s.sTitleRow}>
-        <h2 style={s.sTitle}>Watchlist</h2>
-        {!loading && <span style={s.sCount}>{instruments.length}</span>}
+  instruments, allInstruments, loading, selected, ticks, marketOpen, onSelect,
+  wlSymbols, wlSymbolsSize, onAdd, onRemove, wlApiMissing = false,
+}) => {
+  const [query,         setQuery]         = useState('')
+  const [showDrop,      setShowDrop]      = useState(false)
+  const [localError,    setLocalError]    = useState<string | null>(null)
+  const [adding,        setAdding]        = useState(false)
+  const [removingSet,   setRemovingSet]   = useState<Set<string>>(new Set())
+  const [filter,        setFilter]        = useState<WatchlistFilter>('all')
+  const searchRef                          = useRef<HTMLInputElement>(null)
+
+  const isFull = wlSymbols.size >= 50
+
+  // ⌘K / Ctrl-K focuses the search box
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  // Compute per-symbol changePct using the same logic as the row render,
+  // so filter counts/results stay in sync with what the user sees.
+  const changePctFor = useCallback((inst: Instrument): number => {
+    const tick     = ticks[inst.symbol]
+    const livePx   = tick?.price        ?? Number(inst.lastPrice)
+    const livePrev = tick?.previousClose ?? Number(inst.previousClose ?? inst.lastPrice)
+    const change   = tick?.change       ?? (livePx - livePrev)
+    return tick?.changePct ?? (livePrev !== 0 ? (change / livePrev) * 100 : 0)
+  }, [ticks])
+
+  // Filter counts (always reflect the full watchlist regardless of active filter)
+  const counts = useMemo(() => {
+    let g = 0, l = 0, h = 0
+    for (const inst of instruments) {
+      if (inst.halted) { h++; continue }
+      const p = changePctFor(inst)
+      if (p > 0) g++
+      else if (p < 0) l++
+    }
+    return { all: instruments.length, gainers: g, losers: l, halted: h }
+  }, [instruments, changePctFor])
+
+  // Apply the active filter on top of the watchlist instruments
+  const filteredInstruments = useMemo(() => {
+    if (filter === 'all') return instruments
+    return instruments.filter(inst => {
+      if (filter === 'halted') return !!inst.halted
+      if (inst.halted) return false
+      const p = changePctFor(inst)
+      if (filter === 'gainers') return p > 0
+      if (filter === 'losers')  return p < 0
+      return true
+    })
+  }, [instruments, filter, changePctFor])
+
+  const dropOptions = useMemo(() =>
+    allInstruments
+      .filter(i => !wlSymbols.has(i.symbol) && i.symbol.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 10),
+    [allInstruments, wlSymbols, query]
+  )
+
+  // Auto-clear error after 4 s
+  useEffect(() => {
+    if (!localError) return
+    const t = setTimeout(() => setLocalError(null), 4000)
+    return () => clearTimeout(t)
+  }, [localError])
+
+  const handleAdd = async (symbol: string) => {
+    setQuery('')
+    setShowDrop(false)
+    setAdding(true)
+    try {
+      await onAdd(symbol)
+      setLocalError(null)
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code
+      if (code === 'SYMBOL_ALREADY_IN_WATCHLIST') setLocalError('Symbol already in watchlist')
+      else if (code === 'SYMBOL_NOT_FOUND')        setLocalError('Symbol not found')
+      else if (code === 'WATCHLIST_LIMIT_EXCEEDED') setLocalError('Watchlist full (50/50)')
+      else                                          setLocalError('Failed to add symbol')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleRemove = async (e: React.MouseEvent, symbol: string) => {
+    e.stopPropagation()
+    setRemovingSet(prev => new Set([...prev, symbol]))
+    try {
+      await onRemove(symbol)
+    } catch {
+      setLocalError(`Failed to remove ${symbol}`)
+    } finally {
+      setRemovingSet(prev => { const next = new Set(prev); next.delete(symbol); return next })
+    }
+  }
+
+  return (
+    <div style={s.section}>
+      <div style={{ ...s.sHead, flexDirection: 'column', alignItems: 'stretch', gap: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={s.sTitleRow}>
+            <h2 style={s.sTitle}>Watchlist</h2>
+            {!loading && (
+              <span style={s.sCount}>
+                {isFull ? '50/50' : `${wlSymbolsSize}`}
+              </span>
+            )}
+          </div>
+
+          {/* ── Filter tabs ─────────────────────────────────────────────── */}
+          {!loading && instruments.length > 0 && (
+            <div className="mkt-seg" role="tablist" aria-label="Watchlist filter">
+              <button
+                className={filter === 'all' ? 'active' : ''}
+                onClick={() => setFilter('all')}
+                role="tab"
+                aria-selected={filter === 'all'}
+              >
+                All <span className="seg-count">{counts.all}</span>
+              </button>
+              <button
+                className={filter === 'gainers' ? 'active' : ''}
+                onClick={() => setFilter('gainers')}
+                role="tab"
+                aria-selected={filter === 'gainers'}
+              >
+                <span style={{ color: filter === 'gainers' ? '#15803d' : undefined }}>▲</span>
+                Gainers <span className="seg-count">{counts.gainers}</span>
+              </button>
+              <button
+                className={filter === 'losers' ? 'active' : ''}
+                onClick={() => setFilter('losers')}
+                role="tab"
+                aria-selected={filter === 'losers'}
+              >
+                <span style={{ color: filter === 'losers' ? '#b91c1c' : undefined }}>▼</span>
+                Losers <span className="seg-count">{counts.losers}</span>
+              </button>
+              <button
+                className={filter === 'halted' ? 'active' : ''}
+                onClick={() => setFilter('halted')}
+                role="tab"
+                aria-selected={filter === 'halted'}
+              >
+                Halted <span className="seg-count">{counts.halted}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Search / Add row — hidden when watchlist API is not available */}
+        {!wlApiMissing && <div style={{ marginTop: '10px' }}>
+          <div style={s.wlSearchWrap}>
+            <Search
+              size={13} strokeWidth={2}
+              style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}
+            />
+            <input
+              ref={searchRef}
+              style={isFull ? s.wlInputFull : s.wlInput}
+              placeholder={isFull ? 'Watchlist full (50/50)' : adding ? 'Adding…' : 'Search symbol to add…'}
+              disabled={isFull || adding}
+              value={query}
+              onChange={e => { setQuery(e.target.value); setShowDrop(true) }}
+              onFocus={() => { if (query) setShowDrop(true) }}
+              onBlur={() => setTimeout(() => setShowDrop(false), 150)}
+            />
+            {!isFull && !adding && <span className="mkt-kbd">⌘K</span>}
+          </div>
+        </div>}
+
+        {!wlApiMissing && isFull && <div style={s.wlFullBanner}>Watchlist full (50/50) — remove a symbol to add another</div>}
+        {localError && (
+          <div style={s.wlErrorBanner}>
+            <span>{localError}</span>
+            <button style={s.removeBtn} onClick={() => setLocalError(null)} aria-label="Dismiss error">
+              <X size={12} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
       </div>
-    </div>
 
-    <table style={s.table} className="mkt-table">
-      <thead>
-        <tr>
-          <th style={s.th}>Symbol</th>
-          <th style={s.thRight}>Live Price</th>
-          <th style={s.thRight}>Prev Close</th>
-          <th style={s.thRight}>Change</th>
-          <th style={s.thRight}>Chg %</th>
-          <th style={s.thRight}>Bid</th>
-          <th style={s.thRight}>Ask</th>
-          <th style={s.thRight}>Volume</th>
-          <th style={s.thRight}>Spread</th>
-          <th style={s.thRight}>Day High</th>
-          <th style={s.thRight}>Day Low</th>
-          <th style={s.th}>Status</th>
-          <th style={s.thRight}>Last Updated</th>
-        </tr>
-      </thead>
-      <tbody>
-        {loading
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <tr key={i}>
-                {Array.from({ length: 13 }).map((_, j) => (
-                  <td key={j} style={s.td}><div style={s.skeleton} /></td>
-                ))}
-              </tr>
-            ))
-          : instruments.map(inst => {
-              // WS tick overrides REST data; REST data is always kept fresh by the unified poll
-              const tick        = ticks[inst.symbol]
-              const livePx      = tick?.price         ?? Number(inst.lastPrice)
-              const liveBid     = tick?.bid            ?? Number(inst.bidPrice)
-              const liveAsk     = tick?.ask            ?? Number(inst.askPrice)
-              const liveTs      = tick?.timestamp      ?? inst.dataTimestamp
-              const livePrev    = tick?.previousClose  ?? Number(inst.previousClose ?? inst.lastPrice)
-              const liveDayHigh = tick?.dayHigh        ?? (inst.dayHigh ? Number(inst.dayHigh) : null)
-              const liveDayLow  = tick?.dayLow         ?? (inst.dayLow  ? Number(inst.dayLow)  : null)
-              const liveVolume  = tick?.volume         ?? inst.volume   ?? null
-              const change      = tick?.change         ?? (livePx - livePrev)
-              const changePct   = tick?.changePct      ?? (livePrev !== 0 ? (change / livePrev) * 100 : 0)
+      {/* In-flow search results — pushes the table down while searching */}
+      {!wlApiMissing && showDrop && !isFull && dropOptions.length > 0 && (
+        <div style={s.wlResultsPanel}>
+          {dropOptions.map(opt => (
+            <div
+              key={opt.symbol}
+              className="wl-drop-item"
+              style={s.wlDropItem}
+              onMouseDown={() => handleAdd(opt.symbol)}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                <span className="mkt-sym-avatar" style={{ background: getSymbolColor(opt.symbol), width: 22, height: 22, fontSize: 9 }}>
+                  {opt.symbol.slice(0, 2)}
+                </span>
+                {opt.symbol}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94a3b8', fontSize: '11px', fontWeight: 500 }}>
+                {opt.halted ? <span style={{ color: '#b91c1c', fontWeight: 700 }}>HALTED</span> : <span style={{ color: '#15803d' }}>ACTIVE</span>}
+                <Plus size={12} strokeWidth={2.5} style={{ color: '#2563eb' }} />
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
-              return (
-                <tr
-                  key={inst.symbol}
-                  className={`mkt-row${selected === inst.symbol ? ' selected' : ''}`}
-                  onClick={() => onSelect(inst.symbol)}
-                >
-                  <td style={s.td}><div style={s.symbolCell}>{inst.symbol}</div></td>
-
-                  <td style={s.tdMono}><strong>{fmt(livePx)}</strong></td>
-
-                  <td style={s.tdMono}>{livePrev ? `$${fmt(livePrev)}` : '—'}</td>
-
-                  <td style={{ ...s.tdRight, fontVariantNumeric: 'tabular-nums', fontFamily: "'Menlo','Consolas',monospace" }}>
-                    <span style={{ fontWeight: 600, color: pctColor(change) }}>
-                      {change >= 0 ? '+' : ''}{fmt(change)}
-                    </span>
-                  </td>
-
-                  <td style={s.tdRight}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '3px',
-                      fontSize: '12px', fontWeight: 600, color: pctColor(changePct),
-                      background: pctBg(changePct), padding: '2px 6px', borderRadius: '4px',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      {arrow(changePct)} {Math.abs(changePct).toFixed(2)}%
-                    </span>
-                  </td>
-
-                  <td style={s.tdMono}>{fmt(liveBid)}</td>
-                  <td style={s.tdMono}>{fmt(liveAsk)}</td>
-
-                  <td style={{ ...s.tdMono, color: '#334155' }}>
-                    {liveVolume != null ? liveVolume.toLocaleString() : '—'}
-                  </td>
-
-                  <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
-                    {spread(liveBid, liveAsk)}
-                  </td>
-
-                  <td style={{ ...s.tdMono, color: '#10b981' }}>
-                    {liveDayHigh != null ? `$${fmt(liveDayHigh)}` : '—'}
-                  </td>
-                  <td style={{ ...s.tdMono, color: '#ef4444' }}>
-                    {liveDayLow != null ? `$${fmt(liveDayLow)}` : '—'}
-                  </td>
-
-                  <td style={s.td}>
-                    {inst.halted
-                      ? <span style={s.haltPill}>HALTED</span>
-                      : inst.tradable
-                        ? <span style={s.activePill}><span style={{ width: 5, height: 5, borderRadius: '50%', background: '#15803d', display: 'inline-block' }} />ACTIVE</span>
-                        : <span style={s.closedPill}>CLOSED</span>
-                    }
-                  </td>
-
-                  <td style={{ ...s.tdMono, color: marketOpen ? '#334155' : '#94a3b8' }}>
-                    {fmtET(liveTs)}
-                  </td>
+      <table style={s.table} className="mkt-table">
+        <thead>
+          <tr>
+            <th style={s.th}>Symbol</th>
+            <th style={s.thRight}>Live Price</th>
+            <th style={s.thRight}>Prev Close</th>
+            <th style={s.thRight}>Change</th>
+            <th style={s.thRight}>Chg %</th>
+            <th style={s.thRight}>Bid</th>
+            <th style={s.thRight}>Ask</th>
+            <th style={s.thRight}>Volume</th>
+            <th style={s.thRight}>Spread</th>
+            <th style={s.thRight}>Day High</th>
+            <th style={s.thRight}>Day Low</th>
+            <th style={s.th}>Status</th>
+            <th style={s.thRight}>Last Updated</th>
+            <th style={s.th}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading
+            ? Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 14 }).map((_, j) => (
+                    <td key={j} style={s.td}><div style={s.skeleton} /></td>
+                  ))}
                 </tr>
-              )
-            })
-        }
-      </tbody>
-    </table>
-  </div>
-)
+              ))
+            : filteredInstruments.length === 0
+              ? (
+                  <tr>
+                    <td colSpan={14} style={s.wlEmpty}>
+                      {instruments.length === 0
+                        ? 'Search above to add instruments to your watchlist'
+                        : filter === 'gainers' ? 'No gainers right now'
+                        : filter === 'losers'  ? 'No losers right now'
+                        : filter === 'halted'  ? 'No halted symbols'
+                        : 'No symbols match the current filter'}
+                    </td>
+                  </tr>
+                )
+              : filteredInstruments.map(inst => {
+                  const tick        = ticks[inst.symbol]
+                  const livePx      = tick?.price         ?? Number(inst.lastPrice)
+                  const liveBid     = tick?.bid            ?? Number(inst.bidPrice)
+                  const liveAsk     = tick?.ask            ?? Number(inst.askPrice)
+                  const liveTs      = tick?.timestamp      ?? inst.dataTimestamp
+                  const livePrev    = tick?.previousClose  ?? Number(inst.previousClose ?? inst.lastPrice)
+                  const liveDayHigh = tick?.dayHigh        ?? (inst.dayHigh ? Number(inst.dayHigh) : null)
+                  const liveDayLow  = tick?.dayLow         ?? (inst.dayLow  ? Number(inst.dayLow)  : null)
+                  const liveVolume  = tick?.volume         ?? inst.volume   ?? null
+                  const change      = tick?.change         ?? (livePx - livePrev)
+                  const changePct   = tick?.changePct      ?? (livePrev !== 0 ? (change / livePrev) * 100 : 0)
+                  const removing    = removingSet.has(inst.symbol)
+
+                  return (
+                    <tr
+                      key={inst.symbol}
+                      className={`mkt-row${selected === inst.symbol ? ' selected' : ''}`}
+                      onClick={() => onSelect(inst.symbol)}
+                      style={{ opacity: removing ? 0.4 : 1, transition: 'opacity 0.2s' }}
+                    >
+                      <td style={s.td}>
+                        <span className="mkt-sym-wrap">
+                          <span className="mkt-sym-avatar" style={{ background: getSymbolColor(inst.symbol) }}>
+                            {inst.symbol.slice(0, 2)}
+                          </span>
+                          <span style={s.symbolCell}>{inst.symbol}</span>
+                        </span>
+                      </td>
+
+                      <td style={s.tdMono}><strong>{fmt(livePx)}</strong></td>
+
+                      <td style={s.tdMono}>{livePrev ? `$${fmt(livePrev)}` : '—'}</td>
+
+                      <td style={{ ...s.tdRight, fontVariantNumeric: 'tabular-nums', fontFamily: "'Menlo','Consolas',monospace" }}>
+                        <span style={{ fontWeight: 600, color: pctColor(change) }}>
+                          {change >= 0 ? '+' : ''}{fmt(change)}
+                        </span>
+                      </td>
+
+                      <td style={s.tdRight}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '3px',
+                          fontSize: '12px', fontWeight: 600, color: pctColor(changePct),
+                          background: pctBg(changePct), padding: '2px 6px', borderRadius: '4px',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}>
+                          {arrow(changePct)} {Math.abs(changePct).toFixed(2)}%
+                        </span>
+                      </td>
+
+                      <td style={s.tdMono}>{fmt(liveBid)}</td>
+                      <td style={s.tdMono}>{fmt(liveAsk)}</td>
+
+                      <td style={{ ...s.tdMono, color: '#334155' }}>
+                        {liveVolume != null ? liveVolume.toLocaleString() : '—'}
+                      </td>
+
+                      <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
+                        {spread(liveBid, liveAsk)}
+                      </td>
+
+                      <td style={{ ...s.tdMono, color: '#10b981' }}>
+                        {liveDayHigh != null ? `$${fmt(liveDayHigh)}` : '—'}
+                      </td>
+                      <td style={{ ...s.tdMono, color: '#ef4444' }}>
+                        {liveDayLow != null ? `$${fmt(liveDayLow)}` : '—'}
+                      </td>
+
+                      <td style={s.td}>
+                        {inst.halted
+                          ? <span style={s.haltPill}>HALTED</span>
+                          : inst.tradable
+                            ? <span style={s.activePill}><span style={{ width: 5, height: 5, borderRadius: '50%', background: '#15803d', display: 'inline-block' }} />ACTIVE</span>
+                            : <span style={s.closedPill}>CLOSED</span>
+                        }
+                      </td>
+
+                      <td style={{ ...s.tdMono, color: marketOpen ? '#334155' : '#94a3b8' }}>
+                        {fmtET(liveTs)}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: 'center', padding: '10px 10px' }}>
+                        {!wlApiMissing && (
+                          <button
+                            className="wl-rm"
+                            style={s.removeBtn}
+                            onClick={e => handleRemove(e, inst.symbol)}
+                            disabled={removing}
+                            aria-label={`Remove ${inst.symbol}`}
+                          >
+                            <X size={13} strokeWidth={2.5} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
+          }
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 // ── StockDetailPanel ───────────────────────────────────────────────────────
 
@@ -383,11 +664,12 @@ interface StockDetailPanelProps {
   candlesLoading: boolean
   ticks:          Record<string, TickData>
   marketOpen:     boolean
+  wsLive:         boolean
   onNavigate:     (path: string) => void
 }
 
 const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
-  selected, selectedBase, detailLoading, candles, candlesLoading, ticks, marketOpen, onNavigate,
+  selected, selectedBase, detailLoading, candles, candlesLoading, ticks, marketOpen, wsLive, onNavigate,
 }) => {
   if (!selected) {
     return (
@@ -433,13 +715,24 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
   const tradable  = selectedBase.tradable ?? false
   const canOrder  = (getCurrentUser() === null || getCurrentUser()?.role === 'TRADER') && !halted && tradable
 
-  const chartData = candles.length >= 2 ? candles : generateIntraday(livePx)
+  // Show only the last 60 minutes so the Y scale is tight around recent prices,
+  // making live tick movements clearly visible (full-day scale = < 1px per tick).
+  const recentCandles = candles.length > 60 ? candles.slice(-60) : candles
+  const hasChartData  = recentCandles.length >= 2
 
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
         <div style={s.qHeaderTop}>
-          <div style={s.qSymbol}>{selectedBase.symbol}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              className="mkt-sym-avatar"
+              style={{ background: getSymbolColor(selectedBase.symbol), width: 34, height: 34, fontSize: 12, borderRadius: 8 }}
+            >
+              {selectedBase.symbol.slice(0, 2)}
+            </span>
+            <div style={s.qSymbol}>{selectedBase.symbol}</div>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {!marketOpen && (
               <span style={{
@@ -466,9 +759,15 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
         </div>
 
         <div style={{ margin: '10px -4px 0' }}>
-          {candlesLoading && candles.length === 0
+          {candlesLoading && !hasChartData
             ? <div className="mkt-chart-skeleton" />
-            : <IntradayChart data={chartData} symbol={selectedBase.symbol} positive={changePct >= 0} />
+            : hasChartData
+              ? <IntradayChart data={recentCandles} symbol={selectedBase.symbol} positive={changePct >= 0} live={wsLive && hasChartData && marketOpen} />
+              : (
+                  <div style={{ height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '12px', fontWeight: 500 }}>
+                    No intraday data yet — simulation accumulates ticks while market is open
+                  </div>
+                )
           }
         </div>
       </div>
@@ -538,6 +837,9 @@ const MarketDataPage: React.FC = () => {
   const [config,         setConfig]         = useState<MarketConfig | null>(null)
   const [open,           setOpen]           = useState<boolean>(isMarketOpen()) // pre-config fallback
   const [instruments,    setInstruments]    = useState<Instrument[]>([])
+  const [wlSymbols,      setWlSymbols]      = useState<Set<string>>(new Set())
+  const [wlLoaded,       setWlLoaded]       = useState(false)
+  const [wlApiMissing,   setWlApiMissing]   = useState(false)
   const [selected,       setSelected]       = useState<string | null>(null)
   const [selectedBase,   setSelectedBase]   = useState<Instrument | null>(null)
   const [detailLoading,  setDetailLoading]  = useState(false)
@@ -545,7 +847,13 @@ const MarketDataPage: React.FC = () => {
   const [candles,        setCandles]        = useState<IntradayPoint[]>([])
   const [candlesLoading, setCandlesLoading] = useState(false)
 
-  const watchlistSymbols = useMemo(() => instruments.map(i => i.symbol), [instruments])
+  // Show all instruments when watchlist API is unavailable (backend not rebuilt yet)
+  const watchlistInstruments = useMemo(
+    () => wlApiMissing ? instruments : instruments.filter(i => wlSymbols.has(i.symbol)),
+    [instruments, wlSymbols, wlApiMissing]
+  )
+
+  const watchlistSymbols = useMemo(() => watchlistInstruments.map(i => i.symbol), [watchlistInstruments])
   const { ticks, wsLive } = useMarketSocket(watchlistSymbols)
 
   // Refs so polls always read the latest values without re-registering the interval
@@ -565,6 +873,20 @@ const MarketDataPage: React.FC = () => {
       setInstruments(insts as Instrument[])
       setLoading(false)
     })
+    // Load watchlist independently — non-blocking
+    getWatchlist()
+      .then(wl => {
+        setWlSymbols(new Set(wl.map(e => e.symbol)))
+        setWlLoaded(true)
+      })
+      .catch((err) => {
+        // 404 / 503 = backend not rebuilt yet → fall back to showing all instruments
+        const status = err?.response?.status
+        if (!status || status === 404 || status === 503) {
+          setWlApiMissing(true)
+        }
+        setWlLoaded(true)
+      })
   }, [])
 
   // ── Unified poll ──────────────────────────────────────────────────────────
@@ -647,26 +969,46 @@ const MarketDataPage: React.FC = () => {
     return off
   }, [])
 
+  // ── Watchlist add / remove ────────────────────────────────────────────────
+
+  const handleAddToWatchlist = useCallback(async (symbol: string): Promise<void> => {
+    await addToWatchlist(symbol)
+    setWlSymbols(prev => new Set([...prev, symbol]))
+  }, [])
+
+  const handleRemoveFromWatchlist = useCallback(async (symbol: string): Promise<void> => {
+    await removeFromWatchlist(symbol)
+    setWlSymbols(prev => { const next = new Set(prev); next.delete(symbol); return next })
+  }, [])
+
   // ── Symbol selection ──────────────────────────────────────────────────────
   // Step 1: load tick history for the chart
   // Step 2: WS subscription is handled automatically by useMarketSocket
 
   const handleSelectSymbol = useCallback(async (symbol: string) => {
     setSelected(symbol)
-    // Immediately show instrument data already in the watchlist (no extra REST round-trip)
+    // Show cached data immediately while fresh data loads
     const existing = instruments.find(i => i.symbol === symbol) ?? null
     setSelectedBase(existing)
     setDetailLoading(!existing)
     setCandlesLoading(true)
     setCandles([])
-    try {
-      const history = await getTickHistory(symbol)
-      const built = candlesFromTicks(history.ticks)
-      setCandles(built)
-    } finally {
-      setDetailLoading(false)
-      setCandlesLoading(false)
+
+    // Call GET /api/v1/market/{symbol} and GET /api/v1/market/ticks/history in parallel.
+    // allSettled so a failure of one does not cancel the other.
+    const [detailRes, historyRes] = await Promise.allSettled([
+      getInstrument(symbol),
+      getTickHistory(symbol),
+    ])
+
+    if (detailRes.status === 'fulfilled' && detailRes.value) {
+      setSelectedBase(detailRes.value)
     }
+    if (historyRes.status === 'fulfilled') {
+      setCandles(candlesFromTicks(historyRes.value.ticks))
+    }
+    setDetailLoading(false)
+    setCandlesLoading(false)
   }, [instruments])
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -690,24 +1032,6 @@ const MarketDataPage: React.FC = () => {
             <span style={s.pillDot(wsLive ? '#2563eb' : '#b45309')} />
             {wsLive ? 'Live' : `Polling ${(config?.pollingIntervalMs ?? 5000) / 1000}s`}
           </span>
-          {config && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ ...s.note, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Calendar size={12} strokeWidth={2} />
-                {displayDate()}
-              </span>
-              <span style={s.dividerBar}>|</span>
-              <span style={{ ...s.note, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Clock size={12} strokeWidth={2} />
-                {fmtMarketTime(config.marketHours.start)} – {fmtMarketTime(config.marketHours.end)}
-              </span>
-              <span style={s.dividerBar}>|</span>
-              <span style={{ ...s.note, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <MapPin size={12} strokeWidth={2} />
-                {fmtTz(config.marketHours.timezone)}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -723,12 +1047,18 @@ const MarketDataPage: React.FC = () => {
 
       <div style={s.grid}>
         <WatchlistPanel
-          instruments={instruments}
-          loading={loading}
+          instruments={watchlistInstruments}
+          allInstruments={instruments}
+          loading={loading || !wlLoaded}
           selected={selected}
           ticks={ticks}
           marketOpen={open}
           onSelect={handleSelectSymbol}
+          wlSymbols={wlSymbols}
+          wlSymbolsSize={wlApiMissing ? watchlistInstruments.length : wlSymbols.size}
+          onAdd={handleAddToWatchlist}
+          onRemove={handleRemoveFromWatchlist}
+          wlApiMissing={wlApiMissing}
         />
 
         <StockDetailPanel
@@ -739,6 +1069,7 @@ const MarketDataPage: React.FC = () => {
           candlesLoading={candlesLoading}
           ticks={ticks}
           marketOpen={open}
+          wsLive={wsLive}
           onNavigate={navigate}
         />
       </div>

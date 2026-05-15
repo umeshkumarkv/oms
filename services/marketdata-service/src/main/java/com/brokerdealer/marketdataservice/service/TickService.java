@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,8 +21,13 @@ import java.util.List;
  * Serves the intraday tick history for a single symbol.
  *
  * Time range returned:
- *   from = today at market-open time (config)  [inclusive, UTC Instant]
+ *   from = today at midnight ET (00:00:00)      [inclusive, UTC Instant]
  *   to   = current time truncated to the minute [exclusive, UTC Instant]
+ *
+ * Anchoring to midnight (rather than market-open time) ensures the window
+ * is always valid — in particular when bypass-market-hours=true causes ticks
+ * to be saved before the configured open-time, or when tests run in a timezone
+ * where the local clock is earlier than the ET open-time.
  *
  * tick_time is stored as TIMESTAMPTZ (UTC). The {@code time} field in each
  * TickResponse is formatted as ET local time ("HH:mm") for chart display.
@@ -35,9 +39,6 @@ public class TickService {
 
     private static final DateTimeFormatter ET_MINUTE_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    @Value("${market.hours.open-time}")
-    private String openTime;
-
     @Value("${market.hours.timezone}")
     private String timezone;
 
@@ -45,11 +46,13 @@ public class TickService {
 
     public TickHistoryResponse getHistory(String symbol) {
         String upper = symbol.toUpperCase();
-        ZoneId        et  = ZoneId.of(timezone);
+        ZoneId et = ZoneId.of(timezone);
         ZonedDateTime now = ZonedDateTime.now(et);
 
-        Instant from = now.toLocalDate().atTime(LocalTime.parse(openTime)).atZone(et).toInstant();
-        Instant to   = now.truncatedTo(ChronoUnit.MINUTES).toInstant();
+        // Anchor to today midnight ET so the window is always valid regardless of
+        // what time the configured open-time is or what timezone the developer is in.
+        Instant from = now.toLocalDate().atStartOfDay(et).toInstant();
+        Instant to = now.truncatedTo(ChronoUnit.MINUTES).toInstant();
 
         log.debug("Tick history: symbol={} from={} to={}", upper, from, to);
 

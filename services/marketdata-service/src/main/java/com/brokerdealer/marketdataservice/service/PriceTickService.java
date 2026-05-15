@@ -28,6 +28,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class PriceTickService {
 
     private static final BigDecimal MIN_PRICE = new BigDecimal("0.01");
+    private static final BigDecimal MAX_PRICE = new BigDecimal("99999.9999"); // prevent DB overflow
     private static final BigDecimal TWO = new BigDecimal("2");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final String CACHE_KEY_PREFIX = "market:price:";
@@ -78,9 +79,8 @@ public class PriceTickService {
                 newPrice = computeRandomWalkPrice(currentPrice);
             } else {
                 newPrice = currentPrice.add(increment).setScale(4, RoundingMode.HALF_UP);
-                if (newPrice.compareTo(MIN_PRICE) < 0) {
-                    newPrice = MIN_PRICE;
-                }
+                if (newPrice.compareTo(MIN_PRICE) < 0) newPrice = MIN_PRICE;
+                if (newPrice.compareTo(MAX_PRICE) > 0) newPrice = MAX_PRICE;
             }
         } else {
             newPrice = computeRandomWalkPrice(currentPrice);
@@ -135,7 +135,9 @@ public class PriceTickService {
         BigDecimal changePct = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(9), 4);
         BigDecimal change = currentPrice.multiply(changePct).setScale(4, RoundingMode.HALF_UP);
         BigDecimal newPrice = up ? currentPrice.add(change) : currentPrice.subtract(change);
-        return newPrice.compareTo(MIN_PRICE) < 0 ? MIN_PRICE : newPrice;
+        if (newPrice.compareTo(MIN_PRICE) < 0) return MIN_PRICE;
+        if (newPrice.compareTo(MAX_PRICE) > 0) return MAX_PRICE;
+        return newPrice;
     }
 
     private void broadcastTick(Instrument instrument) {
@@ -168,7 +170,7 @@ public class PriceTickService {
             payload.put("dataTimestamp", instrument.getDataTimestamp().toString());
 
             String json = objectMapper.writeValueAsString(payload);
-            webSocketHandler.broadcast(json);
+            webSocketHandler.broadcastToSymbol(instrument.getSymbol(), json);
         } catch (Exception e) {
             log.warn("Failed to broadcast tick: symbol={} error={}", instrument.getSymbol(), e.getMessage());
         }
