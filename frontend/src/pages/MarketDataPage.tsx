@@ -427,7 +427,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                 role="tab"
                 aria-selected={filter === 'gainers'}
               >
-                <span style={{ color: filter === 'gainers' ? '#15803d' : undefined }}>▲</span>
+                <span style={{ color: filter === 'gainers' ? 'var(--color-success)' : undefined }}>▲</span>
                 Gainers <span className="seg-count">{counts.gainers}</span>
               </button>
               <button
@@ -436,7 +436,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                 role="tab"
                 aria-selected={filter === 'losers'}
               >
-                <span style={{ color: filter === 'losers' ? '#b91c1c' : undefined }}>▼</span>
+                <span style={{ color: filter === 'losers' ? 'var(--color-error)' : undefined }}>▼</span>
                 Losers <span className="seg-count">{counts.losers}</span>
               </button>
               <button
@@ -456,7 +456,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
           <div style={s.wlSearchWrap}>
             <Search
               size={13} strokeWidth={2}
-              style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}
+              style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', pointerEvents: 'none' }}
             />
             <input
               ref={searchRef}
@@ -499,9 +499,9 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                 </span>
                 {opt.symbol}
               </span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94a3b8', fontSize: '11px', fontWeight: 500 }}>
-                {opt.halted ? <span style={{ color: '#b91c1c', fontWeight: 700 }}>HALTED</span> : <span style={{ color: '#15803d' }}>ACTIVE</span>}
-                <Plus size={12} strokeWidth={2.5} style={{ color: '#2563eb' }} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 500 }}>
+                {opt.halted ? <span style={{ color: 'var(--color-error)', fontWeight: 700 }}>HALTED</span> : <span style={{ color: 'var(--color-success)' }}>ACTIVE</span>}
+                <Plus size={12} strokeWidth={2.5} style={{ color: 'var(--color-primary)' }} />
               </span>
             </div>
           ))}
@@ -603,18 +603,18 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                       <td style={s.tdMono}>{fmt(liveBid)}</td>
                       <td style={s.tdMono}>{fmt(liveAsk)}</td>
 
-                      <td style={{ ...s.tdMono, color: '#334155' }}>
+                      <td style={{ ...s.tdMono, color: 'var(--color-text-primary)' }}>
                         {liveVolume != null ? liveVolume.toLocaleString() : '—'}
                       </td>
 
-                      <td style={{ ...s.tdMono, color: '#64748b', fontSize: '11.5px' }}>
+                      <td style={{ ...s.tdMono, color: 'var(--color-text-secondary)', fontSize: '11.5px' }}>
                         {spread(liveBid, liveAsk)}
                       </td>
 
-                      <td style={{ ...s.tdMono, color: '#10b981' }}>
+                      <td style={{ ...s.tdMono, color: 'var(--color-success)' }}>
                         {liveDayHigh != null ? `$${fmt(liveDayHigh)}` : '—'}
                       </td>
-                      <td style={{ ...s.tdMono, color: '#ef4444' }}>
+                      <td style={{ ...s.tdMono, color: 'var(--color-error)' }}>
                         {liveDayLow != null ? `$${fmt(liveDayLow)}` : '—'}
                       </td>
 
@@ -622,12 +622,12 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                         {inst.halted
                           ? <span style={s.haltPill}>HALTED</span>
                           : inst.tradable
-                            ? <span style={s.activePill}><span style={{ width: 5, height: 5, borderRadius: '50%', background: '#15803d', display: 'inline-block' }} />ACTIVE</span>
+                            ? <span style={s.activePill}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--color-success)', display: 'inline-block' }} />ACTIVE</span>
                             : <span style={s.closedPill}>CLOSED</span>
                         }
                       </td>
 
-                      <td style={{ ...s.tdMono, color: marketOpen ? '#334155' : '#94a3b8' }}>
+                      <td style={{ ...s.tdMono, color: marketOpen ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                         {fmtET(liveTs)}
                       </td>
 
@@ -696,7 +696,7 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
     return (
       <div style={s.card}>
         <div style={s.noSelect}>
-          <div style={{ fontSize: '13px', color: '#ef4444', fontWeight: 600 }}>Failed to load {selected}</div>
+          <div style={{ fontSize: '13px', color: 'var(--color-error)', fontWeight: 600 }}>Failed to load {selected}</div>
         </div>
       </div>
     )
@@ -738,7 +738,7 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '4px',
                 padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700,
-                background: '#f1f5f9', color: '#64748b', letterSpacing: '0.04em',
+                background: 'var(--color-border-light)', color: 'var(--color-text-secondary)', letterSpacing: '0.04em',
               }}>
                 MARKET CLOSED
               </span>
@@ -764,7 +764,7 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
             : hasChartData
               ? <IntradayChart data={recentCandles} symbol={selectedBase.symbol} positive={changePct >= 0} live={wsLive && hasChartData && marketOpen} />
               : (
-                  <div style={{ height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '12px', fontWeight: 500 }}>
+                  <div style={{ height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 500 }}>
                     No intraday data yet — simulation accumulates ticks while market is open
                   </div>
                 )
@@ -783,11 +783,11 @@ const StockDetailPanel: React.FC<StockDetailPanelProps> = ({
         <div style={s.bidAskRow}>
           <div style={s.bidBox}>
             <div style={s.baLabel}>Bid</div>
-            <div style={s.baValue('#15803d')}>${fmt(liveBid)}</div>
+            <div style={s.baValue('var(--color-success)')}>${fmt(liveBid)}</div>
           </div>
           <div style={s.askBox}>
             <div style={s.baLabel}>Ask</div>
-            <div style={s.baValue('#b91c1c')}>${fmt(liveAsk)}</div>
+            <div style={s.baValue('var(--color-error)')}>${fmt(liveAsk)}</div>
           </div>
         </div>
 
@@ -1024,12 +1024,12 @@ const MarketDataPage: React.FC = () => {
         <div style={s.headerRight}>
           {config && (
             <span style={s.pill(open)}>
-              <span style={s.pillDot(open ? '#15803d' : '#94a3b8')} />
+              <span style={s.pillDot(open ? 'var(--color-success)' : 'var(--color-text-muted)')} />
               {open ? 'MARKET OPEN' : 'MARKET CLOSED'}
             </span>
           )}
           <span style={s.wsPill(wsLive)}>
-            <span style={s.pillDot(wsLive ? '#2563eb' : '#b45309')} />
+            <span style={s.pillDot(wsLive ? 'var(--color-primary)' : 'var(--color-warning)')} />
             {wsLive ? 'Live' : `Polling ${(config?.pollingIntervalMs ?? 5000) / 1000}s`}
           </span>
         </div>
