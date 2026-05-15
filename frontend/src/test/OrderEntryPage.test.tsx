@@ -165,3 +165,164 @@ describe('OrderEntryPage — order preview', () => {
     expect(screen.queryByText(/Expires/)).toBeNull()
   })
 })
+
+// ── Sell quantity vs holdings validation ──────────────────────────────────────
+
+const portfolioWithHoldings = {
+  cashBalance: '75000.00',
+  reservedCash: '0.00',
+  buyingPower: '75000.00',
+  holdings: [{ symbol: 'AAPL', quantity: 100, avgPrice: '170.00', currentPrice: '175.00', marketValue: '17500.00' }],
+}
+
+// Helper: render page and wait for client list + portfolio to fully load
+const renderAndWaitForPortfolio = async () => {
+  renderPage()
+  await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+  await act(async () => {}) // flush portfolio useEffect async resolution
+}
+
+// Helper: type a symbol into the symbol input (synchronous state update — holdings derived from this)
+const setSymbol = (value: string) => {
+  fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value } })
+}
+
+describe('OrderEntryPage — sell quantity vs holdings validation', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowSellHoldingsErrorWhenQtyExceedsHolding', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
+
+    await waitFor(() =>
+      expect(screen.getByText('Sell quantity cannot exceed available holding of 100 units')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldHideSellHoldingsErrorWhenQtyWithinHolding', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '50' } }) })
+
+    expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
+  })
+
+  it('shouldNotShowSellHoldingsErrorForBuyOrders', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    // BUY is default — enter qty way above any holding; error must never appear
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '9999' } }) })
+
+    expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
+  })
+
+  it('shouldDisableSubmitWhenSellQtyExceedsHolding', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
+
+    expect(screen.getByText('Submit Order')).toBeDisabled()
+  })
+
+  it('shouldShowSellHoldingsErrorImmediatelyWithoutBlur', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    // Enter exceeding qty — no blur needed; error appears immediately on change
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
+
+    expect(screen.getByText('Sell quantity cannot exceed available holding of 100 units')).toBeInTheDocument()
+  })
+
+  it('shouldShowValidationCheckRowHoldingsNaForBuy', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Holdings check — N/A for BUY')).toBeInTheDocument())
+  })
+
+  it('shouldShowSellHoldingsCheckRowWhenSideIsSell', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    await waitFor(() =>
+      expect(screen.getByText(/Sufficient holdings \(holding:/)).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowSellHoldingsFailRowWhenQtyExceedsHolding', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockResolvedValue(portfolioWithHoldings)
+
+    await renderAndWaitForPortfolio()
+    setSymbol('AAPL')
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
+
+    await waitFor(() =>
+      expect(screen.getByText(/Sufficient holdings \(holding: 100/)).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowPortfolioUnavailableWarningWhenPortfolioFailsAndSideSell', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {}) // flush portfolio rejection handler
+
+    await act(async () => { fireEvent.click(screen.getByText('SELL')) })
+
+    await waitFor(() =>
+      expect(screen.getByText('Portfolio data unavailable — holding check skipped')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldPassBuyOrderUnaffectedAfterSellValidationAdded', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    // BUY is default — no sell validation check should interfere
+    expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
+    expect(screen.getByText('Holdings check — N/A for BUY')).toBeInTheDocument()
+  })
+})
