@@ -28,6 +28,7 @@ public class RiskRuleService {
     private final RiskRuleConfigRepository riskRuleConfigRepository;
     private final RiskRuleAuditRepository riskRuleAuditRepository;
     private final RiskRuleMapper riskRuleMapper;
+    private final RiskEvaluationService riskEvaluationService;
 
     public List<RiskRuleResponse> getAllRules() {
         log.debug("Fetching all risk rules ordered by priority");
@@ -75,6 +76,7 @@ public class RiskRuleService {
             riskRuleAuditRepository.saveAll(auditRecords);
         }
 
+        riskEvaluationService.loadRules();
         log.info("Risk rule updated: ruleCode={} auditRecordsCreated={}", ruleCode, auditRecords.size());
         return riskRuleMapper.toResponse(rule);
     }

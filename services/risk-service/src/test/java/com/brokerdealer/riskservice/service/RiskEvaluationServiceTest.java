@@ -10,13 +10,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +30,12 @@ class RiskEvaluationServiceTest {
 
     @Mock
     private RiskRuleConfigRepository riskRuleConfigRepository;
+
+    @Mock
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     private RiskEvaluationService riskEvaluationService;
@@ -154,6 +166,86 @@ class RiskEvaluationServiceTest {
         riskEvaluationService.loadRules();
 
         RiskResult result = riskEvaluationService.evaluate(sampleRequest());
+
+        assertThat(result.getResult()).isEqualTo("PASSED");
+    }
+
+    @Test
+    void shouldRejectDuplicateOrderWhenRedisKeyAlreadyExists() {
+        RiskRuleConfig dupConfig = RiskRuleConfig.builder()
+                .ruleCode("RULE_DUPLICATE_ORDER")
+                .enabled(true)
+                .thresholdValue(null)
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(dupConfig));
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(false);
+        riskEvaluationService.loadRules();
+
+        RiskResult result = riskEvaluationService.evaluate(sampleRequest());
+
+        assertThat(result.getResult()).isEqualTo("REJECTED");
+        assertThat(result.getFailedRule()).isEqualTo("RULE_DUPLICATE_ORDER");
+    }
+
+    @Test
+    void shouldPassDuplicateOrderRuleWhenRedisKeyIsNew() {
+        RiskRuleConfig dupConfig = RiskRuleConfig.builder()
+                .ruleCode("RULE_DUPLICATE_ORDER")
+                .enabled(true)
+                .thresholdValue(null)
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(dupConfig));
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(true);
+        riskEvaluationService.loadRules();
+
+        RiskResult result = riskEvaluationService.evaluate(sampleRequest());
+
+        assertThat(result.getResult()).isEqualTo("PASSED");
+    }
+
+    @Test
+    void shouldRejectSelfTradeWhenCrossingOpenOrderExists() {
+        RiskRuleConfig selfTradeConfig = RiskRuleConfig.builder()
+                .ruleCode("RULE_SELF_TRADE")
+                .enabled(true)
+                .thresholdValue(null)
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(selfTradeConfig));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setHasCrossingOpenOrder(true);
+
+        RiskResult result = riskEvaluationService.evaluate(request);
+
+        assertThat(result.getResult()).isEqualTo("REJECTED");
+        assertThat(result.getFailedRule()).isEqualTo("RULE_SELF_TRADE");
+    }
+
+    @Test
+    void shouldPassSelfTradeRuleWhenNoCrossingOpenOrder() {
+        RiskRuleConfig selfTradeConfig = RiskRuleConfig.builder()
+                .ruleCode("RULE_SELF_TRADE")
+                .enabled(true)
+                .thresholdValue(null)
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(selfTradeConfig));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setHasCrossingOpenOrder(false);
+
+        RiskResult result = riskEvaluationService.evaluate(request);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
     }

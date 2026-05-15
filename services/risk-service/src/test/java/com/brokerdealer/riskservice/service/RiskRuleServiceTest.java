@@ -43,6 +43,9 @@ class RiskRuleServiceTest {
     @Mock
     private RiskRuleMapper riskRuleMapper;
 
+    @Mock
+    private RiskEvaluationService riskEvaluationService;
+
     @InjectMocks
     private RiskRuleService riskRuleService;
 
@@ -116,6 +119,23 @@ class RiskRuleServiceTest {
                     && list.get(0).getOldValue().equals("false")
                     && list.get(0).getNewValue().equals("true");
         }));
+        verify(riskEvaluationService).loadRules();
+    }
+
+    @Test
+    void shouldReloadRulesAfterSaveEvenWhenNoAuditRecordsCreated() {
+        sampleRule.setEnabled(true);
+        UpdateRiskRuleRequest request = new UpdateRiskRuleRequest();
+        request.setEnabled(true);
+        request.setChangeReason("No actual change");
+
+        when(riskRuleConfigRepository.findById("PRICE_DEVIATION_CHECK")).thenReturn(Optional.of(sampleRule));
+        when(riskRuleConfigRepository.save(any())).thenReturn(sampleRule);
+        when(riskRuleMapper.toResponse(sampleRule)).thenReturn(RiskRuleResponse.builder().ruleCode("PRICE_DEVIATION_CHECK").build());
+
+        riskRuleService.updateRule("PRICE_DEVIATION_CHECK", request, "admin-user");
+
+        verify(riskEvaluationService).loadRules();
     }
 
     @Test

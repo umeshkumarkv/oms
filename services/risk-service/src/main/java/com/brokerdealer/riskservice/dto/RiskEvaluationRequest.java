@@ -25,4 +25,7 @@ public class RiskEvaluationRequest {
     private String kycStatus;            // "VERIFIED" | "PENDING" | "EXPIRED"
     private String kycExpiryDate;        // ISO 8601 date string e.g. "2027-01-01"
     private Boolean tradingEnabled;
+
+    // --- Stateful check fields (SCRUM-121) ---
+    private Boolean hasCrossingOpenOrder; // true if an open opposite-side order at crossing price exists
 }
