@@ -23,12 +23,12 @@ VALUES
      'Order Value Spike Check',
      'FAT_FINGER',
      'WARN when orderValue exceeds 10x avgOrderValue',
-     false, 10.00, 'MULTIPLIER', 'WARN', 33, NOW()),
+     true, 10.00, 'MULTIPLIER', 'WARN', 33, NOW()),
 
     ('RULE_DAILY_ORDER_COUNT',
      'Daily Order Count Warning',
      'FAT_FINGER',
      'WARN when dailyOrderCount reaches maxDailyOrders limit',
-     false, null, null, 'WARN', 34, NOW())
+     true, null, null, 'WARN', 34, NOW())
 
 ON CONFLICT (rule_code) DO NOTHING;
