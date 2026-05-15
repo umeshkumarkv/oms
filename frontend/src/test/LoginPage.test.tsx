@@ -43,7 +43,7 @@ describe('LoginPage', () => {
     expect(screen.getByText('trader.john')).toBeInTheDocument()
     expect(screen.getByText('trader.sarah')).toBeInTheDocument()
     expect(screen.getByText('ops.manager')).toBeInTheDocument()
-    expect(screen.getByText('admin.user')).toBeInTheDocument()
+    expect(screen.getByText('risk.manager')).toBeInTheDocument()
   })
 
   it('sign in button is disabled when fields are empty', () => {

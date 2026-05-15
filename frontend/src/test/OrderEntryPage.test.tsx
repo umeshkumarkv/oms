@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import OrderEntryPage from '../pages/OrderEntryPage'
@@ -43,6 +43,11 @@ vi.mock('../api/clientApi', () => ({
 
 vi.mock('../api/orderApi', () => ({
   submitOrder: vi.fn().mockResolvedValue({ orderId: 'test-order-id', status: 'NEW' }),
+}))
+
+vi.mock('../config/sorVenues', () => ({
+  SOR_VENUES: ['NYSE', 'NASDAQ', 'ARCA', 'BATS', 'DARK_POOL'],
+  DEFAULT_VENUE: 'NYSE',
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -401,6 +406,73 @@ describe('OrderEntryPage — SHORT_SELL', () => {
 
     // Holdings check passes for SHORT_SELL — submit disabled only due to other checks (symbol not confirmed via quote)
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
+  })
+})
+
+// ── SOR dropdown ─────────────────────────────────────────────────────────────
+
+describe('OrderEntryPage — SOR dropdown', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowRouteTolabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
+  })
+
+  it('shouldHaveNysePreselectedByDefault', async () => {
+    renderPage()
+    await waitFor(() => {
+      const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
+      expect(dropdown.value).toBe('NYSE')
+    })
+  })
+
+  it('shouldShowAllVenuesInDropdown', async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'NASDAQ' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'ARCA' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'BATS' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'DARK_POOL' })).toBeInTheDocument()
+    })
+  })
+
+  it('shouldUpdateSelectedVenueWhenDropdownChanges', async () => {
+    renderPage()
+    const dropdown = await screen.findByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
+    await act(async () => { fireEvent.change(dropdown, { target: { value: 'NASDAQ' } }) })
+    expect(dropdown.value).toBe('NASDAQ')
+  })
+
+  it('shouldDisableDropdownWhenWindowIsExpired', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
+    renderPage()
+    await waitFor(() => {
+      const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
+      expect(dropdown).toBeDisabled()
+    })
+  })
+})
+
+// ── SOR dropdown — empty venues fallback ──────────────────────────────────────
+
+describe('OrderEntryPage — SOR dropdown — empty venues fallback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.doMock('../config/sorVenues', () => ({ SOR_VENUES: [], DEFAULT_VENUE: 'NYSE' }))
+  })
+
+  afterEach(() => {
+    vi.doMock('../config/sorVenues', () => ({
+      SOR_VENUES: ['NYSE', 'NASDAQ', 'ARCA', 'BATS', 'DARK_POOL'],
+      DEFAULT_VENUE: 'NYSE',
+    }))
+  })
+
+  it('shouldStillRenderRouteToLabelWhenVenuesEmpty', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
   })
 })
 

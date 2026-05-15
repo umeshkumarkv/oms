@@ -25,6 +25,7 @@ export interface SubmitOrderRequest {
   quantity: number
   limitPrice?: string
   gtdDate?: string
+  routingDestination?: string
 }
 
 export interface OrderSummary {
@@ -42,6 +43,7 @@ export interface OrderSummary {
   createdAt: string
   filledQuantity?: number
   avgFillPrice?: string
+  routingDestination?: string
 }
 
 export type FillType = 'PARTIAL' | 'FULL'

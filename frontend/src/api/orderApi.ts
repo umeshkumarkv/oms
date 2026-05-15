@@ -34,15 +34,16 @@ export const getExecutions = async (orderId: string): Promise<Execution[]> => {
 
 export const submitOrder = async (order: SubmitOrderRequest): Promise<SubmitOrderResponse> => {
   const body = {
-    clientOrderId: order.clientOrderId,
-    clientId:      order.clientId,
-    symbol:        order.symbol,
-    side:          order.side,
-    orderType:     order.orderType,
-    tif:           order.tif,
-    quantity:      order.quantity,
-    limitPrice:    order.limitPrice,
-    gtdDate:       order.gtdDate ?? undefined,
+    clientOrderId:      order.clientOrderId,
+    clientId:           order.clientId,
+    symbol:             order.symbol,
+    side:               order.side,
+    orderType:          order.orderType,
+    tif:                order.tif,
+    quantity:           order.quantity,
+    limitPrice:         order.limitPrice,
+    gtdDate:            order.gtdDate ?? undefined,
+    routingDestination: order.routingDestination,
   }
   const res = await http.post('/orders', body)
   return res.data.data

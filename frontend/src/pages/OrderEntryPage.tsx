@@ -11,6 +11,7 @@ import { submitOrder } from '../api/orderApi'
 import { Holiday, Instrument } from '../types/market.types'
 import { Client, Portfolio } from '../types/client.types'
 import { OrderSide, OrderType, TimeInForce } from '../types/order.types'
+import { DEFAULT_VENUE, SOR_VENUES } from '../config/sorVenues'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: string | number): string => {
@@ -124,8 +125,9 @@ const OrderEntryPage: React.FC = () => {
   const [orderType,   setOrderType]   = useState<OrderType>('LIMIT')
   const [quantity,    setQuantity]    = useState('')
   const [limitPrice,  setLimitPrice]  = useState('')
-  const [tif,         setTif]         = useState<TimeInForce>('DAY')
-  const [gtdDate,     setGtdDate]     = useState<Date | null>(null)
+  const [tif,                setTif]                = useState<TimeInForce>('DAY')
+  const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
+  const [routingDestination, setRoutingDestination] = useState(DEFAULT_VENUE)
 
   const [instruments,  setInstruments]  = useState<Instrument[]>([])
   const [quote,        setQuote]        = useState<Instrument | null>(null)
@@ -166,6 +168,7 @@ const OrderEntryPage: React.FC = () => {
     setQuote(null)
     setSide('BUY')
     setOrderType('LIMIT')
+    setRoutingDestination(DEFAULT_VENUE)
   }, [isExpired])
 
   // Computed values for the GTD date picker
@@ -281,6 +284,7 @@ const OrderEntryPage: React.FC = () => {
         limitPrice: orderType === 'LIMIT' ? limitPrice : undefined,
         tif,
         gtdDate: tif === 'GTD' && gtdDateStr ? gtdDateStr : undefined,
+        routingDestination: SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination,
       })
       setToastMsg(`Order ${res.orderId} submitted successfully`)
       setShowToast(true)
@@ -536,6 +540,27 @@ const OrderEntryPage: React.FC = () => {
               {fieldErrors.gtdDate && <div style={s.errorText}>{fieldErrors.gtdDate}</div>}
             </div>
           )}
+
+          {/* Route To */}
+          <div style={s.fieldGroup}>
+            <label style={s.label}>Route To</label>
+            <select
+              style={s.select}
+              value={SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination}
+              onChange={(e) => setRoutingDestination(e.target.value)}
+              disabled={isExpired || SOR_VENUES.length === 0}
+              title={SOR_VENUES.length === 0 ? 'No venues configured' : undefined}
+              aria-label="Route To"
+            >
+              {SOR_VENUES.length === 0 ? (
+                <option value={DEFAULT_VENUE}>{DEFAULT_VENUE}</option>
+              ) : (
+                SOR_VENUES.map((venue) => (
+                  <option key={venue} value={venue}>{venue}</option>
+                ))
+              )}
+            </select>
+          </div>
 
           {/* Submit */}
           <button

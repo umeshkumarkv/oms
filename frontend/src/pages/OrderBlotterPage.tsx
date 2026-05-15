@@ -377,13 +377,14 @@ const OrderBlotterPage: React.FC = () => {
   useEffect(() => { setPage(1) }, [searchText, filterStatuses, filterTif, filterSide])
 
   const handleExportCsv = () => {
-    const headers = ['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit Price', 'Status', 'Filled Qty', 'Avg Fill Price', 'TIF', 'Created At']
+    const headers = ['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit Price', 'Status', 'Filled Qty', 'Avg Fill Price', 'TIF', 'Route', 'Created At']
     const rows = filteredOrders.map(o => [
       o.id, o.clientOrderId, clientNameMap.get(o.clientId) ?? o.clientId,
       o.symbol, o.side, o.orderType, o.quantity,
       o.limitPrice ?? '', o.status,
       o.filledQuantity ?? '', o.avgFillPrice ?? '',
-      o.timeInForce, new Date(o.createdAt).toISOString(),
+      o.timeInForce, o.routingDestination ?? '',
+      new Date(o.createdAt).toISOString(),
     ])
     const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -466,16 +467,16 @@ const OrderBlotterPage: React.FC = () => {
         <table style={s.table}>
           <thead>
             <tr>
-              {['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit', 'Status', 'Filled', 'Avg Fill', 'TIF', 'Created'].map(h => (
+              {['Order ID', 'Client Ref', 'Client', 'Symbol', 'Side', 'Type', 'Qty', 'Limit', 'Status', 'Filled', 'Avg Fill', 'TIF', 'Route', 'Created'].map(h => (
                 <th key={h} style={s.th}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={13} style={s.empty}>Loading orders…</td></tr>
+              <tr><td colSpan={14} style={s.empty}>Loading orders…</td></tr>
             ) : pagedOrders.length === 0 ? (
-              <tr><td colSpan={13} style={s.empty}>No orders match the current filters.</td></tr>
+              <tr><td colSpan={14} style={s.empty}>No orders match the current filters.</td></tr>
             ) : (
               pagedOrders.map(order => {
                 const isFlashing = flashingIds.has(order.id)
@@ -537,6 +538,11 @@ const OrderBlotterPage: React.FC = () => {
                     </td>
                     <td style={s.td}>
                       <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{order.timeInForce}</span>
+                    </td>
+                    <td style={s.td}>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                        {order.routingDestination ?? <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
+                      </span>
                     </td>
                     <td style={s.td}>
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }} title={new Date(order.createdAt).toLocaleString()}>
