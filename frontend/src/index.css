@@ -67,6 +67,8 @@
   --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-sticky-col-header: 2px 0 6px -2px rgba(15, 23, 42, 0.10);
+  --shadow-sticky-col-row:    2px 0 6px -2px rgba(15, 23, 42, 0.08);
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */

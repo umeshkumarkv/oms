@@ -69,18 +69,24 @@ const GlobalStyle = () => (
     .wl-rm:hover { color: var(--color-error-vivid) !important; background: var(--color-error-bg) !important; }
     .wl-drop-item:hover { background: var(--color-bg); }
 
+    .mkt-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--color-surface-muted);
+    }
     .mkt-table thead th:first-child {
       position: sticky;
       left: 0;
-      z-index: 3;
-      box-shadow: 2px 0 6px -2px rgba(15,23,42,0.10);
+      z-index: 4;
+      box-shadow: var(--shadow-sticky-col-header);
     }
     .mkt-table .mkt-row td:first-child {
       position: sticky;
       left: 0;
       z-index: 1;
       background: var(--color-surface);
-      box-shadow: 2px 0 6px -2px rgba(15,23,42,0.08);
+      box-shadow: var(--shadow-sticky-col-row);
     }
     .mkt-table .mkt-row:hover td:first-child { background: var(--color-bg); }
     .mkt-table .mkt-row.selected td:first-child { background: var(--color-row-selected); }
@@ -209,7 +215,7 @@ const s = {
 
   grid:        { display: 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', alignItems: 'start' } as React.CSSProperties,
 
-  section:     { background: 'var(--color-surface)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'hidden' } as React.CSSProperties,
+  section:     { background: 'var(--color-surface)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 220px)' } as React.CSSProperties,
   sHead:       { padding: '14px 20px', borderBottom: '1px solid var(--color-border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', left: 0 } as React.CSSProperties,
   sTitleRow:   { display: 'flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
   sTitle:      { margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
