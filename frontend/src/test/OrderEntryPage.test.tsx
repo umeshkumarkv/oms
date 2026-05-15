@@ -428,7 +428,7 @@ describe('OrderEntryPage — idle timer', () => {
     )
   })
 
-  it('shouldNotShowCountdownWarningExactlyAt15Seconds', async () => {
+  it('shouldShowCountdownWarningExactlyAt15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 15, isExpired: false, resetTimer: vi.fn() })
     renderPage()
     await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())

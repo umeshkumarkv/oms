@@ -90,7 +90,7 @@ const s = {
   datepickerWrapperError: { border: '1.5px solid var(--color-error)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
 
   // Idle timer banners
-  warningBanner: { padding: '12px 16px', background: 'var(--color-warning-bg)', border: '1px solid #fcd34d', borderRadius: 'var(--radius-md)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 600, marginBottom: '16px' } as React.CSSProperties,
+  warningBanner: { padding: '12px 16px', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 600, marginBottom: '16px' } as React.CSSProperties,
   expiredBanner: { padding: '16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', marginBottom: '16px' } as React.CSSProperties,
   expiredTitle:  { margin: '0 0 6px', fontSize: '14px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
   expiredMsg:    { margin: '0 0 12px', fontSize: '13px', color: '#b91c1c' } as React.CSSProperties,
