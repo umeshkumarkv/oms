@@ -49,13 +49,13 @@ Never hardcode hex values in component files.
 --color-nav:            #0f172a   /* navbar AND sidebar — must be identical */
 
 /* Trading semantics */
---color-buy:            #1d4ed8
+--color-buy:            #1d4ed8   /* BUY side — Order Entry button, side accent, SideBadge */
 --color-buy-bg:         #dbeafe
---color-sell:           #be185d
+--color-sell:           #be185d   /* SELL side — Order Entry button, side accent, SideBadge */
 --color-sell-bg:        #fce7f3
 --color-success:        #059669
 --color-success-bg:     #d1fae5
---color-warning:        #d97706
+--color-warning:        #d97706   /* SHORT_SELL side — Order Entry button, side accent, SideBadge */
 --color-warning-bg:     #fef3c7
 --color-error:          #dc2626
 --color-error-bg:       #fee2e2
@@ -82,7 +82,23 @@ Never hardcode hex values in component files.
 --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.12)
 ```
 
-### 2b. Typography
+### 2b. Order Side — Visual Treatment
+
+The Order Entry Window side toggle has three options. Each uses a fixed color — do not change.
+
+| Side       | Token              | Hex       | Used in                                       |
+|------------|--------------------|-----------|-----------------------------------------------|
+| BUY        | `--color-buy`      | `#1d4ed8` | Toggle button active, side accent, SideBadge  |
+| SELL       | `--color-sell`     | `#be185d` | Toggle button active, side accent, SideBadge  |
+| SHORT_SELL | `--color-warning`  | `#d97706` | Toggle button active, side accent, SideBadge  |
+
+`SideBadge` in OrderBlotterPage renders `SHORT_SELL` as the human-readable label **"Short Sell"**.
+The submit button gradient for SHORT_SELL is `linear-gradient(135deg, #f59e0b, #d97706)`.
+Holdings validation (sell qty > holdings) is skipped for SHORT_SELL — only applies to SELL.
+
+---
+
+### 2c. Typography
 
 - Font: Inter (via @fontsource/inter) — weights 400, 500, 600, 700
 - Body: 14px / Inter / color-text-primary
