@@ -169,6 +169,7 @@ class OrderServiceTest {
                     .expiryDate(o.getExpiryDate())
                     .expiryApplied(o.getExpiryApplied())
                     .createdBy(o.getCreatedBy())
+                    .routingDestination(o.getRoutingDestination())
                     .build();
         });
     }
@@ -996,6 +997,42 @@ class OrderServiceTest {
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
+    }
+
+    // --- Routing destination ---
+
+    @Test
+    void shouldDefaultRoutingDestinationToNyseWhenFieldAbsent() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getRoutingDestination()).isEqualTo("NYSE");
+    }
+
+    @Test
+    void shouldStoreProvidedRoutingDestinationWhenNonBlank() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setRoutingDestination("NASDAQ");
+
+        orderService.submitOrder(request, userId);
+
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getRoutingDestination()).isEqualTo("NASDAQ");
+    }
+
+    @Test
+    void shouldDefaultRoutingDestinationToNyseWhenBlankString() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setRoutingDestination("  ");
+
+        orderService.submitOrder(request, userId);
+
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getRoutingDestination()).isEqualTo("NYSE");
     }
 
     // --- Helpers ---

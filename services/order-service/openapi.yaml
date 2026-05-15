@@ -208,6 +208,11 @@ components:
           type: string
           format: date
           description: Optional for GTC orders. Defaults to 180 days.
+        routingDestination:
+          type: string
+          description: "Execution venue for this order. Defaults to NYSE if not provided."
+          example: "NYSE"
+          enum: [NYSE, NASDAQ, ARCA, BATS, DARK_POOL]
 
     SubmitOrderResponse:
       type: object
@@ -261,6 +266,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        routingDestination:
+          type: string
+          description: "Execution venue this order was directed to."
+          example: "NYSE"
 
     OrderListResponse:
       type: object

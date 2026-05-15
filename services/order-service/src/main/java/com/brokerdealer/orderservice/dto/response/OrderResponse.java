@@ -29,4 +29,5 @@ public class OrderResponse {
     Integer filledQuantity;
     String avgFillPrice;
     List<FillResponse> fills;
+    String routingDestination;
 }
