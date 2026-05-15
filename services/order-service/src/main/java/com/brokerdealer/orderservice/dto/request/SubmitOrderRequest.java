@@ -46,4 +46,7 @@ public class SubmitOrderRequest {
     /** Optional for GTD orders. If provided, sets expiryApplied=TRADER; otherwise defaults to today+180. */
     @JsonProperty("gtdDate")
     private LocalDate expiryDate;
+
+    /** Optional execution venue. Defaults to "NYSE" if absent or blank. */
+    private String routingDestination;
 }

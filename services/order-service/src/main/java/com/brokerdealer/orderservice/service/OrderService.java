@@ -236,6 +236,7 @@ public class OrderService {
                 .expiryDate(expiryDate)
                 .expiryApplied(expiryApplied)
                 .createdBy(userId != null ? userId : UUID.randomUUID())
+                .routingDestination(resolveRoutingDestination(request.getRoutingDestination()))
                 .build();
 
         Order savedOrder = orderRepository.save(order);
@@ -500,6 +501,11 @@ public class OrderService {
                 .filledQuantity(filledQuantity)
                 .avgFillPrice(avgFillPrice)
                 .fills(fillResponses)
+                .routingDestination(order.getRoutingDestination())
                 .build();
+    }
+
+    private String resolveRoutingDestination(String requested) {
+        return (requested != null && !requested.isBlank()) ? requested : "NYSE";
     }
 }

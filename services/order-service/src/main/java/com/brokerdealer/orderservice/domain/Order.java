@@ -77,6 +77,9 @@ public class Order {
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
 
+    @Column(name = "routing_destination", length = 50)
+    private String routingDestination;
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();

@@ -280,6 +280,16 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.data.orders").isArray());
     }
 
+    @Test
+    void shouldReturnRoutingDestinationInOrderDetailResponse() throws Exception {
+        when(orderService.getOrderById(orderId)).thenReturn(buildDetailResponseWithVenue("NASDAQ"));
+
+        mockMvc.perform(get("/api/v1/orders/" + orderId)
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.routingDestination").value("NASDAQ"));
+    }
+
     // --- Helpers ---
 
     private OrderDetailResponse buildDetailResponse() {
@@ -296,6 +306,32 @@ class OrderControllerTest {
                 .fills(Collections.emptyList())
                 .createdAt(Instant.now().toString())
                 .updatedAt(Instant.now().toString())
+                .routingDestination("NYSE")
+                .build();
+        return OrderDetailResponse.builder()
+                .data(orderResponse)
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+    }
+
+    private OrderDetailResponse buildDetailResponseWithVenue(String venue) {
+        OrderResponse orderResponse = OrderResponse.builder()
+                .id(orderId)
+                .clientId(clientId)
+                .symbol("AAPL")
+                .side("BUY")
+                .orderType("MARKET")
+                .timeInForce("DAY")
+                .quantity(10)
+                .status("NEW")
+                .filledQuantity(0)
+                .fills(Collections.emptyList())
+                .createdAt(Instant.now().toString())
+                .updatedAt(Instant.now().toString())
+                .routingDestination(venue)
                 .build();
         return OrderDetailResponse.builder()
                 .data(orderResponse)
