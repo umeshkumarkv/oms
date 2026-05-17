@@ -1,5 +1,11 @@
 export type RuleAction   = 'REJECT' | 'WARN'
-export type RuleCategory = 'FINANCIAL_LIMIT' | 'REDUNDANT'
+export type RuleCategory =
+  | 'FINANCIAL_LIMIT'
+  | 'FAT_FINGER'
+  | 'PRE_TRADE'
+  | 'CLIENT'
+  | 'STATEFUL'
+  | 'REDUNDANT'
 
 export interface RiskRule {
   ruleCode:       string

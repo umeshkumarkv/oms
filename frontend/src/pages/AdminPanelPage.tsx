@@ -1,8 +1,44 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AlertTriangle, ChevronDown, ChevronUp, ClipboardList, Clock, Layers, User } from 'lucide-react'
 import { getRiskRuleAudit, getRiskRules, patchRiskRule, resetSystem, triggerScenario } from '../api/riskApi'
 import { getCurrentUser } from '../api/authApi'
 import { RiskRule, RiskRuleAuditRecord } from '../types/risk.types'
+
+// ── Rule grouping constants ─────────────────────────────────────────────────────
+
+const CATEGORY_TO_GROUP: Record<string, string> = {
+  FAT_FINGER:     'FAT_FINGER',
+  CLIENT:         'CLIENT',
+  STATEFUL:       'CLIENT',
+  PRE_TRADE:      'ORDER',
+  FINANCIAL_LIMIT:'ORDER',
+}
+
+const REDUNDANT_CODE_TO_GROUP: Record<string, string> = {
+  MARKET_HOURS_CHECK:      'MARKET',
+  INSTRUMENT_TRADABLE_CHECK:'INSTRUMENT',
+  CLIENT_ACTIVE_CHECK:     'CLIENT',
+  CASH_BALANCE_CHECK:      'CLIENT',
+  HOLDINGS_CHECK:          'CLIENT',
+  QUANTITY_POSITIVE_CHECK: 'ORDER',
+  LIMIT_PRICE_CHECK:       'ORDER',
+}
+
+function getRuleGroupKey(rule: RiskRule): string {
+  if (rule.ruleCategory === 'REDUNDANT') {
+    return REDUNDANT_CODE_TO_GROUP[rule.ruleCode] ?? 'ORDER'
+  }
+  return CATEGORY_TO_GROUP[rule.ruleCategory] ?? 'ORDER'
+}
+
+const RULE_GROUPS: Array<{ key: string; label: string; icon: React.ReactNode }> = [
+  { key: 'MARKET',     label: 'Market Rules',               icon: <Clock size={14} /> },
+  { key: 'CLIENT',     label: 'Client Rules',               icon: <User size={14} /> },
+  { key: 'INSTRUMENT', label: 'Instrument Rules',           icon: <Layers size={14} /> },
+  { key: 'ORDER',      label: 'Order Rules',                icon: <ClipboardList size={14} /> },
+  { key: 'FAT_FINGER', label: 'Fat Finger / Risk Controls', icon: <AlertTriangle size={14} /> },
+]
 
 // ── Demo scenarios (must match application.yml in marketdata-service) ─────────
 const DEMO_SCENARIOS = [
@@ -99,17 +135,6 @@ const ActionBadge: React.FC<{ action: string }> = ({ action }) => (
     color:      action === 'REJECT' ? '#dc2626' : '#d97706',
   }}>
     {action}
-  </span>
-)
-
-const CategoryBadge: React.FC<{ cat: string }> = ({ cat }) => (
-  <span style={{
-    display: 'inline-block', padding: '2px 6px', borderRadius: '4px',
-    fontSize: '10px', fontWeight: 600,
-    background: cat === 'FINANCIAL_LIMIT' ? '#dbeafe' : '#f3f4f6',
-    color:      cat === 'FINANCIAL_LIMIT' ? '#1d4ed8' : '#6b7280',
-  }}>
-    {cat === 'FINANCIAL_LIMIT' ? 'Financial' : 'Redundant'}
   </span>
 )
 
@@ -258,6 +283,18 @@ const AdminPanelPage: React.FC = () => {
   const [auditLog,     setAuditLog]     = useState<RiskRuleAuditRecord[]>([])
   const [rulesLoading, setRulesLoading] = useState(true)
   const [auditLoading, setAuditLoading] = useState(true)
+
+  // Group collapse state — all expanded by default
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    { MARKET: true, CLIENT: true, INSTRUMENT: true, ORDER: true, FAT_FINGER: true }
+  )
+  const allExpanded = Object.values(expandedGroups).every(Boolean)
+  const toggleGroup = (key: string) =>
+    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }))
+  const toggleAll = () => {
+    const next = !allExpanded
+    setExpandedGroups({ MARKET: next, CLIENT: next, INSTRUMENT: next, ORDER: next, FAT_FINGER: next })
+  }
 
   // Toggle modal
   const [toggleModal, setToggleModal] = useState<RiskRule | null>(null)
@@ -462,50 +499,105 @@ const AdminPanelPage: React.FC = () => {
               </button>
             </h2>
             {rulesLoading ? (
-              <div style={{ color: '#9ca3af', fontSize: '13px', padding: '16px 0' }}>Loading rules…</div>
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px', padding: '16px 0' }}>Loading rules…</div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['#', 'Rule Code', 'Category', 'Action', 'Threshold', 'Enabled'].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rules.map(rule => (
-                      <tr key={rule.ruleCode} style={{ opacity: rule.enabled ? 1 : 0.6 }}>
-                        <td style={{ ...s.td, color: '#9ca3af', fontSize: '11px', width: '28px' }}>{rule.priority}</td>
-                        <td style={s.td}>
-                          <div style={{ fontWeight: 600, color: '#1a2236', fontSize: '12px', fontFamily: 'monospace' }}>{rule.ruleCode}</div>
-                          <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{rule.description}</div>
-                        </td>
-                        <td style={s.td}><CategoryBadge cat={rule.ruleCategory} /></td>
-                        <td style={s.td}><ActionBadge action={rule.action} /></td>
-                        <td style={s.td}>
-                          {rule.thresholdValue ? (
-                            <span
-                              style={s.thresholdValue}
-                              title="Click to edit threshold"
-                              onClick={() => setThresholdModal(rule)}
-                            >
-                              {fmtThreshold(rule)} ✎
-                            </span>
-                          ) : (
-                            <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>
-                          )}
-                        </td>
-                        <td style={s.td}>
-                          <Toggle
-                            checked={rule.enabled}
-                            onChange={() => setToggleModal(rule)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                {/* Expand All / Collapse All */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                  <button
+                    style={{ ...s.btn('ghost'), fontSize: '12px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={toggleAll}
+                  >
+                    {allExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    {allExpanded ? 'Collapse All' : 'Expand All'}
+                  </button>
+                </div>
+
+                {/* Grouped rule sections */}
+                {RULE_GROUPS.map(group => {
+                  const groupRules = rules.filter(r => getRuleGroupKey(r) === group.key)
+                  if (groupRules.length === 0) return null
+                  const isExpanded = expandedGroups[group.key]
+                  return (
+                    <div key={group.key} style={{ marginBottom: '12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                      {/* Group header */}
+                      <div
+                        role="button"
+                        aria-expanded={isExpanded}
+                        onClick={() => toggleGroup(group.key)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          padding: '9px 14px', cursor: 'pointer',
+                          background: 'var(--color-border-light)',
+                          borderBottom: isExpanded ? '1px solid var(--color-border)' : 'none',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <span style={{ color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}>
+                          {group.icon}
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', flex: 1 }}>
+                          {group.label}
+                        </span>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: 'var(--radius-pill)',
+                          background: 'var(--color-primary-light)', color: 'var(--color-primary)',
+                        }}>
+                          {groupRules.length}
+                        </span>
+                        <span style={{ color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </span>
+                      </div>
+
+                      {/* Collapsible rule table */}
+                      {isExpanded && (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={s.table}>
+                            <thead>
+                              <tr>
+                                {['#', 'Rule Code', 'Action', 'Threshold', 'Enabled'].map(h => (
+                                  <th key={h} style={s.th}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {groupRules.map(rule => (
+                                <tr key={rule.ruleCode} style={{ opacity: rule.enabled ? 1 : 0.6 }}>
+                                  <td style={{ ...s.td, color: 'var(--color-text-muted)', fontSize: '11px', width: '28px' }}>{rule.priority}</td>
+                                  <td style={s.td}>
+                                    <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '12px', fontFamily: 'monospace' }}>{rule.ruleCode}</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '1px' }}>{rule.description}</div>
+                                  </td>
+                                  <td style={s.td}><ActionBadge action={rule.action} /></td>
+                                  <td style={s.td}>
+                                    {rule.thresholdValue ? (
+                                      <span
+                                        style={s.thresholdValue}
+                                        title="Click to edit threshold"
+                                        onClick={() => setThresholdModal(rule)}
+                                      >
+                                        {fmtThreshold(rule)} ✎
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>—</span>
+                                    )}
+                                  </td>
+                                  <td style={s.td}>
+                                    <Toggle
+                                      checked={rule.enabled}
+                                      onChange={() => setToggleModal(rule)}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
