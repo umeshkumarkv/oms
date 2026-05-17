@@ -106,7 +106,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <argLine>@{argLine} -Dnet.bytebuddy.experimental=true</argLine>
+          <argLine>@{argLine} -Xmx256m -XX:+UseSerialGC -Djdk.attach.allowAttachSelf=true -Dnet.bytebuddy.experimental=true</argLine>
+          <forkCount>0</forkCount>
         </configuration>
       </plugin>
     </plugins>

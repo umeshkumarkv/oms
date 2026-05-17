@@ -2,11 +2,14 @@ package com.brokerdealer.riskservice.service;
 
 import com.brokerdealer.riskservice.domain.RiskResult;
 import com.brokerdealer.riskservice.domain.RiskRuleConfig;
+import com.brokerdealer.riskservice.domain.RiskWarning;
 import com.brokerdealer.riskservice.dto.RiskEvaluationRequest;
 import com.brokerdealer.riskservice.repository.RiskRuleConfigRepository;
+import com.brokerdealer.riskservice.repository.RiskWarningRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,8 +24,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +37,9 @@ class RiskEvaluationServiceTest {
 
     @Mock
     private RiskRuleConfigRepository riskRuleConfigRepository;
+
+    @Mock
+    private RiskWarningRepository riskWarningRepository;
 
     @Mock
     private StringRedisTemplate stringRedisTemplate;
@@ -248,5 +258,113 @@ class RiskEvaluationServiceTest {
         RiskResult result = riskEvaluationService.evaluate(request);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
+    }
+
+    // ─── WARN rule wiring (SCRUM-122) ────────────────────────────────────────
+
+    @Test
+    void shouldPersistWarningAndContinueWhenWarnRuleTriggers() {
+        // ORDER_VALUE_SPIKE_CHECK: orderValue=600000 vs avg=50000, multiplier=10 → spike at 500000 → WARNED
+        RiskRuleConfig warnConfig = RiskRuleConfig.builder()
+                .ruleCode("ORDER_VALUE_SPIKE_CHECK")
+                .enabled(true)
+                .thresholdValue(new BigDecimal("10"))
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(warnConfig));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setOrderValue("600000.00");
+        request.setAvgOrderValue("50000.00");
+
+        RiskResult result = riskEvaluationService.evaluate(request);
+
+        assertThat(result.getResult()).isEqualTo("PASSED");
+        verify(riskWarningRepository).saveAll(argThat((List<RiskWarning> list) ->
+                list.size() == 1 && "ORDER_VALUE_SPIKE_CHECK".equals(list.get(0).getRuleCode())));
+    }
+
+    @Test
+    void shouldNotPersistWarningWhenWarnRuleIsDisabled() {
+        RiskRuleConfig warnConfig = RiskRuleConfig.builder()
+                .ruleCode("ORDER_VALUE_SPIKE_CHECK")
+                .enabled(false)
+                .thresholdValue(new BigDecimal("10"))
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(warnConfig));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setOrderValue("600000.00");
+        request.setAvgOrderValue("50000.00");
+
+        riskEvaluationService.evaluate(request);
+
+        verify(riskWarningRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void shouldStopBeforeWarnRulesWhenRejectRuleFires() {
+        // REJECT rule (priority 1) fires before WARN rule (priority 2) → WARN rule never evaluates
+        RiskRuleConfig rejectConfig = RiskRuleConfig.builder()
+                .ruleCode("SINGLE_ORDER_QTY_LIMIT")
+                .enabled(true)
+                .thresholdValue(new BigDecimal("100"))
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        RiskRuleConfig warnConfig = RiskRuleConfig.builder()
+                .ruleCode("ORDER_VALUE_SPIKE_CHECK")
+                .enabled(true)
+                .thresholdValue(new BigDecimal("10"))
+                .priority(2)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(rejectConfig, warnConfig));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setQuantity(500);          // exceeds SINGLE_ORDER_QTY_LIMIT threshold of 100 → REJECTED
+        request.setOrderValue("600000.00");
+        request.setAvgOrderValue("50000.00");
+
+        RiskResult result = riskEvaluationService.evaluate(request);
+
+        assertThat(result.getResult()).isEqualTo("REJECTED");
+        assertThat(result.getFailedRule()).isEqualTo("SINGLE_ORDER_QTY_LIMIT");
+        verify(riskWarningRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void shouldPersistMultipleWarningsForMultipleWarnRules() {
+        RiskRuleConfig warnConfig1 = RiskRuleConfig.builder()
+                .ruleCode("ORDER_VALUE_SPIKE_CHECK")
+                .enabled(true)
+                .thresholdValue(new BigDecimal("10"))
+                .priority(1)
+                .updatedAt(Instant.now())
+                .build();
+        RiskRuleConfig warnConfig2 = RiskRuleConfig.builder()
+                .ruleCode("NOTIONAL_VALUE_CHECK")
+                .enabled(true)
+                .thresholdValue(new BigDecimal("100000"))
+                .priority(2)
+                .updatedAt(Instant.now())
+                .build();
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(warnConfig1, warnConfig2));
+        riskEvaluationService.loadRules();
+
+        RiskEvaluationRequest request = sampleRequest();
+        request.setOrderValue("600000.00"); // triggers ORDER_VALUE_SPIKE_CHECK and NOTIONAL_VALUE_CHECK
+        request.setAvgOrderValue("50000.00");
+
+        RiskResult result = riskEvaluationService.evaluate(request);
+
+        assertThat(result.getResult()).isEqualTo("PASSED");
+        verify(riskWarningRepository).saveAll(argThat((List<RiskWarning> list) -> list.size() == 2));
     }
 }
