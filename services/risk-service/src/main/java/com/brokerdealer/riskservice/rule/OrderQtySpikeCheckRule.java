@@ -32,13 +32,13 @@ public class OrderQtySpikeCheckRule implements RiskRule {
             log.debug("ORDER_QTY_SPIKE_CHECK skipped: required field is null; orderId={}", context.getOrderId());
             return RiskResult.passed();
         }
-        if (request.getAvgOrderQty() == 0) {
+        BigDecimal avgQty = new BigDecimal(request.getAvgOrderQty());
+        if (avgQty.compareTo(BigDecimal.ZERO) == 0) {
             log.debug("ORDER_QTY_SPIKE_CHECK skipped: avgOrderQty is 0 (no history); orderId={}", context.getOrderId());
             return RiskResult.passed();
         }
 
         BigDecimal qty    = new BigDecimal(request.getQuantity().toString());
-        BigDecimal avgQty = new BigDecimal(request.getAvgOrderQty().toString());
         BigDecimal spike  = avgQty.multiply(multiplier);
 
         if (qty.compareTo(spike) > 0) {

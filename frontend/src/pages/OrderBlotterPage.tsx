@@ -13,6 +13,11 @@ const ALL_STATUSES: OrderStatus[] = [
   'FILLED', 'CANCELLED', 'REJECTED', 'EXPIRED',
 ]
 
+const TERMINAL_STATES = new Set<OrderStatus>(['RISK_REJECTED', 'FILLED', 'CANCELLED', 'REJECTED', 'EXPIRED'])
+
+const isBlotterVisible = (order: OrderSummary, todayStartMs: number): boolean =>
+  new Date(order.createdAt).getTime() >= todayStartMs || !TERMINAL_STATES.has(order.status)
+
 interface StatusConfig { bg: string; color: string; label: string; strikethrough?: boolean }
 
 const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
@@ -294,11 +299,12 @@ const OrderBlotterPage: React.FC = () => {
 
   const loadOrders = useCallback(async () => {
     setLoading(true)
-    const params: GetOrdersParams = {}
+    const params: GetOrdersParams = { pageSize: 500 }
     if (filterClientId) params.clientId = filterClientId
     try {
       const result = await getOrders(params)
-      setOrders(result.orders)
+      const todayStartMs = new Date(new Date().setUTCHours(0, 0, 0, 0)).getTime()
+      setOrders(result.orders.filter(o => isBlotterVisible(o, todayStartMs)))
     } finally {
       setLoading(false)
     }
@@ -322,11 +328,17 @@ const OrderBlotterPage: React.FC = () => {
 
     if ((last.type === 'ORDER_STATE_CHANGED' || last.type === 'EXECUTION_COMPLETED') && last.orderId) {
       const targetId = last.orderId
+      const todayStartMs = new Date(new Date().setUTCHours(0, 0, 0, 0)).getTime()
       getOrder(targetId)
         .then(updated => {
           setOrders(prev => {
             const idx = prev.findIndex(o => o.id === updated.id)
-            if (idx === -1) return [updated, ...prev]
+            const visible = isBlotterVisible(updated, todayStartMs)
+            if (idx === -1) {
+              return visible ? [updated, ...prev] : prev
+            }
+            // Prior-day order just reached terminal state — remove it from the blotter
+            if (!visible) return prev.filter(o => o.id !== updated.id)
             const next = [...prev]
             next[idx] = updated
             return next
@@ -411,7 +423,7 @@ const OrderBlotterPage: React.FC = () => {
         <div>
           <h1 style={s.title}>Order Blotter</h1>
           <div style={s.subtitle}>
-            {loading ? 'Loading…' : `${totalFiltered} order${totalFiltered !== 1 ? 's' : ''}`}
+            {loading ? 'Loading…' : `${totalFiltered} order${totalFiltered !== 1 ? 's' : ''} today`}
             {' · '}{wsConnected ? 'live via WebSocket' : 'polling every 15s'}
           </div>
         </div>

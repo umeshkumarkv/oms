@@ -19,7 +19,7 @@ class OrderQtySpikeCheckRuleTest {
             .clientId(UUID.randomUUID())
             .build();
 
-    private RiskEvaluationRequest request(Integer quantity, Integer avgOrderQty) {
+    private RiskEvaluationRequest request(Integer quantity, String avgOrderQty) {
         RiskEvaluationRequest req = new RiskEvaluationRequest();
         req.setQuantity(quantity);
         req.setAvgOrderQty(avgOrderQty);
@@ -30,7 +30,7 @@ class OrderQtySpikeCheckRuleTest {
     void shouldWarnWhenQuantityExceedsTenTimesAvg() {
         // qty=1500, avg=100, spike=1000 → 1500 > 1000 → WARNED
         OrderQtySpikeCheckRule rule = new OrderQtySpikeCheckRule(MULTIPLIER, true);
-        RiskResult result = rule.evaluate(request(1500, 100), context);
+        RiskResult result = rule.evaluate(request(1500, "100"), context);
 
         assertThat(result.getResult()).isEqualTo("WARNED");
         assertThat(result.getFailedRule()).isEqualTo("ORDER_QTY_SPIKE_CHECK");
@@ -41,7 +41,7 @@ class OrderQtySpikeCheckRuleTest {
     void shouldPassWhenQuantityBelowSpike() {
         // qty=500, avg=100, spike=1000 → 500 < 1000 → PASSED
         OrderQtySpikeCheckRule rule = new OrderQtySpikeCheckRule(MULTIPLIER, true);
-        RiskResult result = rule.evaluate(request(500, 100), context);
+        RiskResult result = rule.evaluate(request(500, "100"), context);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
     }
@@ -49,7 +49,7 @@ class OrderQtySpikeCheckRuleTest {
     @Test
     void shouldSkipWhenAvgOrderQtyIsZero() {
         OrderQtySpikeCheckRule rule = new OrderQtySpikeCheckRule(MULTIPLIER, true);
-        RiskResult result = rule.evaluate(request(5000, 0), context);
+        RiskResult result = rule.evaluate(request(5000, "0"), context);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
     }
@@ -65,7 +65,7 @@ class OrderQtySpikeCheckRuleTest {
     @Test
     void shouldSkipWhenQuantityIsNull() {
         OrderQtySpikeCheckRule rule = new OrderQtySpikeCheckRule(MULTIPLIER, true);
-        RiskResult result = rule.evaluate(request(null, 100), context);
+        RiskResult result = rule.evaluate(request(null, "100"), context);
 
         assertThat(result.getResult()).isEqualTo("PASSED");
     }
