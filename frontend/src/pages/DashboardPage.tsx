@@ -142,10 +142,11 @@ const DashboardPage: React.FC = () => {
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     try {
+      const todayStart = new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString()
       const [openPage, filledPage, expiredPage, gtdPage, hours] = await Promise.all([
         getOrders({ status: 'OPEN' }),
-        getOrders({ status: 'FILLED' }),
-        getOrders({ status: 'EXPIRED' }),
+        getOrders({ status: 'FILLED', createdAfter: todayStart }),
+        getOrders({ status: 'EXPIRED', createdAfter: todayStart }),
         getOrders({ tif: 'GTD', status: 'OPEN' }),
         getMarketHours(),
       ])
