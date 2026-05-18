@@ -12,7 +12,7 @@ export interface OrdersPage {
 export interface GetOrdersParams {
   status?: string
   clientId?: string
-  tif?: string
+  timeInForce?: string
   createdAfter?: string
   page?: number
   pageSize?: number

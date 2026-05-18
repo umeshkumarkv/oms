@@ -70,7 +70,7 @@ describe('DashboardPage — createdAfter date scoping', () => {
 
     await waitFor(() => {
       const openCall = mockGetOrders.mock.calls.find(
-        ([p]: [Record<string, unknown>]) => p.status === 'OPEN' && !p.tif
+        ([p]: [Record<string, unknown>]) => p.status === 'OPEN' && !p.timeInForce
       )
       expect(openCall).toBeDefined()
       expect(openCall![0].createdAfter).toBeUndefined()
@@ -82,7 +82,7 @@ describe('DashboardPage — createdAfter date scoping', () => {
 
     await waitFor(() => {
       const gtdCall = mockGetOrders.mock.calls.find(
-        ([p]: [Record<string, unknown>]) => p.tif === 'GTD'
+        ([p]: [Record<string, unknown>]) => p.timeInForce === 'GTD'
       )
       expect(gtdCall).toBeDefined()
       expect(gtdCall![0].createdAfter).toBeUndefined()
