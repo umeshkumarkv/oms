@@ -303,6 +303,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: brokerdealer
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokerdealer?currentSchema=execution_schema
       JWT_SECRET: dev-secret-key-change-in-production-min-32-chars
+      MARKETDATA_SERVICE_URL: http://marketdata-service:8084
     depends_on:
       kafka:
         condition: service_healthy

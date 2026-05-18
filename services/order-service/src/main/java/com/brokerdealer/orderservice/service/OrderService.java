@@ -445,9 +445,16 @@ public class OrderService {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
-                try {
-                    predicates.add(cb.equal(root.get("status"), OrderStatus.valueOf(status)));
-                } catch (IllegalArgumentException ignored) {}
+                if ("OPEN".equalsIgnoreCase(status)) {
+                    List<OrderStatus> terminalStates = List.of(
+                            OrderStatus.RISK_REJECTED, OrderStatus.FILLED,
+                            OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED);
+                    predicates.add(root.get("status").in(terminalStates).not());
+                } else {
+                    try {
+                        predicates.add(cb.equal(root.get("status"), OrderStatus.valueOf(status)));
+                    } catch (IllegalArgumentException ignored) {}
+                }
             }
             if (clientId != null) {
                 predicates.add(cb.equal(root.get("clientId"), clientId));
