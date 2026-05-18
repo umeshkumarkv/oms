@@ -1,6 +1,7 @@
 package com.brokerdealer.riskservice.filter;
 
 import com.brokerdealer.riskservice.controller.RiskRuleController;
+import com.brokerdealer.riskservice.service.PendingChangeService;
 import com.brokerdealer.riskservice.service.RiskRuleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,9 @@ class RoleAuthorizationFilterTest {
 
     @MockBean
     private RiskRuleService riskRuleService;
+
+    @MockBean
+    private PendingChangeService pendingChangeService;
 
     // ─── Missing header → 401 ────────────────────────────────────────────────
 
@@ -85,7 +89,7 @@ class RoleAuthorizationFilterTest {
                         .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"enabled\":true}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isAccepted());
     }
 
     // ─── Error envelope shape ─────────────────────────────────────────────────

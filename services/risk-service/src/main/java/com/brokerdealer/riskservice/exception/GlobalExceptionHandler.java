@@ -27,6 +27,24 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(PendingChangeNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePendingChangeNotFoundException(PendingChangeNotFoundException ex) {
+        log.warn("Pending change not found: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(SelfApprovalNotAllowedException.class)
+    public ResponseEntity<Map<String, Object>> handleSelfApprovalNotAllowedException(SelfApprovalNotAllowedException ex) {
+        log.warn("Self-approval attempt: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(ChangeAlreadyReviewedException.class)
+    public ResponseEntity<Map<String, Object>> handleChangeAlreadyReviewedException(ChangeAlreadyReviewedException ex) {
+        log.warn("Change already reviewed: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage());
