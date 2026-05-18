@@ -1028,6 +1028,29 @@ class OrderServiceTest {
                 .hasMessageContaining("Invalid createdAfter format");
     }
 
+    @Test
+    void shouldReturnNonTerminalOrdersWhenStatusIsOpen() {
+        Order order = buildOrder(UUID.randomUUID(), OrderStatus.NEW);
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+        OrderListResponse response = orderService.getOrders("OPEN", null, null, null, null, 0, 50);
+
+        assertThat(response.getData().getOrders()).hasSize(1);
+        assertThat(response.getData().getOrders().get(0).getStatus()).isEqualTo("NEW");
+    }
+
+    @Test
+    void shouldHandleOpenStatusCaseInsensitively() {
+        Order order = buildOrder(UUID.randomUUID(), OrderStatus.ACCEPTED);
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+        OrderListResponse response = orderService.getOrders("open", null, null, null, null, 0, 50);
+
+        assertThat(response.getData().getOrders()).hasSize(1);
+    }
+
     // --- Helpers ---
 
     private Order buildOrder(UUID id, OrderStatus status) {
