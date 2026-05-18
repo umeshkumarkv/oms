@@ -117,6 +117,16 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: createdAfter
+          in: query
+          required: false
+          description: >
+            ISO 8601 UTC instant. When present, only orders created at or after
+            this timestamp are returned. Example: 2026-05-18T00:00:00Z
+          schema:
+            type: string
+            format: date-time
+            example: "2026-05-18T00:00:00Z"
         - name: page
           in: query
           schema:
@@ -134,6 +144,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderListResponse'
+        '400':
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: "Invalid createdAfter format: must be ISO 8601 UTC"
+                  details: []
 
   /api/v1/orders/{id}:
     get:
