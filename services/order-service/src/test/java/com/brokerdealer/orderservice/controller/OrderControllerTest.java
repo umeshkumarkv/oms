@@ -255,7 +255,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithPaginatedOrderList() throws Exception {
-        when(orderService.getOrders(isNull(), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+        when(orderService.getOrders(isNull(), isNull(), isNull(), isNull(), isNull(), anyInt(), anyInt()))
                 .thenReturn(buildListResponse());
 
         mockMvc.perform(get("/api/v1/orders")
@@ -269,7 +269,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithFilteredOrderList() throws Exception {
-        when(orderService.getOrders(any(), any(), any(), any(), anyInt(), anyInt()))
+        when(orderService.getOrders(any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(buildListResponse());
 
         mockMvc.perform(get("/api/v1/orders")
@@ -278,6 +278,33 @@ class OrderControllerTest {
                         .header("X-User-Role", "OPERATIONS"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orders").isArray());
+    }
+
+    @Test
+    void shouldReturn200WithCreatedAfterParam() throws Exception {
+        when(orderService.getOrders(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(buildListResponse());
+
+        mockMvc.perform(get("/api/v1/orders")
+                        .param("status", "FILLED")
+                        .param("createdAfter", "2026-05-18T00:00:00Z")
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orders").isArray())
+                .andExpect(jsonPath("$.data.totalCount").value(1));
+    }
+
+    @Test
+    void shouldReturn400WhenCreatedAfterIsInvalidIso8601() throws Exception {
+        when(orderService.getOrders(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenThrow(new ValidationException("VALIDATION_ERROR",
+                        "Invalid createdAfter format: must be ISO 8601 UTC (e.g. 2026-05-18T00:00:00Z)"));
+
+        mockMvc.perform(get("/api/v1/orders")
+                        .param("createdAfter", "2026-05-18")
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test

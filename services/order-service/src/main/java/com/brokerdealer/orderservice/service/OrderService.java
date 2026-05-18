@@ -50,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -394,7 +395,7 @@ public class OrderService {
     }
 
     public OrderListResponse getOrders(String status, UUID clientId, String side, String timeInForce,
-                                       int page, int pageSize) {
+                                       String createdAfter, int page, int pageSize) {
         if (timeInForce != null && !timeInForce.isBlank()) {
             try {
                 TimeInForce.valueOf(timeInForce);
@@ -404,10 +405,20 @@ public class OrderService {
             }
         }
 
+        Instant createdAfterInstant = null;
+        if (createdAfter != null && !createdAfter.isBlank()) {
+            try {
+                createdAfterInstant = Instant.parse(createdAfter);
+            } catch (DateTimeParseException e) {
+                throw new ValidationException("VALIDATION_ERROR",
+                        "Invalid createdAfter format: must be ISO 8601 UTC (e.g. 2026-05-18T00:00:00Z)");
+            }
+        }
+
         int validatedPageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         int validatedPage = Math.max(page, 0);
 
-        Specification<Order> spec = buildOrderSpec(status, clientId, side, timeInForce);
+        Specification<Order> spec = buildOrderSpec(status, clientId, side, timeInForce, createdAfterInstant);
         Page<Order> ordersPage = orderRepository.findAll(spec, PageRequest.of(validatedPage, validatedPageSize));
 
         List<OrderResponse> items = ordersPage.getContent().stream()
@@ -429,7 +440,8 @@ public class OrderService {
                 .build();
     }
 
-    private Specification<Order> buildOrderSpec(String status, UUID clientId, String side, String timeInForce) {
+    private Specification<Order> buildOrderSpec(String status, UUID clientId, String side, String timeInForce,
+                                                Instant createdAfterInstant) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
@@ -449,6 +461,9 @@ public class OrderService {
                 try {
                     predicates.add(cb.equal(root.get("timeInForce"), TimeInForce.valueOf(timeInForce)));
                 } catch (IllegalArgumentException ignored) {}
+            }
+            if (createdAfterInstant != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), createdAfterInstant));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };

@@ -48,9 +48,10 @@ public class OrderController {
             @RequestParam(required = false) UUID clientId,
             @RequestParam(required = false) String side,
             @RequestParam(required = false) String timeInForce,
+            @RequestParam(required = false) String createdAfter,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int pageSize) {
-        OrderListResponse response = orderService.getOrders(status, clientId, side, timeInForce, page, pageSize);
+        OrderListResponse response = orderService.getOrders(status, clientId, side, timeInForce, createdAfter, page, pageSize);
         return ResponseEntity.ok(response);
     }
 

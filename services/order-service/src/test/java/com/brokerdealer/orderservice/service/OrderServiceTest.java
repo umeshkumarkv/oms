@@ -431,7 +431,7 @@ class OrderServiceTest {
 
     @Test
     void shouldThrowValidationExceptionForInvalidTifFilter() {
-        assertThatThrownBy(() -> orderService.getOrders(null, null, null, "GTC", 0, 50))
+        assertThatThrownBy(() -> orderService.getOrders(null, null, null, "GTC", null, 0, 50))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Invalid tif filter value");
     }
@@ -948,7 +948,7 @@ class OrderServiceTest {
         when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
-        OrderListResponse response = orderService.getOrders(null, null, null, null, 0, 50);
+        OrderListResponse response = orderService.getOrders(null, null, null, null, null, 0, 50);
 
         assertThat(response.getData().getOrders()).hasSize(1);
         assertThat(response.getData().getTotalCount()).isEqualTo(1);
@@ -962,7 +962,7 @@ class OrderServiceTest {
         when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
 
-        OrderListResponse response = orderService.getOrders(null, null, null, null, 0, 500);
+        OrderListResponse response = orderService.getOrders(null, null, null, null, null, 0, 500);
 
         assertThat(response.getData().getPageSize()).isEqualTo(200);
     }
@@ -972,11 +972,60 @@ class OrderServiceTest {
         when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 50), 0));
 
-        OrderListResponse response = orderService.getOrders("FILLED", clientId, null, null, 0, 50);
+        OrderListResponse response = orderService.getOrders("FILLED", clientId, null, null, null, 0, 50);
 
         assertThat(response.getData().getOrders()).isEmpty();
         assertThat(response.getData().getTotalCount()).isEqualTo(0);
         assertThat(response.getData().getTotalPages()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldFilterByCreatedAfterWhenProvided() {
+        Order order = buildOrder(UUID.randomUUID(), OrderStatus.FILLED);
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+        OrderListResponse response = orderService.getOrders("FILLED", null, null, null,
+                "2026-05-18T00:00:00Z", 0, 50);
+
+        assertThat(response.getData().getOrders()).hasSize(1);
+        assertThat(response.getData().getTotalCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReturnAllOrdersWhenCreatedAfterIsNull() {
+        Order order = buildOrder(UUID.randomUUID(), OrderStatus.FILLED);
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+        OrderListResponse response = orderService.getOrders("FILLED", null, null, null, null, 0, 50);
+
+        assertThat(response.getData().getOrders()).hasSize(1);
+    }
+
+    @Test
+    void shouldReturnAllOrdersWhenCreatedAfterIsBlank() {
+        Order order = buildOrder(UUID.randomUUID(), OrderStatus.FILLED);
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+        OrderListResponse response = orderService.getOrders("FILLED", null, null, null, "  ", 0, 50);
+
+        assertThat(response.getData().getOrders()).hasSize(1);
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenCreatedAfterIsDateOnly() {
+        assertThatThrownBy(() -> orderService.getOrders(null, null, null, null, "2026-05-18", 0, 50))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Invalid createdAfter format");
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenCreatedAfterIsGibberish() {
+        assertThatThrownBy(() -> orderService.getOrders(null, null, null, null, "not-a-date", 0, 50))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Invalid createdAfter format");
     }
 
     // --- Helpers ---
