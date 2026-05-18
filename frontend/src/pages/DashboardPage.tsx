@@ -147,7 +147,7 @@ const DashboardPage: React.FC = () => {
         getOrders({ status: 'OPEN' }),
         getOrders({ status: 'FILLED', createdAfter: todayStart }),
         getOrders({ status: 'EXPIRED', createdAfter: todayStart }),
-        getOrders({ tif: 'GTD', status: 'OPEN' }),
+        getOrders({ timeInForce: 'GTD', status: 'OPEN' }),
         getMarketHours(),
       ])
       const gtdExpiringSoon = (gtdPage.orders ?? []).filter(isExpiringSoon)
