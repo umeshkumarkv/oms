@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronDown, ChevronUp, ClipboardList, Clock, Layers, Us
 import { getRiskRuleAudit, getRiskRules, patchRiskRule, resetSystem, triggerScenario } from '../api/riskApi'
 import { getCurrentUser } from '../api/authApi'
 import { RiskRule, RiskRuleAuditRecord } from '../types/risk.types'
+import PendingApprovalsPanel from '../components/PendingApprovalsPanel'
 
 // ── Rule grouping constants ─────────────────────────────────────────────────────
 
@@ -340,25 +341,23 @@ const AdminPanelPage: React.FC = () => {
 
   useEffect(() => { loadRules(); loadAudit() }, [loadRules, loadAudit])
 
+  // ── Pending approvals panel ref for reloading ────────────────────────────
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0)
+  const reloadPending = useCallback(() => setPendingRefreshKey(k => k + 1), [])
+
   // ── Toggle handler ───────────────────────────────────────────────────────
   const handleToggleConfirm = async (reason: string) => {
     if (!toggleModal) return
     const rule     = toggleModal
     const newValue = !rule.enabled
-
-    // Optimistic update
-    setRules(prev => prev.map(r => r.ruleCode === rule.ruleCode ? { ...r, enabled: newValue } : r))
     setToggleModal(null)
 
     try {
-      // TODO: SCRUM-47 — replace stub fallback in patchRiskRule with real PATCH /api/v1/risk/rules/{ruleCode}
       await patchRiskRule(rule.ruleCode, { enabled: newValue, changeReason: reason })
-      showToast(`${rule.ruleCode} ${newValue ? 'enabled' : 'disabled'} successfully`, 'success')
-      loadAudit()
+      showToast(`${rule.ruleCode} change submitted — awaiting checker approval`, 'success')
+      reloadPending()
     } catch {
-      // Revert optimistic update
-      setRules(prev => prev.map(r => r.ruleCode === rule.ruleCode ? { ...r, enabled: rule.enabled } : r))
-      showToast(`Failed to update ${rule.ruleCode}`, 'error')
+      showToast(`Failed to submit change for ${rule.ruleCode}`, 'error')
     }
   }
 
@@ -366,20 +365,14 @@ const AdminPanelPage: React.FC = () => {
   const handleThresholdConfirm = async (newValue: string, reason: string) => {
     if (!thresholdModal) return
     const rule = thresholdModal
-    const prev = rule.thresholdValue
-
-    // Optimistic update
-    setRules(r => r.map(x => x.ruleCode === rule.ruleCode ? { ...x, thresholdValue: newValue } : x))
     setThresholdModal(null)
 
     try {
-      // TODO: SCRUM-47 — replace stub fallback in patchRiskRule with real PATCH /api/v1/risk/rules/{ruleCode}
       await patchRiskRule(rule.ruleCode, { thresholdValue: newValue, changeReason: reason })
-      showToast(`${rule.ruleCode} threshold updated to ${newValue}`, 'success')
-      loadAudit()
+      showToast(`${rule.ruleCode} threshold change submitted — awaiting checker approval`, 'success')
+      reloadPending()
     } catch {
-      setRules(r => r.map(x => x.ruleCode === rule.ruleCode ? { ...x, thresholdValue: prev } : x))
-      showToast(`Failed to update threshold for ${rule.ruleCode}`, 'error')
+      showToast(`Failed to submit threshold change for ${rule.ruleCode}`, 'error')
     }
   }
 
@@ -601,6 +594,9 @@ const AdminPanelPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Pending Approvals Panel */}
+          <PendingApprovalsPanel key={pendingRefreshKey} onChangeReviewed={() => { loadRules(); loadAudit() }} />
 
           {/* Risk Audit Log Card */}
           <div style={s.card}>

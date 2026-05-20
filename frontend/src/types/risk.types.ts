@@ -35,3 +35,22 @@ export interface RiskRuleAuditRecord {
   changeReason: string
   changedAt:    string
 }
+
+export type PendingChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type PendingChangeType   = 'ENABLE' | 'DISABLE' | 'UPDATE_THRESHOLD'
+
+export interface PendingChange {
+  id:                string
+  ruleCode:          string
+  changeType:        PendingChangeType
+  proposedEnabled:   boolean | null
+  proposedThreshold: string | null
+  makerUserId:       string
+  makerUsername:     string
+  status:            PendingChangeStatus
+  makerNote:         string | null
+  rejectionReason:   string | null
+  checkerUserId:     string | null
+  submittedAt:       string
+  reviewedAt:        string | null
+}
