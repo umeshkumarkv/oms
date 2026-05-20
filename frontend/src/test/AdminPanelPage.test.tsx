@@ -68,6 +68,7 @@ beforeEach(() => {
   vi.mocked(authApi.getCurrentUser).mockReturnValue(mockUser as never)
   vi.mocked(riskApi.getRiskRules).mockResolvedValue(MOCK_RULES)
   vi.mocked(riskApi.getRiskRuleAudit).mockResolvedValue([])
+  vi.mocked(riskApi.getPendingChanges).mockResolvedValue([])
   vi.mocked(riskApi.patchRiskRule).mockResolvedValue(undefined as never)
   vi.mocked(riskApi.triggerScenario).mockResolvedValue(undefined as never)
   vi.mocked(riskApi.resetSystem).mockResolvedValue(undefined as never)
