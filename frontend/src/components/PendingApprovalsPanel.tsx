@@ -233,6 +233,16 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
                         <td className="pap-td">
                           <div>
                             <StatusBadge status={change.status as PendingChangeStatus} />
+                            {change.status === 'PENDING' && change.makerNote && (
+                              <div
+                                style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '2px', maxWidth: '140px', cursor: 'help' }}
+                                title={change.makerNote}
+                              >
+                                {change.makerNote.length > 40
+                                  ? change.makerNote.slice(0, 40) + '…'
+                                  : change.makerNote}
+                              </div>
+                            )}
                             {isReviewed && change.reviewedAt && (
                               <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                                 {formatShortDateTime(change.reviewedAt)}

@@ -140,6 +140,36 @@ describe('PendingApprovalsPanel — rendering pending changes', () => {
     expect(await screen.findByText('Policy violation')).toBeTruthy()
   })
 
+  it('shouldRenderMakerNoteTooltipForPendingChange', async () => {
+    vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
+      makePendingChange({ makerNote: 'Disabling for maintenance' }),
+    ])
+    renderPanel()
+    const noteEl = await screen.findByText('Disabling for maintenance')
+    expect(noteEl).toBeTruthy()
+    expect(noteEl.getAttribute('title')).toBe('Disabling for maintenance')
+  })
+
+  it('shouldTruncateMakerNoteAndPreserveFullTitleWhenLongerThan40Chars', async () => {
+    const longNote = 'This rule is being disabled for scheduled quarterly maintenance window'
+    vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
+      makePendingChange({ makerNote: longNote }),
+    ])
+    renderPanel()
+    const noteEl = await screen.findByText(longNote.slice(0, 40) + '…')
+    expect(noteEl).toBeTruthy()
+    expect(noteEl.getAttribute('title')).toBe(longNote)
+  })
+
+  it('shouldNotRenderMakerNoteForNonPendingChange', async () => {
+    vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
+      makePendingChange({ status: 'APPROVED', makerNote: 'Should not appear', reviewedAt: '2026-05-20T11:00:00Z', checkerUserId: 'user-checker' }),
+    ])
+    renderPanel()
+    await screen.findByText('Approved')
+    expect(screen.queryByText('Should not appear')).toBeNull()
+  })
+
 })
 
 describe('PendingApprovalsPanel — approve flow', () => {
