@@ -235,7 +235,7 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
                             <StatusBadge status={change.status as PendingChangeStatus} />
                             {change.status === 'PENDING' && change.makerNote && (
                               <div
-                                style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '2px', maxWidth: '140px', cursor: 'help' }}
+                                style={{ fontSize: '10px', color: 'var(--color-warning)', marginTop: '2px', maxWidth: '140px', cursor: 'help' }}
                                 title={change.makerNote}
                               >
                                 {change.makerNote.length > 40
