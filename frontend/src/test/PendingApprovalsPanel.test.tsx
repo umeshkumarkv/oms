@@ -87,28 +87,31 @@ describe('PendingApprovalsPanel — rendering pending changes', () => {
     expect(await screen.findByText('(you)')).toBeTruthy()
   })
 
-  it('shouldRenderDisableLabelForDisableChangeType', async () => {
+  it('shouldRenderDisableFromAndToColumnsForDisableChangeType', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'DISABLE', proposedEnabled: false }),
     ])
     renderPanel()
-    expect(await screen.findByText('Disable')).toBeTruthy()
+    expect(await screen.findByText('Enabled')).toBeTruthy()   // From column
+    expect(screen.getByText('Disabled')).toBeTruthy()          // To column
   })
 
-  it('shouldRenderEnableLabelForEnableChangeType', async () => {
+  it('shouldRenderEnableFromAndToColumnsForEnableChangeType', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'ENABLE', proposedEnabled: true }),
     ])
     renderPanel()
-    expect(await screen.findByText('Enable')).toBeTruthy()
+    expect(await screen.findByText('Disabled')).toBeTruthy()  // From column
+    expect(screen.getByText('Enabled')).toBeTruthy()           // To column
   })
 
-  it('shouldRenderThresholdLabelWithValueForThresholdChangeType', async () => {
+  it('shouldRenderProposedThresholdInToColumnForThresholdChangeType', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'UPDATE_THRESHOLD', proposedThreshold: '750000' }),
     ])
     renderPanel()
-    expect(await screen.findByText('Threshold → 750000')).toBeTruthy()
+    expect(await screen.findByText('750000')).toBeTruthy()     // To column
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0) // From column shows —
   })
 
   it('shouldRenderApprovedStatusBadgeForReviewedChange', async () => {

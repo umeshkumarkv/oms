@@ -36,6 +36,25 @@ export interface RiskRuleAuditRecord {
   changedAt:    string
 }
 
+export interface ApiErrorResponse {
+  meta: {
+    requestId: string
+    timestamp: string
+  }
+  error: {
+    code: string
+    message: string
+    details: unknown[]
+  }
+}
+
+export interface AxiosApiError {
+  response?: {
+    status?: number
+    data?: ApiErrorResponse
+  }
+}
+
 export type PendingChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type PendingChangeType   = 'ENABLE' | 'DISABLE' | 'UPDATE_THRESHOLD'
 
