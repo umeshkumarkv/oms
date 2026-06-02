@@ -35,3 +35,41 @@ export interface RiskRuleAuditRecord {
   changeReason: string
   changedAt:    string
 }
+
+export interface ApiErrorResponse {
+  meta: {
+    requestId: string
+    timestamp: string
+  }
+  error: {
+    code: string
+    message: string
+    details: unknown[]
+  }
+}
+
+export interface AxiosApiError {
+  response?: {
+    status?: number
+    data?: ApiErrorResponse
+  }
+}
+
+export type PendingChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type PendingChangeType   = 'ENABLE' | 'DISABLE' | 'UPDATE_THRESHOLD'
+
+export interface PendingChange {
+  id:                string
+  ruleCode:          string
+  changeType:        PendingChangeType
+  proposedEnabled:   boolean | null
+  proposedThreshold: string | null
+  makerUserId:       string
+  makerUsername:     string
+  status:            PendingChangeStatus
+  makerNote:         string | null
+  rejectionReason:   string | null
+  checkerUserId:     string | null
+  submittedAt:       string
+  reviewedAt:        string | null
+}
