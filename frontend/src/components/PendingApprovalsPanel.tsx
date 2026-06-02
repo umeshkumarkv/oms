@@ -27,6 +27,25 @@ function btnCls(variant: 'primary' | 'danger' | 'secondary' | 'ghost', sm?: bool
   return ['pap-btn', `pap-btn--${variant}`, sm ? 'pap-btn--sm' : ''].filter(Boolean).join(' ')
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const s = {
+  overlay:    { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500 } as React.CSSProperties,
+  modal:      { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '24px', width: '440px', maxWidth: '90vw', boxShadow: 'var(--shadow-lg)' } as React.CSSProperties,
+  modalTitle: { margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)' } as React.CSSProperties,
+  modalSub:   { margin: '0 0 16px', fontSize: '13px', color: 'var(--color-text-secondary)' } as React.CSSProperties,
+  modalFoot:  { display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' } as React.CSSProperties,
+  fieldGroup: { marginBottom: '14px' } as React.CSSProperties,
+  label:      { display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px', textTransform: 'uppercase' as const, letterSpacing: '0.04em' } as React.CSSProperties,
+  textarea:   { width: '100%', padding: '8px 10px', borderRadius: 'var(--radius-md)', fontSize: '13px', boxSizing: 'border-box' as const, outline: 'none', resize: 'vertical' as const, minHeight: '72px' } as React.CSSProperties,
+  card:       { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: '20px', marginBottom: '16px' } as React.CSSProperties,
+  cardTitle:  { margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } as React.CSSProperties,
+  table:      { width: '100%', borderCollapse: 'collapse' as const, fontSize: '12px' } as React.CSSProperties,
+  th:         { padding: '8px 10px', textAlign: 'left' as const, fontSize: '10px', fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-bg)', textTransform: 'uppercase' as const, letterSpacing: '0.03em', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  td:         { padding: '9px 10px', borderBottom: '1px solid var(--color-border-light)', verticalAlign: 'middle' as const } as React.CSSProperties,
+  toast:      (type: 'success' | 'error'): React.CSSProperties => ({ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 18px', borderRadius: 'var(--radius-md)', color: 'var(--color-surface)', fontSize: '13px', fontWeight: 500, boxShadow: 'var(--shadow-md)', zIndex: 9999, maxWidth: '360px', background: type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }),
+}
+
 // ── Reject modal ──────────────────────────────────────────────────────────────
 
 interface RejectModalProps {
@@ -37,32 +56,33 @@ interface RejectModalProps {
 
 const RejectModal: React.FC<RejectModalProps> = ({ change, onConfirm, onCancel }) => {
   const [reason, setReason] = useState('')
-  const valid = reason.trim().length > 0
+  const valid    = reason.trim().length > 0
+  const hasError = !valid && reason.length > 0
   return (
-    <div className="pap-overlay" onClick={onCancel}>
-      <div className="pap-modal" onClick={e => e.stopPropagation()}>
-        <h3 className="pap-modal-title">Reject Change</h3>
-        <p className="pap-modal-sub">
+    <div style={s.overlay} onClick={onCancel}>
+      <div style={s.modal} onClick={e => e.stopPropagation()}>
+        <h3 style={s.modalTitle}>Reject Change</h3>
+        <p style={s.modalSub}>
           {change.ruleCode}: {getFromValue(change)} → {getToValue(change)}, submitted by {change.makerUsername}
         </p>
-        <div className="pap-field-group">
-          <label className="pap-label">
+        <div style={s.fieldGroup}>
+          <label style={s.label}>
             Rejection Reason <span style={{ color: 'var(--color-error)' }}>*</span>
           </label>
           <textarea
-            className={`pap-textarea${!valid && reason.length > 0 ? ' pap-textarea--error' : ''}`}
+            style={{ ...s.textarea, border: `1px solid ${hasError ? 'var(--color-error)' : 'var(--color-border)'}` }}
             placeholder="Provide a mandatory reason for rejection"
             value={reason}
             onChange={e => setReason(e.target.value)}
             autoFocus
           />
-          {!valid && reason.length > 0 && (
+          {hasError && (
             <div style={{ fontSize: '11px', color: 'var(--color-error)', marginTop: '4px' }}>
               Rejection reason is required.
             </div>
           )}
         </div>
-        <div className="pap-modal-foot">
+        <div style={s.modalFoot}>
           <button className={btnCls('secondary')} onClick={onCancel}>Cancel</button>
           <button
             className={btnCls('danger')}
@@ -158,7 +178,7 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
   return (
     <>
       {toast && (
-        <div className={`pap-toast pap-toast--${toast.type}`}>{toast.message}</div>
+        <div style={s.toast(toast.type)}>{toast.message}</div>
       )}
       {rejectTarget && (
         <RejectModal
@@ -168,8 +188,8 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
         />
       )}
 
-      <div className="pap-card">
-        <h2 className="pap-card-title">
+      <div style={s.card}>
+        <h2 style={s.cardTitle}>
           Pending Approvals
           <button className={btnCls('secondary', true)} onClick={loadChanges}>
             ↻ Refresh
@@ -186,11 +206,11 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="pap-table">
+            <table style={s.table}>
               <thead>
                 <tr>
                   {TABLE_HEADERS.map(h => (
-                    <th key={h} className="pap-th">{h}</th>
+                    <th key={h} style={s.th}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -202,22 +222,22 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
                   return (
                     <React.Fragment key={change.id}>
                       <tr style={{ opacity: isReviewed ? 0.7 : 1 }}>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-primary)', fontWeight: 600 }}>
                             {change.ruleCode}
                           </span>
                         </td>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                             {getFromValue(change)}
                           </span>
                         </td>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
                             {getToValue(change)}
                           </span>
                         </td>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                             {change.makerUsername}
                             {isSelfChange && (
@@ -225,12 +245,12 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
                             )}
                           </span>
                         </td>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
                             {formatShortDateTime(change.submittedAt)}
                           </span>
                         </td>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           <div>
                             <StatusBadge status={change.status as PendingChangeStatus} />
                             {change.status === 'PENDING' && change.makerNote && (
@@ -260,7 +280,7 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
                             )}
                           </div>
                         </td>
-                        <td className="pap-td">
+                        <td style={s.td}>
                           {isReviewed ? (
                             <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>—</span>
                           ) : (

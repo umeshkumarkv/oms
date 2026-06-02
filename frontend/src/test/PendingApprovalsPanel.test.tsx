@@ -87,31 +87,31 @@ describe('PendingApprovalsPanel — rendering pending changes', () => {
     expect(await screen.findByText('(you)')).toBeTruthy()
   })
 
-  it('shouldRenderDisableFromAndToColumnsForDisableChangeType', async () => {
+  it('shouldRenderCurrentAndNewValueColumnsForDisableChangeType', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'DISABLE', proposedEnabled: false }),
     ])
     renderPanel()
-    expect(await screen.findByText('Enabled')).toBeTruthy()   // From column
-    expect(screen.getByText('Disabled')).toBeTruthy()          // To column
+    expect(await screen.findByText('Enabled')).toBeTruthy()   // Current Value column
+    expect(screen.getByText('Disabled')).toBeTruthy()          // New Value column
   })
 
-  it('shouldRenderEnableFromAndToColumnsForEnableChangeType', async () => {
+  it('shouldRenderCurrentAndNewValueColumnsForEnableChangeType', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'ENABLE', proposedEnabled: true }),
     ])
     renderPanel()
-    expect(await screen.findByText('Disabled')).toBeTruthy()  // From column
-    expect(screen.getByText('Enabled')).toBeTruthy()           // To column
+    expect(await screen.findByText('Disabled')).toBeTruthy()  // Current Value column
+    expect(screen.getByText('Enabled')).toBeTruthy()           // New Value column
   })
 
-  it('shouldRenderProposedThresholdInToColumnForThresholdChangeType', async () => {
+  it('shouldRenderProposedThresholdInNewValueColumnForThresholdChangeType', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'UPDATE_THRESHOLD', proposedThreshold: '750000' }),
     ])
     renderPanel()
-    expect(await screen.findByText('750000')).toBeTruthy()     // To column
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0) // From column shows —
+    expect(await screen.findByText('750000')).toBeTruthy()     // New Value column
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0) // Current Value column shows —
   })
 
   it('shouldRenderApprovedStatusBadgeForReviewedChange', async () => {
