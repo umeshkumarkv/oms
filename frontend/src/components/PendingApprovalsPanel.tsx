@@ -153,7 +153,7 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
     }
   }
 
-  const TABLE_HEADERS: string[] = ['Rule Code', 'From', 'To', 'Submitted By', 'Submitted At', 'Status', 'Actions']
+  const TABLE_HEADERS: string[] = ['Rule Code', 'Current Value', 'New Value', 'Submitted By', 'Submitted At', 'Status', 'Actions']
 
   return (
     <>
