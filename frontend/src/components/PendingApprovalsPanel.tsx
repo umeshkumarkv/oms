@@ -41,7 +41,7 @@ const s = {
   card:       { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: '20px', marginBottom: '16px' } as React.CSSProperties,
   cardTitle:  { margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } as React.CSSProperties,
   table:      { width: '100%', borderCollapse: 'collapse' as const, fontSize: '12px' } as React.CSSProperties,
-  th:         { padding: '8px 10px', textAlign: 'left' as const, fontSize: '10px', fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-bg)', textTransform: 'uppercase' as const, letterSpacing: '0.03em', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  th:         { padding: '8px 10px', textAlign: 'left' as const, fontSize: '10px', fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-bg)', textTransform: 'uppercase' as const, letterSpacing: '0.03em', whiteSpace: 'nowrap' as const, position: 'sticky' as const, top: 0, zIndex: 1 } as React.CSSProperties,
   td:         { padding: '9px 10px', borderBottom: '1px solid var(--color-border-light)', verticalAlign: 'middle' as const } as React.CSSProperties,
   toast:      (type: 'success' | 'error'): React.CSSProperties => ({ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 18px', borderRadius: 'var(--radius-md)', color: 'var(--color-surface)', fontSize: '13px', fontWeight: 500, boxShadow: 'var(--shadow-md)', zIndex: 9999, maxWidth: '360px', background: type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }),
 }
@@ -205,7 +205,7 @@ const PendingApprovalsPanel: React.FC<PendingApprovalsPanelProps> = ({ onChangeR
             No pending changes found.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '400px' }}>
             <table style={s.table}>
               <thead>
                 <tr>
