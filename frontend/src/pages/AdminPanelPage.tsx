@@ -103,7 +103,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked,
     aria-checked={checked}
     style={{
       width: '38px', height: '20px', borderRadius: '10px',
-      background: checked ? '#10b981' : 'var(--color-border)',
+      background: checked ? 'var(--color-success)' : 'var(--color-border)',
       position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
     }}
   >
