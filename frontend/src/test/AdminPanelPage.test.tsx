@@ -70,8 +70,6 @@ beforeEach(() => {
   vi.mocked(riskApi.getRiskRuleAudit).mockResolvedValue([])
   vi.mocked(riskApi.getPendingChanges).mockResolvedValue([])
   vi.mocked(riskApi.patchRiskRule).mockResolvedValue(undefined as never)
-  vi.mocked(riskApi.triggerScenario).mockResolvedValue(undefined as never)
-  vi.mocked(riskApi.resetSystem).mockResolvedValue(undefined as never)
 })
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
