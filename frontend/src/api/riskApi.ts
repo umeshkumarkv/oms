@@ -31,11 +31,3 @@ export const rejectChange = async (changeId: string, rejectionReason: string): P
   const res = await http.patch(`/risk/rules/pending-changes/${changeId}/reject`, { rejectionReason })
   return res.data.data
 }
-
-export const triggerScenario = async (scenarioId: string, symbol: string): Promise<void> => {
-  await http.post('/admin/scenario', { scenarioId, symbol })
-}
-
-export const resetSystem = async (): Promise<void> => {
-  await http.post('/admin/reset')
-}
