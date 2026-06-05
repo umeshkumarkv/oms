@@ -141,6 +141,7 @@ const OrderEntryPage: React.FC = () => {
   const [toastMsg,     setToastMsg]     = useState('')
   const [fieldErrors,  setFieldErrors]  = useState<FieldErrors>({})
   const [showModal,    setShowModal]    = useState(false)
+  const [symbolNotFound, setSymbolNotFound] = useState(false)
 
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -166,6 +167,7 @@ const OrderEntryPage: React.FC = () => {
     setFieldErrors({})
     setSubmitError(null)
     setQuote(null)
+    setSymbolNotFound(false)
     setSide('BUY')
     setOrderType('LIMIT')
     setRoutingDestination(DEFAULT_VENUE)
@@ -212,13 +214,23 @@ const OrderEntryPage: React.FC = () => {
 
   useEffect(() => {
     if (symbolDebounce.current) clearTimeout(symbolDebounce.current)
-    if (!symbol) { setQuote(null); return }
+    if (!symbol) { setQuote(null); setSymbolNotFound(false); return }
     symbolDebounce.current = setTimeout(async () => {
       setQuoteLoading(true)
-      const q = await getInstrument(symbol)
-      setQuote(q)
-      if (q && !limitPrice) {
-        setLimitPrice(side === 'BUY' ? q.askPrice : q.bidPrice)
+      setSymbolNotFound(false)
+      try {
+        const q = await getInstrument(symbol)
+        setQuote(q)
+        if (q && !limitPrice) {
+          setLimitPrice(side === 'BUY' ? q.askPrice : q.bidPrice)
+        }
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { error?: { code?: string } } } }
+        const code = axiosErr?.response?.data?.error?.code
+        if (code === 'SYMBOL_NOT_FOUND') {
+          setSymbolNotFound(true)
+          setQuote(null)
+        }
       }
       setQuoteLoading(false)
     }, 400)
@@ -331,7 +343,7 @@ const OrderEntryPage: React.FC = () => {
 
   // Side-aware accent color
   const sideAccent = side === 'BUY' ? 'var(--color-buy)' : side === 'SHORT_SELL' ? 'var(--color-warning)' : 'var(--color-sell)'
-  const submitBg   = submitting || !allChecksPass
+  const submitBg   = submitting || !allChecksPass || symbolNotFound
     ? '#9ca3af'
     : side === 'BUY'
       ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
@@ -414,13 +426,14 @@ const OrderEntryPage: React.FC = () => {
           <div style={{ ...s.fieldGroup, position: 'relative' }}>
             <label style={s.label}>Symbol</label>
             <input
-              style={fieldErrors.symbol ? s.inputError : s.input}
+              style={fieldErrors.symbol || symbolNotFound ? s.inputError : s.input}
               placeholder="e.g. AAPL"
               value={symbolInput}
               onChange={(e) => {
                 const v = e.target.value.toUpperCase()
                 setSymbolInput(v)
                 setSymbol(v)
+                setSymbolNotFound(false)
               }}
               autoComplete="off"
               disabled={isExpired}
@@ -447,6 +460,7 @@ const OrderEntryPage: React.FC = () => {
               </div>
             )}
             {quoteLoading && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Fetching quote…</div>}
+            {symbolNotFound && <div style={s.errorText}>Symbol not found. Please search and select a valid instrument.</div>}
             {fieldErrors.symbol && <div style={s.errorText}>{fieldErrors.symbol}</div>}
           </div>
 
@@ -569,11 +583,11 @@ const OrderEntryPage: React.FC = () => {
               borderRadius: 'var(--radius-md)', border: 'none',
               background: submitBg, color: '#fff',
               fontSize: '15px', fontWeight: 700,
-              cursor: submitting || !allChecksPass || isExpired ? 'not-allowed' : 'pointer',
+              cursor: submitting || !allChecksPass || isExpired || symbolNotFound ? 'not-allowed' : 'pointer',
               marginTop: '8px', transition: 'opacity 0.2s',
             }}
             onClick={handleSubmit}
-            disabled={submitting || !allChecksPass || isExpired}
+            disabled={submitting || !allChecksPass || isExpired || symbolNotFound}
           >
             {submitting ? (
               <>
