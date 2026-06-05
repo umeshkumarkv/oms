@@ -612,3 +612,82 @@ describe('OrderEntryPage — real-time Bid/Ask (SCRUM-108)', () => {
     expect(screen.getByText('$175.50')).toBeInTheDocument()
   })
 })
+
+// ── SYMBOL_NOT_FOUND handling — SCRUM-138 ─────────────────────────────────────
+
+describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowInlineErrorWhenGetInstrumentThrowsSymbolNotFound', async () => {
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockRejectedValueOnce({
+      response: { data: { error: { code: 'SYMBOL_NOT_FOUND' } } },
+    })
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+    })
+    await waitFor(
+      () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
+      { timeout: 1500 }
+    )
+  })
+
+  it('shouldDisableSubmitButtonWhenSymbolNotFound', async () => {
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockRejectedValueOnce({
+      response: { data: { error: { code: 'SYMBOL_NOT_FOUND' } } },
+    })
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+    })
+    await waitFor(
+      () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
+      { timeout: 1500 }
+    )
+    expect(screen.getByText('Submit Order')).toBeDisabled()
+  })
+
+  it('shouldClearSymbolNotFoundErrorImmediatelyOnInputChange', async () => {
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockRejectedValueOnce({
+      response: { data: { error: { code: 'SYMBOL_NOT_FOUND' } } },
+    })
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+    })
+    await waitFor(
+      () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
+      { timeout: 1500 }
+    )
+
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPLE' } })
+    })
+    expect(screen.queryByText('Symbol not found. Please search and select a valid instrument.')).toBeNull()
+  })
+
+  it('shouldNotShowSymbolNotFoundErrorForNonSymbolNotFoundErrors', async () => {
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockRejectedValueOnce({
+      response: { data: { error: { code: 'INTERNAL_SERVER_ERROR' } } },
+    })
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+    })
+    await waitFor(() => expect(vi.mocked(getInstrument)).toHaveBeenCalled(), { timeout: 1500 })
+    await act(async () => {})
+    expect(screen.queryByText('Symbol not found. Please search and select a valid instrument.')).toBeNull()
+  })
+})
