@@ -72,6 +72,9 @@ class PendingChangeServiceTest {
                         : type == PendingChangeType.DISABLE ? Boolean.FALSE : null)
                 .proposedThreshold(type == PendingChangeType.UPDATE_THRESHOLD
                         ? new BigDecimal("5000.0000") : null)
+                .currentEnabled(type == PendingChangeType.ENABLE ? Boolean.FALSE
+                        : type == PendingChangeType.DISABLE ? Boolean.TRUE : null)
+                .currentThreshold(type == PendingChangeType.UPDATE_THRESHOLD ? "10000" : null)
                 .makerUserId(MAKER_ID)
                 .makerUsername(MAKER_NAME)
                 .status(status)
@@ -90,7 +93,7 @@ class PendingChangeServiceTest {
         UUID changeId = UUID.randomUUID();
         RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.DISABLE, PendingChangeStatus.PENDING);
 
-        when(riskRuleConfigRepository.existsById(RULE_CODE)).thenReturn(true);
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
         when(pendingChangeRepository.save(any())).thenReturn(saved);
 
         PendingChangeResponse response = pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
@@ -114,7 +117,7 @@ class PendingChangeServiceTest {
         UUID changeId = UUID.randomUUID();
         RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.ENABLE, PendingChangeStatus.PENDING);
 
-        when(riskRuleConfigRepository.existsById(RULE_CODE)).thenReturn(true);
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
         when(pendingChangeRepository.save(any())).thenReturn(saved);
 
         PendingChangeResponse response = pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
@@ -130,7 +133,7 @@ class PendingChangeServiceTest {
         UUID changeId = UUID.randomUUID();
         RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.UPDATE_THRESHOLD, PendingChangeStatus.PENDING);
 
-        when(riskRuleConfigRepository.existsById(RULE_CODE)).thenReturn(true);
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
         when(pendingChangeRepository.save(any())).thenReturn(saved);
 
         PendingChangeResponse response = pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
@@ -154,7 +157,7 @@ class PendingChangeServiceTest {
         UpdateRiskRuleRequest request = new UpdateRiskRuleRequest();
         request.setEnabled(false);
 
-        when(riskRuleConfigRepository.existsById("UNKNOWN")).thenReturn(false);
+        when(riskRuleConfigRepository.findById("UNKNOWN")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> pendingChangeService.submitPendingChange("UNKNOWN", request, MAKER_ID, MAKER_NAME))
                 .isInstanceOf(RuleNotFoundException.class)
@@ -169,13 +172,71 @@ class PendingChangeServiceTest {
         UUID changeId = UUID.randomUUID();
         RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.DISABLE, PendingChangeStatus.PENDING);
 
-        when(riskRuleConfigRepository.existsById(RULE_CODE)).thenReturn(true);
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
         when(pendingChangeRepository.save(any())).thenReturn(saved);
 
         pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
 
         verify(riskRuleConfigRepository, never()).save(any());
         verifyNoInteractions(riskEvaluationService);
+    }
+
+    @Test
+    void shouldPopulateCurrentEnabledTrueWhenDisableChangeSubmitted() {
+        sampleRule.setEnabled(true);
+        UpdateRiskRuleRequest request = new UpdateRiskRuleRequest();
+        request.setEnabled(false);
+
+        UUID changeId = UUID.randomUUID();
+        RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.DISABLE, PendingChangeStatus.PENDING);
+
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
+        when(pendingChangeRepository.save(any())).thenReturn(saved);
+
+        pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
+
+        ArgumentCaptor<RiskRulePendingChange> captor = ArgumentCaptor.forClass(RiskRulePendingChange.class);
+        verify(pendingChangeRepository).save(captor.capture());
+        assertThat(captor.getValue().getCurrentEnabled()).isTrue();
+        assertThat(captor.getValue().getCurrentThreshold()).isEqualTo("10000.0000");
+    }
+
+    @Test
+    void shouldPopulateCurrentEnabledFalseWhenEnableChangeSubmitted() {
+        sampleRule.setEnabled(false);
+        UpdateRiskRuleRequest request = new UpdateRiskRuleRequest();
+        request.setEnabled(true);
+
+        UUID changeId = UUID.randomUUID();
+        RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.ENABLE, PendingChangeStatus.PENDING);
+
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
+        when(pendingChangeRepository.save(any())).thenReturn(saved);
+
+        pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
+
+        ArgumentCaptor<RiskRulePendingChange> captor = ArgumentCaptor.forClass(RiskRulePendingChange.class);
+        verify(pendingChangeRepository).save(captor.capture());
+        assertThat(captor.getValue().getCurrentEnabled()).isFalse();
+    }
+
+    @Test
+    void shouldPopulateCurrentThresholdWhenUpdateThresholdChangeSubmitted() {
+        sampleRule.setThresholdValue(new BigDecimal("500.0000"));
+        UpdateRiskRuleRequest request = new UpdateRiskRuleRequest();
+        request.setThresholdValue(new BigDecimal("1000.0000"));
+
+        UUID changeId = UUID.randomUUID();
+        RiskRulePendingChange saved = buildPendingChange(changeId, PendingChangeType.UPDATE_THRESHOLD, PendingChangeStatus.PENDING);
+
+        when(riskRuleConfigRepository.findById(RULE_CODE)).thenReturn(Optional.of(sampleRule));
+        when(pendingChangeRepository.save(any())).thenReturn(saved);
+
+        pendingChangeService.submitPendingChange(RULE_CODE, request, MAKER_ID, MAKER_NAME);
+
+        ArgumentCaptor<RiskRulePendingChange> captor = ArgumentCaptor.forClass(RiskRulePendingChange.class);
+        verify(pendingChangeRepository).save(captor.capture());
+        assertThat(captor.getValue().getCurrentThreshold()).isEqualTo("500.0000");
     }
 
     // ─── listPendingChanges ───────────────────────────────────────────────────

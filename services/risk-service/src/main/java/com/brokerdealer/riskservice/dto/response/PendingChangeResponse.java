@@ -17,6 +17,8 @@ public class PendingChangeResponse {
     PendingChangeType changeType;
     Boolean proposedEnabled;
     String proposedThreshold;
+    Boolean currentEnabled;
+    String currentThreshold;
     String makerUserId;
     String makerUsername;
     PendingChangeStatus status;

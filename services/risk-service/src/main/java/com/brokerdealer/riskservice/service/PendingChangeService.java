@@ -41,9 +41,8 @@ public class PendingChangeService {
                     "At least one of 'enabled' or 'thresholdValue' must be provided");
         }
 
-        if (!riskRuleConfigRepository.existsById(ruleCode)) {
-            throw new RuleNotFoundException("RULE_NOT_FOUND", "Risk rule not found: " + ruleCode);
-        }
+        RiskRuleConfig currentRule = riskRuleConfigRepository.findById(ruleCode)
+                .orElseThrow(() -> new RuleNotFoundException("RULE_NOT_FOUND", "Risk rule not found: " + ruleCode));
 
         PendingChangeType changeType = resolveChangeType(request);
 
@@ -52,6 +51,9 @@ public class PendingChangeService {
                 .changeType(changeType)
                 .proposedEnabled(request.getEnabled())
                 .proposedThreshold(request.getThresholdValue())
+                .currentEnabled(currentRule.getEnabled())
+                .currentThreshold(currentRule.getThresholdValue() != null
+                        ? currentRule.getThresholdValue().toPlainString() : null)
                 .makerUserId(makerUserId)
                 .makerUsername(makerUsername)
                 .status(PendingChangeStatus.PENDING)
@@ -173,6 +175,8 @@ public class PendingChangeService {
                 .proposedEnabled(change.getProposedEnabled())
                 .proposedThreshold(change.getProposedThreshold() != null
                         ? change.getProposedThreshold().toPlainString() : null)
+                .currentEnabled(change.getCurrentEnabled())
+                .currentThreshold(change.getCurrentThreshold())
                 .makerUserId(change.getMakerUserId())
                 .makerUsername(change.getMakerUsername())
                 .status(change.getStatus())

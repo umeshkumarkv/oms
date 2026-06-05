@@ -52,6 +52,12 @@ public class RiskRulePendingChange {
     @Column(name = "checker_user_id", length = 200)
     private String checkerUserId;
 
+    @Column(name = "current_enabled")
+    private Boolean currentEnabled;
+
+    @Column(name = "current_threshold", length = 255)
+    private String currentThreshold;
+
     @Column(name = "submitted_at", nullable = false, updatable = false)
     private Instant submittedAt;
 
