@@ -1,12 +1,15 @@
 package com.brokerdealer.marketdataservice.service;
 
+import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
+import com.brokerdealer.marketdataservice.mapper.InstrumentSearchMapper;
 import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
@@ -26,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -43,7 +47,10 @@ public class MarketDataService {
     private String timezone;
 
     private static final String CACHE_KEY_PREFIX = "market:price:";
+    private static final String SEARCH_CACHE_KEY_PREFIX = "market:search:";
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
+    private static final Duration SEARCH_CACHE_TTL = Duration.ofSeconds(10);
+    private static final int SEARCH_MAX_LIMIT = 20;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     @Value("${market.simulation.bypass-market-hours:false}")
@@ -55,6 +62,7 @@ public class MarketDataService {
     private final InstrumentRepository instrumentRepository;
     private final InstrumentMapper instrumentMapper;
     private final InstrumentSummaryMapper instrumentSummaryMapper;
+    private final InstrumentSearchMapper instrumentSearchMapper;
     private final MarketHolidayRepository marketHolidayRepository;
     private final MarketHolidayMapper marketHolidayMapper;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -156,6 +164,61 @@ public class MarketDataService {
                             status);
                 })
                 .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<InstrumentSearchResponse> searchInstruments(String q, int limit) {
+        String normalised = q.trim();
+        int effectiveLimit = Math.min(Math.max(limit, 1), SEARCH_MAX_LIMIT);
+        String cacheKey = SEARCH_CACHE_KEY_PREFIX + normalised.toLowerCase();
+        log.debug("Searching instruments: q={}, limit={}", normalised, effectiveLimit);
+
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached instanceof List<?> list
+                && (list.isEmpty() || list.get(0) instanceof InstrumentSearchResponse)) {
+            log.debug("Search cache hit: q={}", normalised);
+            return list.stream()
+                    .filter(InstrumentSearchResponse.class::isInstance)
+                    .map(InstrumentSearchResponse.class::cast)
+                    .limit(effectiveLimit)
+                    .toList();
+        }
+
+        String qUpper = normalised.toUpperCase();
+        List<InstrumentSearchResponse> results = instrumentRepository
+                .findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc()
+                .stream()
+                .filter(i -> matchesQuery(i, qUpper))
+                .sorted(Comparator.comparingInt(i -> relevanceScore(i, qUpper)))
+                .map(instrumentSearchMapper::toSearchResponse)
+                .toList();
+
+        redisTemplate.opsForValue().set(cacheKey, results, SEARCH_CACHE_TTL);
+        log.debug("Search cache populated: q={}, hits={}", normalised, results.size());
+
+        return results.stream().limit(effectiveLimit).toList();
+    }
+
+    private boolean matchesQuery(Instrument instrument, String qUpper) {
+        if (instrument.getSymbol().toUpperCase().contains(qUpper)) return true;
+        if (instrument.getCompanyName() != null
+                && instrument.getCompanyName().toUpperCase().contains(qUpper)) return true;
+        if (instrument.getCusip() != null
+                && instrument.getCusip().toUpperCase().startsWith(qUpper)) return true;
+        if (instrument.getSecNumber() != null
+                && instrument.getSecNumber().equalsIgnoreCase(qUpper)) return true;
+        return false;
+    }
+
+    private int relevanceScore(Instrument instrument, String qUpper) {
+        if (instrument.getSymbol().equalsIgnoreCase(qUpper)) return 0;
+        if (instrument.getCusip() != null && instrument.getCusip().equalsIgnoreCase(qUpper)) return 1;
+        if (instrument.getSecNumber() != null && instrument.getSecNumber().equalsIgnoreCase(qUpper)) return 2;
+        if (instrument.getSymbol().toUpperCase().startsWith(qUpper)) return 3;
+        if (instrument.getCusip() != null && instrument.getCusip().toUpperCase().startsWith(qUpper)) return 4;
+        if (instrument.getCompanyName() != null
+                && instrument.getCompanyName().toUpperCase().contains(qUpper)) return 5;
+        return 6;
     }
 
     public boolean isMarketOpen(ZonedDateTime now) {

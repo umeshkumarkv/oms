@@ -7,7 +7,9 @@ import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
+import com.brokerdealer.marketdataservice.mapper.InstrumentSearchMapper;
 import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
@@ -45,6 +47,9 @@ class MarketDataServiceTest {
 
     @Mock
     private InstrumentSummaryMapper instrumentSummaryMapper;
+
+    @Mock
+    private InstrumentSearchMapper instrumentSearchMapper;
 
     @Mock
     private MarketHolidayRepository marketHolidayRepository;
@@ -464,6 +469,183 @@ class MarketDataServiceTest {
                 .lastPrice("175.00")
                 .tradable(true)
                 .halted(halted)
+                .build();
+    }
+
+    // --- searchInstruments ---
+
+    @Test
+    void shouldReturnMatchingInstrumentsBySymbolStartsWith() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("AAP", 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void shouldReturnMatchingInstrumentsByCompanyName() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("Apple", 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void shouldReturnMatchingInstrumentsByExactCusip() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("037833100", 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getCusip()).isEqualTo("037833100");
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenNoMatchFound() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("XYZNOTREAL", 10);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldLimitSearchResultsByParameter() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        Instrument amzn = buildSearchInstrument("AMZN", "Amazon.com Inc.", "023135106", "AMZN-US", "NASDAQ");
+        Instrument meta = buildSearchInstrument("META", "Meta Platforms Inc.", "30303M102", "META-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+        InstrumentSearchResponse amznResp = buildSearchResponse("AMZN", "Amazon.com Inc.", "023135106");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl, amzn, meta));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+        when(instrumentSearchMapper.toSearchResponse(amzn)).thenReturn(amznResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("A", 2);
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void shouldCapLimitAtTwenty() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("AAPL", 50);
+
+        assertThat(result).hasSizeLessThanOrEqualTo(20);
+    }
+
+    @Test
+    void shouldOrderExactSymbolMatchFirst() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        Instrument aaplx = buildSearchInstrument("AAPLX", "Apple Extended", "999999999", "AAPLX-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+        InstrumentSearchResponse aaplxResp = buildSearchResponse("AAPLX", "Apple Extended", "999999999");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aaplx, aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+        when(instrumentSearchMapper.toSearchResponse(aaplx)).thenReturn(aaplxResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("AAPL", 10);
+
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void shouldPopulateCacheOnCacheMiss() {
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+
+        marketDataService.searchInstruments("AAPL", 10);
+
+        verify(valueOperations).set(eq("market:search:aapl"), any(List.class), eq(Duration.ofSeconds(10)));
+    }
+
+    @Test
+    void shouldReturnCachedResultsOnSearchCacheHit() {
+        List<InstrumentSearchResponse> cached = List.of(buildSearchResponse("AAPL", "Apple Inc.", "037833100"));
+        when(valueOperations.get("market:search:aapl")).thenReturn(cached);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("AAPL", 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+        verifyNoInteractions(instrumentSearchMapper);
+    }
+
+    @Test
+    void shouldFallThroughToDbWhenCacheContainsLinkedHashMap() {
+        // Simulate Redis deserializing InstrumentSearchResponse → LinkedHashMap (type info missing)
+        List<java.util.LinkedHashMap<String, Object>> staleCache = List.of(new java.util.LinkedHashMap<>());
+        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
+        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+
+        when(valueOperations.get("market:search:aapl")).thenReturn(staleCache);
+        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
+                .thenReturn(List.of(aapl));
+        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+
+        List<InstrumentSearchResponse> result = marketDataService.searchInstruments("AAPL", 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
+        verify(instrumentRepository).findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc();
+    }
+
+    private Instrument buildSearchInstrument(String symbol, String companyName,
+            String cusip, String secNumber, String exchange) {
+        return Instrument.builder()
+                .symbol(symbol)
+                .lastPrice(new BigDecimal("175.00"))
+                .tradable(true)
+                .tradingHalted(false)
+                .companyName(companyName)
+                .cusip(cusip)
+                .secNumber(secNumber)
+                .exchange(exchange)
+                .build();
+    }
+
+    private InstrumentSearchResponse buildSearchResponse(String symbol, String companyName, String cusip) {
+        return InstrumentSearchResponse.builder()
+                .symbol(symbol)
+                .companyName(companyName)
+                .cusip(cusip)
+                .lastPrice("175.00")
+                .tradable(true)
                 .build();
     }
 }

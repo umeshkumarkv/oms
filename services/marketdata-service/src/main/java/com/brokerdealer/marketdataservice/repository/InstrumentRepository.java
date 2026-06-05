@@ -10,4 +10,6 @@ import java.util.List;
 public interface InstrumentRepository extends JpaRepository<Instrument, String> {
 
     List<Instrument> findAllByOrderBySymbolAsc();
+
+    List<Instrument> findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc();
 }

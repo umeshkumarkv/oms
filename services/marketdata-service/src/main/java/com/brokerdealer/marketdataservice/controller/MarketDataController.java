@@ -1,6 +1,7 @@
 package com.brokerdealer.marketdataservice.controller;
 
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
@@ -27,6 +28,15 @@ public class MarketDataController {
 
     private final MarketDataService marketDataService;
     private final TickService tickService;
+
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchInstruments(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "10") int limit) {
+        log.debug("GET /api/v1/market/search?q={}&limit={}", q, limit);
+        List<InstrumentSearchResponse> data = marketDataService.searchInstruments(q, limit);
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
 
     @GetMapping("/{symbol}")
     public ResponseEntity<Map<String, Object>> getInstrument(@PathVariable String symbol) {
