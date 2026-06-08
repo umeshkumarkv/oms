@@ -38,4 +38,14 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     @Query("SELECT AVG(CAST(o.quantity AS java.lang.Double)), AVG(o.orderValue) " +
            "FROM Order o WHERE o.clientId = :clientId AND o.createdAt >= :cutoff")
     List<Object[]> computeAvgMetricsByClientId(@Param("clientId") UUID clientId, @Param("cutoff") Instant cutoff);
+
+    // Sum of quantity committed to open (non-terminal) SELL orders for a client+symbol.
+    // Used by Level 2 check #20 to compute availableToSell = totalHoldings - committed.
+    @Query("SELECT COALESCE(SUM(o.quantity), 0) FROM Order o " +
+           "WHERE o.clientId = :clientId AND o.symbol = :symbol " +
+           "AND o.side = com.brokerdealer.orderservice.domain.OrderSide.SELL " +
+           "AND o.status IN :openStatuses")
+    long sumOpenSellQuantity(@Param("clientId") UUID clientId,
+                             @Param("symbol") String symbol,
+                             @Param("openStatuses") List<OrderStatus> openStatuses);
 }
