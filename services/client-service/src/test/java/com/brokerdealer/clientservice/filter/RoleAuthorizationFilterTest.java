@@ -1,9 +1,12 @@
 package com.brokerdealer.clientservice.filter;
 
 import com.brokerdealer.clientservice.controller.ClientController;
+import com.brokerdealer.clientservice.domain.DefaultRoute;
+import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
+import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.service.ClientService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -131,6 +134,52 @@ class RoleAuthorizationFilterTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"adjustment\":\"1000.00\",\"reason\":\"ORDER_RESERVE\"}"))
                 .andExpect(status().isOk());
+    }
+
+    // ─── PATCH /default-route — ADMIN only ───────────────────────────────────
+
+    @Test
+    void shouldAllowAdminToPatchDefaultRoute() throws Exception {
+        when(clientService.updateDefaultRoute(any(UUID.class), any(UpdateDefaultRouteRequest.class)))
+                .thenReturn(UpdateDefaultRouteResponse.builder()
+                        .clientId(UUID.fromString(CLIENT_ID))
+                        .defaultRoute(DefaultRoute.NYSE)
+                        .build());
+
+        mockMvc.perform(patch("/api/v1/clients/" + CLIENT_ID + "/default-route")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"NYSE\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldReturn403WhenTraderPatchesDefaultRoute() throws Exception {
+        mockMvc.perform(patch("/api/v1/clients/" + CLIENT_ID + "/default-route")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"NYSE\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void shouldReturn403WhenOperationsPatchesDefaultRoute() throws Exception {
+        mockMvc.perform(patch("/api/v1/clients/" + CLIENT_ID + "/default-route")
+                        .header("X-User-Role", "OPERATIONS")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"NYSE\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void shouldReturn401WhenNoRoleHeaderOnDefaultRoutePatch() throws Exception {
+        mockMvc.perform(patch("/api/v1/clients/" + CLIENT_ID + "/default-route")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"NYSE\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     // ─── Error envelope shape ─────────────────────────────────────────────────

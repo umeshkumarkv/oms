@@ -2,14 +2,18 @@ package com.brokerdealer.clientservice.controller;
 
 import com.brokerdealer.clientservice.domain.AccountType;
 import com.brokerdealer.clientservice.domain.ClientStatus;
+import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.domain.KycStatus;
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
+import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
+import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
 import com.brokerdealer.clientservice.exception.InvalidReservationException;
+import com.brokerdealer.clientservice.exception.ValidationException;
 import com.brokerdealer.clientservice.service.ClientService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -331,6 +335,61 @@ class ClientControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content("{\"adjustment\":\"1000.00\",\"reason\":\"test\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn200WithUpdatedDefaultRouteOnValidPatch() throws Exception {
+        UpdateDefaultRouteResponse response = UpdateDefaultRouteResponse.builder()
+                .clientId(CLIENT_001)
+                .defaultRoute(DefaultRoute.NYSE)
+                .build();
+
+        when(clientService.updateDefaultRoute(eq(CLIENT_001), any(UpdateDefaultRouteRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/default-route", CLIENT_001)
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"NYSE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.clientId").value(CLIENT_001.toString()))
+                .andExpect(jsonPath("$.data.defaultRoute").value("NYSE"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn400WithInvalidRouteErrorForUnknownRouteValue() throws Exception {
+        when(clientService.updateDefaultRoute(eq(CLIENT_001), any(UpdateDefaultRouteRequest.class)))
+                .thenThrow(new ValidationException("INVALID_ROUTE",
+                        "Invalid route value: LONDON. Valid values: NASDAQ, NYSE, ARCA, BATS"));
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/default-route", CLIENT_001)
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"LONDON\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_ROUTE"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn404WhenClientNotFoundOnDefaultRouteUpdate() throws Exception {
+        UUID unknownId = UUID.randomUUID();
+        when(clientService.updateDefaultRoute(eq(unknownId), any(UpdateDefaultRouteRequest.class)))
+                .thenThrow(new ClientNotFoundException("CLIENT_NOT_FOUND",
+                        "Client not found: " + unknownId));
+
+        mockMvc.perform(patch("/api/v1/clients/{id}/default-route", unknownId)
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultRoute\":\"NYSE\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.meta.timestamp").exists());

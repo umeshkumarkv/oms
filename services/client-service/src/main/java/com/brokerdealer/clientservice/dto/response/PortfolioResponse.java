@@ -1,6 +1,7 @@
 package com.brokerdealer.clientservice.dto.response;
 
 import com.brokerdealer.clientservice.domain.ClientStatus;
+import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.domain.KycStatus;
 import lombok.Builder;
 import lombok.Value;
@@ -20,6 +21,7 @@ public class PortfolioResponse {
     LocalDate kycExpiryDate;
     Boolean marginCallActive;
     Integer maxOpenOrders;
+    DefaultRoute defaultRoute;
     String cashBalance;
     String reservedCash;
     String buyingPower;

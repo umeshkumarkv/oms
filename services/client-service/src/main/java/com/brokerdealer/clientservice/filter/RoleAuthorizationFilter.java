@@ -88,6 +88,10 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
             }
             return true;
         }
+        // PATCH /default-route — ADMIN only
+        if ("PATCH".equalsIgnoreCase(method) && path.contains("/default-route")) {
+            return "ADMIN".equals(role);
+        }
         return false;
     }
 

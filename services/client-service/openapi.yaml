@@ -68,6 +68,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/clients/{id}/default-route:
+    patch:
+      summary: Update client default route (ADMIN only)
+      operationId: updateDefaultRoute
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDefaultRouteRequest'
+      responses:
+        '200':
+          description: Default route updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateDefaultRouteResponse'
+        '400':
+          description: Invalid route value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: INVALID_ROUTE
+                  message: "Invalid route value: LONDON. Valid values: NASDAQ, NYSE, ARCA, BATS"
+                  details: []
+        '403':
+          description: Forbidden — ADMIN role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/clients/{id}/reserved-cash:
     patch:
       summary: Adjust client reserved cash
@@ -151,6 +201,12 @@ components:
         data:
           type: object
           properties:
+            clientId:
+              type: string
+              format: uuid
+            defaultRoute:
+              type: string
+              enum: [NASDAQ, NYSE, ARCA, BATS]
             cashBalance:
               type: string
             reservedCash:
@@ -161,6 +217,29 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/HoldingDetail'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    UpdateDefaultRouteRequest:
+      type: object
+      required: [defaultRoute]
+      properties:
+        defaultRoute:
+          type: string
+          enum: [NASDAQ, NYSE, ARCA, BATS]
+
+    UpdateDefaultRouteResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            clientId:
+              type: string
+              format: uuid
+            defaultRoute:
+              type: string
+              enum: [NASDAQ, NYSE, ARCA, BATS]
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 

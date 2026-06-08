@@ -2,14 +2,18 @@ package com.brokerdealer.clientservice.service;
 
 import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.Client;
+import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.domain.Holding;
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
+import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
+import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
 import com.brokerdealer.clientservice.exception.InvalidReservationException;
+import com.brokerdealer.clientservice.exception.ValidationException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
 import com.brokerdealer.clientservice.repository.HoldingRepository;
@@ -74,6 +78,7 @@ public class ClientService {
                 .kycExpiryDate(client.getKycExpiryDate())
                 .marginCallActive(client.getMarginCallActive())
                 .maxOpenOrders(client.getMaxOpenOrders())
+                .defaultRoute(client.getDefaultRoute())
                 .cashBalance(client.getCashBalance().setScale(2, RoundingMode.HALF_UP).toPlainString())
                 .reservedCash(client.getReservedCash().setScale(2, RoundingMode.HALF_UP).toPlainString())
                 .buyingPower(buyingPower.setScale(2, RoundingMode.HALF_UP).toPlainString())
@@ -105,6 +110,34 @@ public class ClientService {
                 .currentPrice(currentPrice != null ? currentPrice.toPlainString() : null)
                 .marketValue(marketValue)
                 .unrealisedPnL(unrealisedPnL)
+                .build();
+    }
+
+    @Transactional
+    public UpdateDefaultRouteResponse updateDefaultRoute(UUID id, UpdateDefaultRouteRequest request) {
+        log.debug("Updating default route: clientId={}", id);
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ClientNotFoundException("CLIENT_NOT_FOUND",
+                        "Client not found: " + id));
+
+        DefaultRoute route;
+        try {
+            route = DefaultRoute.valueOf(request.getDefaultRoute());
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("INVALID_ROUTE",
+                    "Invalid route value: " + request.getDefaultRoute()
+                            + ". Valid values: NASDAQ, NYSE, ARCA, BATS");
+        }
+
+        client.setDefaultRoute(route);
+        clientRepository.save(client);
+        evictPortfolioCache(id);
+
+        log.info("Default route updated: clientId={} defaultRoute={}", id, route);
+
+        return UpdateDefaultRouteResponse.builder()
+                .clientId(id)
+                .defaultRoute(route)
                 .build();
     }
 
