@@ -1,5 +1,6 @@
 package com.brokerdealer.orderservice.controller;
 
+import com.brokerdealer.orderservice.domain.OrderStatus;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
 import com.brokerdealer.orderservice.dto.response.FillResponse;
 import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
@@ -7,6 +8,7 @@ import com.brokerdealer.orderservice.dto.response.OrderListData;
 import com.brokerdealer.orderservice.dto.response.OrderListResponse;
 import com.brokerdealer.orderservice.dto.response.OrderResponse;
 import com.brokerdealer.orderservice.dto.response.ResponseMeta;
+import com.brokerdealer.orderservice.dto.response.StatusCountsResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
@@ -31,7 +33,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -292,6 +296,59 @@ class OrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orders").isArray())
                 .andExpect(jsonPath("$.data.totalCount").value(1));
+    }
+
+    // --- GET /api/v1/orders/status-counts ---
+
+    @Test
+    void shouldReturn200WithAllElevenStatusCountsInStandardEnvelope() throws Exception {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (OrderStatus s : OrderStatus.values()) {
+            counts.put(s.name(), 0);
+        }
+        counts.put("NEW", 3);
+        counts.put("FILLED", 12);
+        StatusCountsResponse response = StatusCountsResponse.builder()
+                .data(counts)
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+        when(orderService.getStatusCountsForToday()).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/orders/status-counts")
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.NEW").value(3))
+                .andExpect(jsonPath("$.data.FILLED").value(12))
+                .andExpect(jsonPath("$.data.VALIDATED").value(0))
+                .andExpect(jsonPath("$.data.RISK_CHECK_PASSED").value(0))
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturn200WithAllZeroCountsOnEmptyDay() throws Exception {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (OrderStatus s : OrderStatus.values()) {
+            counts.put(s.name(), 0);
+        }
+        StatusCountsResponse response = StatusCountsResponse.builder()
+                .data(counts)
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+        when(orderService.getStatusCountsForToday()).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/orders/status-counts")
+                        .header("X-User-Role", "OPERATIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.NEW").value(0))
+                .andExpect(jsonPath("$.data.FILLED").value(0))
+                .andExpect(jsonPath("$.data.EXPIRED").value(0));
     }
 
     @Test

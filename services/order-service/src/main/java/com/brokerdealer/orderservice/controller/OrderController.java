@@ -3,6 +3,7 @@ package com.brokerdealer.orderservice.controller;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
 import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
 import com.brokerdealer.orderservice.dto.response.OrderListResponse;
+import com.brokerdealer.orderservice.dto.response.StatusCountsResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.service.OrderService;
 import jakarta.validation.Valid;
@@ -53,6 +54,11 @@ public class OrderController {
             @RequestParam(defaultValue = "50") int pageSize) {
         OrderListResponse response = orderService.getOrders(status, clientId, side, timeInForce, createdAfter, page, pageSize);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/status-counts")
+    public ResponseEntity<StatusCountsResponse> getStatusCounts() {
+        return ResponseEntity.ok(orderService.getStatusCountsForToday());
     }
 
     @GetMapping("/{id}")

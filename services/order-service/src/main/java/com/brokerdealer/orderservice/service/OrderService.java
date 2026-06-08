@@ -22,6 +22,7 @@ import com.brokerdealer.orderservice.dto.response.OrderListData;
 import com.brokerdealer.orderservice.dto.response.OrderListResponse;
 import com.brokerdealer.orderservice.dto.response.OrderResponse;
 import com.brokerdealer.orderservice.dto.response.ResponseMeta;
+import com.brokerdealer.orderservice.dto.response.StatusCountsResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
@@ -57,9 +58,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -76,6 +80,8 @@ public class OrderService {
 
     private static final int MAX_PAGE_SIZE = 200;
     private static final String ORDER_CACHE_KEY_PREFIX = "order:state:";
+    private static final String STATUS_COUNTS_CACHE_KEY = "dashboard:status-counts:today";
+    private static final Duration STATUS_COUNTS_TTL = Duration.ofSeconds(15);
 
     private final OrderRepository orderRepository;
     private final ClientServiceClient clientServiceClient;
@@ -534,5 +540,62 @@ public class OrderService {
 
     private String resolveRoutingDestination(String requested) {
         return (requested != null && !requested.isBlank()) ? requested : "NYSE";
+    }
+
+    public StatusCountsResponse getStatusCountsForToday() {
+        // --- Cache-aside: try Redis first ---
+        try {
+            Object cached = redisTemplate.opsForValue().get(STATUS_COUNTS_CACHE_KEY);
+            if (cached instanceof Map<?, ?> rawMap) {
+                log.debug("Cache hit: statusCounts key={}", STATUS_COUNTS_CACHE_KEY);
+                Map<String, Integer> counts = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                    int val = entry.getValue() instanceof Number n ? n.intValue() : 0;
+                    counts.put(entry.getKey().toString(), val);
+                }
+                return StatusCountsResponse.builder()
+                        .data(counts)
+                        .meta(ResponseMeta.builder()
+                                .timestamp(Instant.now().toString())
+                                .requestId(UUID.randomUUID().toString())
+                                .build())
+                        .build();
+            }
+        } catch (Exception e) {
+            log.warn("Redis read failed for statusCounts: {}", e.getMessage());
+        }
+
+        // --- Cache miss: query DB with today's ET date boundary ---
+        LocalDate today = LocalDate.now(ET_ZONE);
+        Instant startOfDay = today.atStartOfDay(ET_ZONE).toInstant();
+        Instant endOfDay = today.plusDays(1).atStartOfDay(ET_ZONE).toInstant();
+
+        List<Object[]> rows = orderRepository.countByStatusForDateRange(startOfDay, endOfDay);
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (OrderStatus s : OrderStatus.values()) {
+            counts.put(s.name(), 0);
+        }
+        for (Object[] row : rows) {
+            OrderStatus status = (OrderStatus) row[0];
+            long count = ((Number) row[1]).longValue();
+            counts.put(status.name(), (int) count);
+        }
+
+        // --- Populate cache ---
+        try {
+            redisTemplate.opsForValue().set(STATUS_COUNTS_CACHE_KEY, counts, STATUS_COUNTS_TTL);
+            log.debug("Cache populated: statusCounts key={}", STATUS_COUNTS_CACHE_KEY);
+        } catch (Exception e) {
+            log.warn("Redis write failed for statusCounts: {}", e.getMessage());
+        }
+
+        return StatusCountsResponse.builder()
+                .data(counts)
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
     }
 }

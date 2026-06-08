@@ -18,6 +18,7 @@ import com.brokerdealer.orderservice.dto.market.MarketHoursResponse;
 import com.brokerdealer.orderservice.dto.request.SubmitOrderRequest;
 import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
 import com.brokerdealer.orderservice.dto.response.OrderListResponse;
+import com.brokerdealer.orderservice.dto.response.StatusCountsResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
@@ -50,13 +51,17 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -69,6 +74,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.reset;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -1132,6 +1138,87 @@ class OrderServiceTest {
         OrderListResponse response = orderService.getOrders("open", null, null, null, null, 0, 50);
 
         assertThat(response.getData().getOrders()).hasSize(1);
+    }
+
+    // --- GET /api/v1/orders/status-counts ---
+
+    @Test
+    void shouldReturnAllElevenStatusesWithCorrectCountsWhenOrdersExistToday() {
+        List<Object[]> rows = new java.util.ArrayList<>();
+        rows.add(new Object[]{OrderStatus.NEW, 3L});
+        rows.add(new Object[]{OrderStatus.FILLED, 12L});
+        rows.add(new Object[]{OrderStatus.REJECTED, 1L});
+        when(orderRepository.countByStatusForDateRange(any(Instant.class), any(Instant.class)))
+                .thenReturn(rows);
+
+        StatusCountsResponse response = orderService.getStatusCountsForToday();
+
+        assertThat(response.getData()).hasSize(11);
+        assertThat(response.getData().get("NEW")).isEqualTo(3);
+        assertThat(response.getData().get("FILLED")).isEqualTo(12);
+        assertThat(response.getData().get("REJECTED")).isEqualTo(1);
+        assertThat(response.getData().get("VALIDATED")).isEqualTo(0);
+        assertThat(response.getData().get("RISK_CHECK_PASSED")).isEqualTo(0);
+        assertThat(response.getData().get("CANCELLED")).isEqualTo(0);
+        assertThat(response.getMeta().getTimestamp()).isNotNull();
+        assertThat(response.getMeta().getRequestId()).isNotNull();
+    }
+
+    @Test
+    void shouldReturnAllStatusesWithZeroWhenNoOrdersToday() {
+        when(orderRepository.countByStatusForDateRange(any(Instant.class), any(Instant.class)))
+                .thenReturn(Collections.emptyList());
+
+        StatusCountsResponse response = orderService.getStatusCountsForToday();
+
+        assertThat(response.getData()).hasSize(11);
+        for (OrderStatus s : OrderStatus.values()) {
+            assertThat(response.getData().get(s.name()))
+                    .as("count for %s", s).isEqualTo(0);
+        }
+    }
+
+    @Test
+    void shouldReturnCachedResultOnCacheHit() {
+        Map<String, Integer> cachedCounts = new LinkedHashMap<>();
+        for (OrderStatus s : OrderStatus.values()) {
+            cachedCounts.put(s.name(), 5);
+        }
+        when(valueOperations.get("dashboard:status-counts:today")).thenReturn(cachedCounts);
+
+        StatusCountsResponse response = orderService.getStatusCountsForToday();
+
+        assertThat(response.getData().get("NEW")).isEqualTo(5);
+        assertThat(response.getData().get("FILLED")).isEqualTo(5);
+        verify(orderRepository, never()).countByStatusForDateRange(any(), any());
+    }
+
+    @Test
+    void shouldPopulateCacheWithFifteenSecondTtlOnCacheMiss() {
+        when(orderRepository.countByStatusForDateRange(any(Instant.class), any(Instant.class)))
+                .thenReturn(Collections.emptyList());
+
+        orderService.getStatusCountsForToday();
+
+        verify(valueOperations).set(
+                eq("dashboard:status-counts:today"),
+                any(),
+                eq(Duration.ofSeconds(15))
+        );
+    }
+
+    @Test
+    void shouldDegradeGracefullyWhenRedisThrowsOnRead() {
+        reset(redisTemplate);
+        when(redisTemplate.opsForValue()).thenThrow(new RuntimeException("Redis unavailable"));
+        when(orderRepository.countByStatusForDateRange(any(Instant.class), any(Instant.class)))
+                .thenReturn(Collections.singletonList(new Object[]{OrderStatus.FILLED, 7L}));
+
+        StatusCountsResponse response = orderService.getStatusCountsForToday();
+
+        assertThat(response.getData()).hasSize(11);
+        assertThat(response.getData().get("FILLED")).isEqualTo(7);
+        verify(orderRepository).countByStatusForDateRange(any(), any());
     }
 
     // --- Helpers ---

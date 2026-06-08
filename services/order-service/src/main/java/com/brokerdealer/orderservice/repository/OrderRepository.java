@@ -48,4 +48,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     long sumOpenSellQuantity(@Param("clientId") UUID clientId,
                              @Param("symbol") String symbol,
                              @Param("openStatuses") List<OrderStatus> openStatuses);
+
+    // Count orders grouped by status for a given ET date range
+    @Query("SELECT o.status, COUNT(o) FROM Order o " +
+           "WHERE o.createdAt >= :startOfDay AND o.createdAt < :endOfDay " +
+           "GROUP BY o.status")
+    List<Object[]> countByStatusForDateRange(@Param("startOfDay") Instant startOfDay,
+                                              @Param("endOfDay") Instant endOfDay);
 }
