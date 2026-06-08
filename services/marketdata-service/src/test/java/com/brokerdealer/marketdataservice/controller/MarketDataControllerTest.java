@@ -4,6 +4,8 @@ import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketMoversResponse;
+import com.brokerdealer.marketdataservice.dto.response.MoverEntryResponse;
 import com.brokerdealer.marketdataservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
@@ -183,6 +185,53 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data[0].holidayDate").value("2026-01-01"))
                 .andExpect(jsonPath("$.data[0].holidayName").value("New Year's Day"))
                 .andExpect(jsonPath("$.data[1].holidayDate").value("2026-12-25"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn200WithStandardEnvelopeForGetMovers() throws Exception {
+        MarketMoversResponse movers = MarketMoversResponse.builder()
+                .gainers(List.of(
+                        MoverEntryResponse.builder().symbol("NVDA").percentChange("3.51").build(),
+                        MoverEntryResponse.builder().symbol("TSLA").percentChange("2.47").build()
+                ))
+                .losers(List.of(
+                        MoverEntryResponse.builder().symbol("BAC").percentChange("-1.83").build(),
+                        MoverEntryResponse.builder().symbol("JPM").percentChange("-1.04").build()
+                ))
+                .build();
+
+        when(marketDataService.getMarketMovers()).thenReturn(movers);
+
+        mockMvc.perform(get("/api/v1/market/movers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.gainers").isArray())
+                .andExpect(jsonPath("$.data.gainers[0].symbol").value("NVDA"))
+                .andExpect(jsonPath("$.data.gainers[0].percentChange").value("3.51"))
+                .andExpect(jsonPath("$.data.gainers[1].symbol").value("TSLA"))
+                .andExpect(jsonPath("$.data.losers").isArray())
+                .andExpect(jsonPath("$.data.losers[0].symbol").value("BAC"))
+                .andExpect(jsonPath("$.data.losers[0].percentChange").value("-1.83"))
+                .andExpect(jsonPath("$.data.losers[1].symbol").value("JPM"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithEmptyMoversWhenNoInstruments() throws Exception {
+        MarketMoversResponse empty = MarketMoversResponse.builder()
+                .gainers(List.of())
+                .losers(List.of())
+                .build();
+
+        when(marketDataService.getMarketMovers()).thenReturn(empty);
+
+        mockMvc.perform(get("/api/v1/market/movers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.gainers").isArray())
+                .andExpect(jsonPath("$.data.gainers").isEmpty())
+                .andExpect(jsonPath("$.data.losers").isArray())
+                .andExpect(jsonPath("$.data.losers").isEmpty())
                 .andExpect(jsonPath("$.meta.timestamp").exists());
     }
 

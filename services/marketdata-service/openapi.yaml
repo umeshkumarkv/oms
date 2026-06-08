@@ -51,6 +51,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketHoursResponse'
 
+  /api/v1/market/movers:
+    get:
+      summary: Get top market movers (gainers and losers by % change from open price)
+      operationId: getMarketMovers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Top 5 gainers and losers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketMoversResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/market/instruments:
     get:
       summary: List all instruments
@@ -265,6 +285,36 @@ components:
         requestId:
           type: string
           format: uuid
+
+    MoverEntry:
+      type: object
+      properties:
+        symbol:
+          type: string
+          example: "NVDA"
+        percentChange:
+          type: string
+          description: BigDecimal 2dp — positive for gainers, negative for losers
+          example: "3.21"
+
+    MarketMoversResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            gainers:
+              type: array
+              items:
+                $ref: '#/components/schemas/MoverEntry'
+              maxItems: 5
+            losers:
+              type: array
+              items:
+                $ref: '#/components/schemas/MoverEntry'
+              maxItems: 5
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
 
     ErrorResponse:
       type: object

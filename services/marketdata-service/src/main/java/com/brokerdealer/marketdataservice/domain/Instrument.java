@@ -63,6 +63,9 @@ public class Instrument {
     @Column(name = "seed_ask_price", precision = 19, scale = 4)
     private BigDecimal seedAskPrice;
 
+    @Column(name = "open_price", precision = 19, scale = 4)
+    private BigDecimal openPrice;
+
     @Column(name = "company_name", length = 200)
     private String companyName;
 

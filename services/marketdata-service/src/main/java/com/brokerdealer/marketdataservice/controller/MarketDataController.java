@@ -6,6 +6,7 @@ import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse
 import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketMoversResponse;
 import com.brokerdealer.marketdataservice.dto.response.TickHistoryResponse;
 import com.brokerdealer.marketdataservice.service.MarketDataService;
 import com.brokerdealer.marketdataservice.service.TickService;
@@ -70,6 +71,13 @@ public class MarketDataController {
     public ResponseEntity<Map<String, Object>> getMarketConfig() {
         log.debug("GET /api/v1/market/config");
         MarketConfigResponse data = marketDataService.getMarketConfig();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @GetMapping("/movers")
+    public ResponseEntity<Map<String, Object>> getMarketMovers() {
+        log.debug("GET /api/v1/market/movers");
+        MarketMoversResponse data = marketDataService.getMarketMovers();
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
