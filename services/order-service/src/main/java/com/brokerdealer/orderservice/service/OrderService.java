@@ -204,11 +204,16 @@ public class OrderService {
         Integer maxDailyOrders = clientResponse.getData().getMaxOpenOrders();
 
         // --- L2 checks #20-21: holdings validation — SELL only, SHORT_SELL intentionally bypasses ---
+        // availableToSell = settled holdings (client-service) - in-flight SELL commitments (own DB)
+        // This prevents double-sell: two concurrent SELLs cannot collectively exceed actual holdings.
         if (requestedSide == OrderSide.SELL) {
-            if (holdingsForSymbol <= 0) {
+            int committedToOpenSell = (int) orderRepository.sumOpenSellQuantity(
+                    request.getClientId(), request.getSymbol(), OPEN_STATUSES);
+            int availableToSell = holdingsForSymbol - committedToOpenSell;
+            if (availableToSell <= 0) {
                 throw new InsufficientHoldingsException();
             }
-            if (holdingsForSymbol < request.getQuantity()) {
+            if (availableToSell < request.getQuantity()) {
                 throw new InsufficientHoldingsException();
             }
         }

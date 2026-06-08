@@ -152,6 +152,9 @@ class OrderServiceTest {
         // Default: execution-service returns no fills
         when(executionServiceClient.getFills(any())).thenReturn(Collections.emptyList());
 
+        // Default: no open SELL commitments (zero shares committed to in-flight SELL orders)
+        when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(0L);
+
         // Default repository: save passes through with generated ID
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
@@ -938,6 +941,86 @@ class OrderServiceTest {
                 .isInstanceOf(InsufficientHoldingsException.class);
         verify(orderRepository, never()).save(any());
         verify(orderEventProducer, never()).publishOrderStateChanged(any());
+    }
+
+    // --- SCRUM-134: double-sell prevention (availableToSell = holdings - openSellCommitments) ---
+
+    @Test
+    void shouldPassSellOrderWhenNoOpenCommitmentsAndHoldingsEqualQuantity() {
+        // holdings=10, committed=0, qty=10 → availableToSell=10, passes
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(10));
+        when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(0L);
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+        request.setQuantity(10);
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        assertThat(response.getData().getStatus()).isEqualTo(OrderStatus.NEW.name());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldPassSellOrderWhenQuantityLessThanAvailableAfterPartialCommitment() {
+        // holdings=100, committed=40, qty=50 → availableToSell=60, passes
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(100));
+        when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(40L);
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+        request.setQuantity(50);
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        assertThat(response.getData().getStatus()).isEqualTo(OrderStatus.NEW.name());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldRejectDoubleSellWhenSecondSellExceedsAvailableAfterFullCommitment() {
+        // holdings=100, committed=100 (first SELL still open), qty=1 → availableToSell=0, rejects
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(100));
+        when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(100L);
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+        request.setQuantity(1);
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(InsufficientHoldingsException.class);
+        verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
+    }
+
+    @Test
+    void shouldRejectSellOrderWhenQuantityExceedsAvailableAfterPartialCommitment() {
+        // holdings=100, committed=60, qty=50 → availableToSell=40, rejects (40 < 50)
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(100));
+        when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(60L);
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+        request.setQuantity(50);
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(InsufficientHoldingsException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectSellOrderWhenCommitmentsEqualHoldingsLeavingZeroAvailable() {
+        // holdings=50, committed=50, qty=1 → availableToSell=0, rejects
+        when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(50));
+        when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(50L);
+
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setSide("SELL");
+        request.setQuantity(1);
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(InsufficientHoldingsException.class);
+        verify(orderRepository, never()).save(any());
     }
 
     // --- GET /orders ---
