@@ -42,6 +42,7 @@ None — marketdata-service does not consume any Kafka topic.
 | Key Pattern              | TTL        | Purpose                              |
 |--------------------------|------------|--------------------------------------|
 | market:price:{symbol}    | 30 seconds | Mock price data for instruments      |
+| market:movers            | 30 seconds | Top 5 gainers and losers by % change |
 
 Cache-aside pattern. No explicit invalidation — auto-expiry only.
 
@@ -51,11 +52,12 @@ Cache-aside pattern. No explicit invalidation — auto-expiry only.
 
 See openapi.yaml for full schema.
 
-| Method | Path                        | Auth Required | Description                    |
-|--------|-----------------------------|---------------|--------------------------------|
-| GET    | /api/v1/market/{symbol}     | No            | Get instrument by symbol       |
-| GET    | /api/v1/market/hours        | No            | Market open/close status       |
-| GET    | /api/v1/market/instruments  | No            | List all instruments           |
+| Method | Path                        | Auth Required          | Description                    |
+|--------|-----------------------------|------------------------|--------------------------------|
+| GET    | /api/v1/market/{symbol}     | No                     | Get instrument by symbol       |
+| GET    | /api/v1/market/hours        | No                     | Market open/close status       |
+| GET    | /api/v1/market/instruments  | No                     | List all instruments           |
+| GET    | /api/v1/market/movers       | TRADER, OPERATIONS     | Top 5 gainers and losers       |
 
 ---
 

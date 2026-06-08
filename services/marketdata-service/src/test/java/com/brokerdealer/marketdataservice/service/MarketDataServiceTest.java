@@ -6,6 +6,7 @@ import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketMoversResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
@@ -429,6 +430,105 @@ class MarketDataServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSymbol()).isEqualTo("HALT");
         assertThat(result.get(0).getHalted()).isTrue();
+    }
+
+    // --- getMarketMovers ---
+
+    @Test
+    void shouldReturnTopGainersAndLosersForNormalWatchlist() {
+        // 6 instruments: 3 gainers, 3 losers — expect top 5 each (all 6 since only 6)
+        List<Instrument> instruments = List.of(
+                buildMoversInstrument("NVDA",  new BigDecimal("885.00"), new BigDecimal("855.00")), // +3.51%
+                buildMoversInstrument("TSLA",  new BigDecimal("178.50"), new BigDecimal("174.20")), // +2.47%
+                buildMoversInstrument("AAPL",  new BigDecimal("172.00"), new BigDecimal("169.80")), // +1.30%
+                buildMoversInstrument("GOOGL", new BigDecimal("158.50"), new BigDecimal("160.00")), // -0.94%
+                buildMoversInstrument("JPM",   new BigDecimal("190.00"), new BigDecimal("192.00")), // -1.04%
+                buildMoversInstrument("BAC",   new BigDecimal("37.50"),  new BigDecimal("38.20"))   // -1.83%
+        );
+        when(instrumentRepository.findAll()).thenReturn(instruments);
+
+        MarketMoversResponse result = marketDataService.getMarketMovers();
+
+        assertThat(result.getGainers()).hasSize(5);
+        assertThat(result.getLosers()).hasSize(5);
+        // gainers sorted descending — NVDA first
+        assertThat(result.getGainers().get(0).getSymbol()).isEqualTo("NVDA");
+        assertThat(new BigDecimal(result.getGainers().get(0).getPercentChange()))
+                .isGreaterThan(new BigDecimal(result.getGainers().get(1).getPercentChange()));
+        // losers sorted ascending — BAC first (most negative)
+        assertThat(result.getLosers().get(0).getSymbol()).isEqualTo("BAC");
+        assertThat(new BigDecimal(result.getLosers().get(0).getPercentChange()))
+                .isLessThan(new BigDecimal(result.getLosers().get(1).getPercentChange()));
+        // percentChange is 2dp
+        assertThat(result.getGainers().get(0).getPercentChange()).matches("-?\\d+\\.\\d{2}");
+        verify(valueOperations).set(eq(MOVERS_CACHE_KEY), any(MarketMoversResponse.class), any(Duration.class));
+    }
+
+    @Test
+    void shouldReturnFewerThan5WhenInsufficientInstruments() {
+        List<Instrument> instruments = List.of(
+                buildMoversInstrument("AAPL", new BigDecimal("172.00"), new BigDecimal("169.80")),
+                buildMoversInstrument("MSFT", new BigDecimal("412.00"), new BigDecimal("405.50")),
+                buildMoversInstrument("GOOGL", new BigDecimal("158.50"), new BigDecimal("160.00"))
+        );
+        when(instrumentRepository.findAll()).thenReturn(instruments);
+
+        MarketMoversResponse result = marketDataService.getMarketMovers();
+
+        assertThat(result.getGainers()).hasSize(3);
+        assertThat(result.getLosers()).hasSize(3);
+    }
+
+    @Test
+    void shouldReturnCachedMoversOnCacheHit() {
+        MarketMoversResponse cached = MarketMoversResponse.builder()
+                .gainers(List.of())
+                .losers(List.of())
+                .build();
+        when(valueOperations.get(MOVERS_CACHE_KEY)).thenReturn(cached);
+
+        MarketMoversResponse result = marketDataService.getMarketMovers();
+
+        assertThat(result).isSameAs(cached);
+        verifyNoInteractions(instrumentRepository);
+    }
+
+    @Test
+    void shouldReturnZeroPercentChangeWhenOpenPriceIsNull() {
+        List<Instrument> instruments = List.of(
+                buildMoversInstrument("AAPL", new BigDecimal("172.00"), null)
+        );
+        when(instrumentRepository.findAll()).thenReturn(instruments);
+
+        MarketMoversResponse result = marketDataService.getMarketMovers();
+
+        assertThat(result.getGainers()).hasSize(1);
+        assertThat(result.getGainers().get(0).getPercentChange()).isEqualTo("0.00");
+    }
+
+    @Test
+    void shouldReturnZeroPercentChangeWhenLastPriceEqualsOpenPrice() {
+        List<Instrument> instruments = List.of(
+                buildMoversInstrument("AAPL", new BigDecimal("172.00"), new BigDecimal("172.00"))
+        );
+        when(instrumentRepository.findAll()).thenReturn(instruments);
+
+        MarketMoversResponse result = marketDataService.getMarketMovers();
+
+        assertThat(result.getGainers()).hasSize(1);
+        assertThat(result.getGainers().get(0).getPercentChange()).isEqualTo("0.00");
+    }
+
+    private static final String MOVERS_CACHE_KEY = "market:movers";
+
+    private Instrument buildMoversInstrument(String symbol, BigDecimal lastPrice, BigDecimal openPrice) {
+        return Instrument.builder()
+                .symbol(symbol)
+                .lastPrice(lastPrice)
+                .openPrice(openPrice)
+                .tradable(true)
+                .tradingHalted(false)
+                .build();
     }
 
     // --- helpers ---

@@ -7,6 +7,8 @@ import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse
 import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHoursResponse;
+import com.brokerdealer.marketdataservice.dto.response.MarketMoversResponse;
+import com.brokerdealer.marketdataservice.dto.response.MoverEntryResponse;
 import com.brokerdealer.marketdataservice.exception.SymbolNotFoundException;
 import com.brokerdealer.marketdataservice.mapper.InstrumentMapper;
 import com.brokerdealer.marketdataservice.mapper.InstrumentSearchMapper;
@@ -48,9 +50,11 @@ public class MarketDataService {
 
     private static final String CACHE_KEY_PREFIX = "market:price:";
     private static final String SEARCH_CACHE_KEY_PREFIX = "market:search:";
+    private static final String MOVERS_CACHE_KEY = "market:movers";
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static final Duration SEARCH_CACHE_TTL = Duration.ofSeconds(10);
     private static final int SEARCH_MAX_LIMIT = 20;
+    private static final int MOVERS_LIMIT = 5;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     @Value("${market.simulation.bypass-market-hours:false}")
@@ -236,6 +240,59 @@ public class MarketDataService {
         LocalTime open  = LocalTime.parse(openTime);
         LocalTime close = LocalTime.parse(closeTime);
         return !time.isBefore(open) && time.isBefore(close);
+    }
+
+    public MarketMoversResponse getMarketMovers() {
+        log.debug("Fetching market movers");
+
+        Object cached = redisTemplate.opsForValue().get(MOVERS_CACHE_KEY);
+        if (cached instanceof MarketMoversResponse hit) {
+            log.debug("Cache hit: market movers");
+            return hit;
+        }
+
+        record Mover(String symbol, BigDecimal pct) {}
+
+        List<Mover> movers = instrumentRepository.findAll().stream()
+                .map(i -> new Mover(i.getSymbol(), computeOpenPricePct(i.getLastPrice(), i.getOpenPrice())))
+                .toList();
+
+        List<MoverEntryResponse> gainers = movers.stream()
+                .sorted(Comparator.comparing(Mover::pct).reversed())
+                .limit(MOVERS_LIMIT)
+                .map(m -> MoverEntryResponse.builder()
+                        .symbol(m.symbol())
+                        .percentChange(m.pct().toPlainString())
+                        .build())
+                .toList();
+
+        List<MoverEntryResponse> losers = movers.stream()
+                .sorted(Comparator.comparing(Mover::pct))
+                .limit(MOVERS_LIMIT)
+                .map(m -> MoverEntryResponse.builder()
+                        .symbol(m.symbol())
+                        .percentChange(m.pct().toPlainString())
+                        .build())
+                .toList();
+
+        MarketMoversResponse response = MarketMoversResponse.builder()
+                .gainers(gainers)
+                .losers(losers)
+                .build();
+
+        redisTemplate.opsForValue().set(MOVERS_CACHE_KEY, response, CACHE_TTL);
+        log.debug("Cache populated: market movers");
+        return response;
+    }
+
+    private BigDecimal computeOpenPricePct(BigDecimal lastPrice, BigDecimal openPrice) {
+        if (lastPrice == null || openPrice == null || openPrice.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return lastPrice.subtract(openPrice)
+                .divide(openPrice, 4, RoundingMode.HALF_UP)
+                .multiply(HUNDRED)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     // --- private enrichment helpers ---
