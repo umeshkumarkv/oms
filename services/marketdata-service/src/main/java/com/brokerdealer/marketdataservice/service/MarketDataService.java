@@ -2,6 +2,8 @@ package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketConfigResponse;
@@ -71,6 +73,7 @@ public class MarketDataService {
     private final MarketHolidayMapper marketHolidayMapper;
     private final RedisTemplate<String, Object> redisTemplate;
     private final MarketDataWebSocketHandler webSocketHandler;
+    private final ObjectMapper objectMapper;
 
     public InstrumentResponse getInstrument(String symbol) {
         String normalised = symbol.toUpperCase();
@@ -78,9 +81,9 @@ public class MarketDataService {
         String cacheKey = CACHE_KEY_PREFIX + normalised;
 
         Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached instanceof InstrumentResponse hit) {
+        if (cached != null) {
             log.debug("Cache hit: symbol={}", normalised);
-            return hit;
+            return objectMapper.convertValue(cached, InstrumentResponse.class);
         }
 
         InstrumentResponse response = instrumentRepository.findById(normalised)
@@ -170,7 +173,6 @@ public class MarketDataService {
                 .toList();
     }
 
-    @SuppressWarnings("unchecked")
     public List<InstrumentSearchResponse> searchInstruments(String q, int limit) {
         String normalised = q.trim();
         int effectiveLimit = Math.min(Math.max(limit, 1), SEARCH_MAX_LIMIT);
@@ -178,14 +180,11 @@ public class MarketDataService {
         log.debug("Searching instruments: q={}, limit={}", normalised, effectiveLimit);
 
         Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached instanceof List<?> list
-                && (list.isEmpty() || list.get(0) instanceof InstrumentSearchResponse)) {
+        if (cached != null) {
             log.debug("Search cache hit: q={}", normalised);
-            return list.stream()
-                    .filter(InstrumentSearchResponse.class::isInstance)
-                    .map(InstrumentSearchResponse.class::cast)
-                    .limit(effectiveLimit)
-                    .toList();
+            List<InstrumentSearchResponse> cachedList = objectMapper.convertValue(
+                    cached, new TypeReference<List<InstrumentSearchResponse>>() {});
+            return cachedList.stream().limit(effectiveLimit).toList();
         }
 
         String qUpper = normalised.toUpperCase();
@@ -246,9 +245,9 @@ public class MarketDataService {
         log.debug("Fetching market movers");
 
         Object cached = redisTemplate.opsForValue().get(MOVERS_CACHE_KEY);
-        if (cached instanceof MarketMoversResponse hit) {
+        if (cached != null) {
             log.debug("Cache hit: market movers");
-            return hit;
+            return objectMapper.convertValue(cached, MarketMoversResponse.class);
         }
 
         record Mover(String symbol, BigDecimal pct) {}

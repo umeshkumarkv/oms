@@ -15,11 +15,15 @@ import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -63,6 +67,11 @@ class MarketDataServiceTest {
 
     @Mock
     private ValueOperations<String, Object> valueOperations;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @InjectMocks
     private MarketDataService marketDataService;
@@ -489,7 +498,8 @@ class MarketDataServiceTest {
 
         MarketMoversResponse result = marketDataService.getMarketMovers();
 
-        assertThat(result).isSameAs(cached);
+        assertThat(result.getGainers()).isEmpty();
+        assertThat(result.getLosers()).isEmpty();
         verifyNoInteractions(instrumentRepository);
     }
 
@@ -707,22 +717,24 @@ class MarketDataServiceTest {
     }
 
     @Test
-    void shouldFallThroughToDbWhenCacheContainsLinkedHashMap() {
-        // Simulate Redis deserializing InstrumentSearchResponse → LinkedHashMap (type info missing)
-        List<java.util.LinkedHashMap<String, Object>> staleCache = List.of(new java.util.LinkedHashMap<>());
-        Instrument aapl = buildSearchInstrument("AAPL", "Apple Inc.", "037833100", "AAPL-US", "NASDAQ");
-        InstrumentSearchResponse aaplResp = buildSearchResponse("AAPL", "Apple Inc.", "037833100");
+    void shouldReturnDeserializedSearchResponseFromCacheViaConvertValue() {
+        // Redis returns plain LinkedHashMap (no @class metadata) — convertValue handles it correctly
+        java.util.LinkedHashMap<String, Object> cachedEntry = new java.util.LinkedHashMap<>();
+        cachedEntry.put("symbol", "AAPL");
+        cachedEntry.put("companyName", "Apple Inc.");
+        cachedEntry.put("cusip", "037833100");
+        cachedEntry.put("lastPrice", "175.00");
+        cachedEntry.put("tradable", true);
+        List<java.util.LinkedHashMap<String, Object>> cachedList = List.of(cachedEntry);
 
-        when(valueOperations.get("market:search:aapl")).thenReturn(staleCache);
-        when(instrumentRepository.findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc())
-                .thenReturn(List.of(aapl));
-        when(instrumentSearchMapper.toSearchResponse(aapl)).thenReturn(aaplResp);
+        when(valueOperations.get("market:search:aapl")).thenReturn(cachedList);
 
         List<InstrumentSearchResponse> result = marketDataService.searchInstruments("AAPL", 10);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSymbol()).isEqualTo("AAPL");
-        verify(instrumentRepository).findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc();
+        verifyNoInteractions(instrumentSearchMapper);
+        verifyNoInteractions(instrumentRepository);
     }
 
     private Instrument buildSearchInstrument(String symbol, String companyName,
