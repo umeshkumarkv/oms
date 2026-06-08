@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -122,5 +122,58 @@ describe('LoginPage', () => {
     renderLoginPage()
     await userEvent.click(screen.getByText('trader.john'))
     expect(screen.getByLabelText(/username/i)).toHaveValue('trader.john')
+  })
+})
+
+describe('LoginPage — session expired banner', () => {
+  const renderWithSessionExpired = () =>
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/', state: { sessionExpired: true } }]}>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </MemoryRouter>
+    )
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('displays banner when location state includes sessionExpired', () => {
+    renderWithSessionExpired()
+    expect(screen.getByText('Session expired — please sign in again')).toBeInTheDocument()
+  })
+
+  it('clicking ✕ removes the banner', async () => {
+    renderWithSessionExpired()
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument()
+  })
+
+  it('banner auto-dismisses after 10 seconds', () => {
+    vi.useFakeTimers()
+    renderWithSessionExpired()
+    expect(screen.getByText('Session expired — please sign in again')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(10_000) })
+    expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('banner clears on successful sign-in', async () => {
+    vi.mocked(authApi.login).mockResolvedValue({
+      token: 'test-token',
+      expiresAt: '2026-12-31T00:00:00Z',
+      role: 'TRADER',
+      userId: '00000000-0000-0000-0000-000000000001',
+      displayName: 'Test User',
+    })
+    renderWithSessionExpired()
+    expect(screen.getByText('Session expired — please sign in again')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText(/username/i), 'trader01')
+    await userEvent.type(screen.getByLabelText(/password/i), 'Demo@1234')
+    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await waitFor(() =>
+      expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument()
+    )
   })
 })

@@ -23,12 +23,26 @@ const LoginPage: React.FC = () => {
   const [inlineError,  setInlineError]  = useState<string | null>(null)
   const [networkError, setNetworkError] = useState<string | null>(null)
 
+  const routeSessionExpired = (location.state as { sessionExpired?: boolean } | null)?.sessionExpired
+  const [bannerVisible, setBannerVisible] = useState(() => !!(sessionExpired || routeSessionExpired))
+
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true })
   }, [user, navigate])
 
-  const routeSessionExpired = (location.state as { sessionExpired?: boolean } | null)?.sessionExpired
-  const sessionExpiredMsg   = sessionExpired || routeSessionExpired
+  useEffect(() => {
+    if (!bannerVisible) return
+    const timer = setTimeout(() => {
+      setBannerVisible(false)
+      clearSessionExpired()
+    }, 10_000)
+    return () => clearTimeout(timer)
+  }, [bannerVisible, clearSessionExpired])
+
+  const handleDismissBanner = () => {
+    setBannerVisible(false)
+    clearSessionExpired()
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +58,7 @@ const LoginPage: React.FC = () => {
         role: data.role,
         displayName: data.displayName,
       })
+      setBannerVisible(false)
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number } }
@@ -166,7 +181,7 @@ const LoginPage: React.FC = () => {
           </p>
 
           {/* Session expired banner */}
-          {sessionExpiredMsg && (
+          {bannerVisible && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '10px 14px',
@@ -179,7 +194,7 @@ const LoginPage: React.FC = () => {
             }} role="alert">
               Session expired — please sign in again
               <button
-                onClick={clearSessionExpired}
+                onClick={handleDismissBanner}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'inherit', opacity: 0.7 }}
                 aria-label="Dismiss"
               >✕</button>
