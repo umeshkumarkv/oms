@@ -20,8 +20,8 @@ test.describe('Order Entry', () => {
     await expect(page.getByPlaceholder('Number of shares')).toBeVisible()
   })
 
-  test('Submit Order button is disabled when form is incomplete', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeDisabled()
+  test('PLACE ORDER button is disabled when form is incomplete', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeDisabled()
   })
 
   test('Limit Price field is visible for LIMIT orders', async ({ page }) => {
@@ -58,7 +58,7 @@ test.describe('Order Entry', () => {
     await page.getByPlaceholder('e.g. AAPL').fill('AAPL')
     await page.getByPlaceholder('Number of shares').fill('1')
 
-    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeEnabled({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeEnabled({ timeout: 5000 })
   })
 
   test('shows a validation error for LIMIT order with no price', async ({ page }) => {
@@ -71,6 +71,27 @@ test.describe('Order Entry', () => {
     // Limit price placeholder is "0.00"; default value is empty → check fails → button disabled
     const limitPrice = page.getByPlaceholder('0.00')
     await limitPrice.clear()
-    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeDisabled()
+  })
+
+  test('BUY LIMIT order form renders correctly', async ({ page }) => {
+    await page.getByRole('button', { name: 'BUY' }).click()
+    await page.getByRole('button', { name: 'LIMIT' }).click()
+
+    await page.getByPlaceholder('e.g. AAPL').fill('AAPL')
+    await page.getByPlaceholder('Number of shares').fill('100')
+
+    // BUY button active — white text on blue background
+    await expect(page.getByRole('button', { name: 'BUY' })).toHaveCSS('color', 'rgb(255, 255, 255)')
+    // LIMIT button active
+    await expect(page.getByRole('button', { name: 'LIMIT' })).toHaveCSS('color', 'rgb(255, 255, 255)')
+    // Limit Price field visible
+    await expect(page.getByPlaceholder('0.00')).toBeVisible()
+    // PLACE ORDER button is visible
+    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeVisible()
+    // Two-column layout — Order Details card present
+    await expect(page.getByText('Order Details')).toBeVisible()
+    // Validation panel present
+    await expect(page.getByText('Validation')).toBeVisible()
   })
 })

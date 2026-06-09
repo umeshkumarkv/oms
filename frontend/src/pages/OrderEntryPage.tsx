@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useIdleTimer } from '../hooks/useIdleTimer'
@@ -20,6 +20,15 @@ const fmt = (v: string | number): string => {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
+const fmtDec2 = (v: string | number): string => {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (isNaN(n)) return '—'
+  return n.toFixed(2)
+}
+
+const fmtPnl = (value: number, pct: number): string =>
+  `${fmt(value)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`
+
 const tomorrowStr = (): string => {
   const d = new Date()
   d.setDate(d.getDate() + 1)
@@ -35,52 +44,76 @@ const toYYYYMMDD = (d: Date): string => {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = {
-  page:        { fontFamily: "'Inter', system-ui, sans-serif", padding: '24px', minHeight: 'calc(100vh - 52px)', background: 'var(--color-bg)' } as React.CSSProperties,
-  header:      { marginBottom: '20px' } as React.CSSProperties,
-  title:       { margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
-  grid:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' } as React.CSSProperties,
-  card:        { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: '24px' } as React.CSSProperties,
-  cardTitle:   { margin: '0 0 20px', fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', paddingBottom: '12px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
-  fieldGroup:  { marginBottom: '16px' } as React.CSSProperties,
-  label:       { display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
-  input:       { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none', transition: 'border-color 0.15s', color: 'var(--color-text-primary)', background: '#fff' },
-  inputError:  { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-error)', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none', color: 'var(--color-text-primary)', background: '#fff' },
-  select:      { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', background: '#fff', boxSizing: 'border-box' as const, color: 'var(--color-text-primary)' },
-  errorText:   { fontSize: '12px', color: 'var(--color-error)', marginTop: '4px' } as React.CSSProperties,
+  page:       { fontFamily: "'Inter', system-ui, sans-serif", padding: '24px', minHeight: 'calc(100vh - 52px)', background: 'var(--color-bg)' } as React.CSSProperties,
+  header:     { marginBottom: '20px' } as React.CSSProperties,
+  title:      { margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
+  grid:       { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' } as React.CSSProperties,
+  card:       { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: '24px', border: '1px solid var(--color-border-light)' } as React.CSSProperties,
+  cardTitle:  { margin: '0 0 16px', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' } as React.CSSProperties,
+  fieldGroup: { marginBottom: '14px' } as React.CSSProperties,
+  label:      { display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
+  input:      { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none', transition: 'border-color 0.15s', color: 'var(--color-text-primary)', background: '#fff' },
+  inputError: { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-error)', fontSize: '14px', boxSizing: 'border-box' as const, outline: 'none', color: 'var(--color-text-primary)', background: '#fff' },
+  select:     { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', background: '#fff', boxSizing: 'border-box' as const, color: 'var(--color-text-primary)' },
+  errorText:  { fontSize: '12px', color: 'var(--color-error)', marginTop: '4px' } as React.CSSProperties,
+
+  // Grouped fields visual section
+  fieldBox:   { background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '14px', border: '1px solid var(--color-border-light)', marginBottom: '14px' } as React.CSSProperties,
+
+  // Advanced collapsible toggle
+  advancedToggle: { display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', padding: '4px 0', marginBottom: '8px' } as React.CSSProperties,
 
   // Toggle group
   toggleGroup: { display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1.5px solid var(--color-border)' } as React.CSSProperties,
-  toggleBtn:   (active: boolean, color?: string) => ({
+  toggleBtn:   (active: boolean, activeColor?: string) => ({
     flex: 1, padding: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
-    background: active ? (color ?? 'var(--color-primary)') : '#f9fafb',
+    background: active ? (activeColor ?? 'var(--color-primary)') : '#f9fafb',
     color:      active ? '#fff' : 'var(--color-text-secondary)',
-    transition: 'background 0.15s',
+    transition: 'background 0.15s, color 0.15s',
   } as React.CSSProperties),
 
-  // Right panel sections
-  divider:    { borderTop: '1px solid var(--color-border-light)', margin: '16px 0' } as React.CSSProperties,
-  row:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } as React.CSSProperties,
-  rowLabel:   { fontSize: '13px', color: 'var(--color-text-secondary)' } as React.CSSProperties,
-  rowValue:   (bold?: boolean, color?: string) => ({ fontSize: '13px', fontWeight: bold ? 700 : 400, color: color ?? 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties),
+  // Shared row layout
+  divider:  { borderTop: '1px solid var(--color-border-light)', margin: '12px 0' } as React.CSSProperties,
+  row:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } as React.CSSProperties,
+  rowLabel: { fontSize: '13px', color: 'var(--color-text-secondary)', flex: 1 } as React.CSSProperties,
+  rowValue: (bold?: boolean, color?: string) => ({ fontSize: '13px', fontWeight: bold ? 700 : 400, color: color ?? 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' as const } as React.CSSProperties),
 
-  // Quote card
-  quoteSymbol: { fontSize: '22px', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '4px' } as React.CSSProperties,
-  quotePrice:  { fontSize: '28px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '12px', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
-  quoteMeta:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' } as React.CSSProperties,
-  quoteItem:   { background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '8px 10px' } as React.CSSProperties,
-  quoteItemLabel: { fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const } as React.CSSProperties,
-  quoteItemVal:   { fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginTop: '2px', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
-  haltedBadge: { display: 'inline-block', padding: '2px 8px', background: 'var(--color-error-bg)', color: 'var(--color-error)', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 700, marginLeft: '8px' } as React.CSSProperties,
+  // Market Intelligence panel
+  ltpLabel:  { fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: '2px' } as React.CSSProperties,
+  ltpPrice:  { fontSize: '28px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '2px', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
+  ltpMeta:   { fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '12px', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
+  miGrid:    { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' } as React.CSSProperties,
+  miItem:    { background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '8px 10px' } as React.CSSProperties,
+  miLabel:   { fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: '2px' } as React.CSSProperties,
+  miValue:   { fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' } as React.CSSProperties,
+  haltedBadge: { display: 'inline-flex', alignItems: 'center', padding: '2px 8px', background: 'var(--color-error-bg)', color: 'var(--color-error)', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 700, marginLeft: '8px' } as React.CSSProperties,
+  staleBadge:  { display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'var(--color-warning-bg)', color: 'var(--color-warning)', borderRadius: 'var(--radius-sm)', fontSize: '10px', fontWeight: 700, marginLeft: '6px' } as React.CSSProperties,
 
   // Validation check
-  checkRow:   { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '12px' } as React.CSSProperties,
-  checkText:  (pass: boolean) => ({ color: pass ? 'var(--color-text-primary)' : 'var(--color-text-muted)' } as React.CSSProperties),
+  checkRow:  { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '12px' } as React.CSSProperties,
+  checkText: (pass: boolean) => ({ color: pass ? 'var(--color-text-primary)' : 'var(--color-text-muted)' } as React.CSSProperties),
+
+  // Alert badge
+  alertBadge: (type: 'success' | 'warning' | 'danger') => ({
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+    fontSize: '12px', fontWeight: 600, marginBottom: '6px',
+    background: type === 'success' ? 'var(--color-success-bg)'
+      : type === 'warning' ? 'var(--color-warning-bg)'
+      : 'var(--color-error-bg)',
+    color: type === 'success' ? 'var(--color-success)'
+      : type === 'warning' ? 'var(--color-warning)'
+      : 'var(--color-error)',
+    border: `1px solid ${type === 'success' ? '#86efac'
+      : type === 'warning' ? 'var(--color-warning-border)'
+      : '#fca5a5'}`,
+  } as React.CSSProperties),
 
   // Toast
   toast: { position: 'fixed' as const, top: '20px', right: '20px', background: 'var(--color-nav)', color: '#fff', padding: '14px 20px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 9999, fontSize: '14px', fontWeight: 500 },
 
   // Error banner / modal
-  errorBanner:  { padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', color: '#b91c1c', fontSize: '13px', marginBottom: '16px' } as React.CSSProperties,
+  errorBanner:  { padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', color: '#b91c1c', fontSize: '13px', marginBottom: '14px' } as React.CSSProperties,
   modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998 },
   modal:        { background: '#fff', borderRadius: 'var(--radius-xl)', padding: '28px', maxWidth: '420px', width: '90%', boxShadow: 'var(--shadow-lg)' } as React.CSSProperties,
   modalTitle:   { margin: '0 0 12px', fontSize: '17px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
@@ -91,12 +124,9 @@ const s = {
   datepickerWrapper:      { border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
   datepickerWrapperError: { border: '1.5px solid var(--color-error)', borderRadius: 'var(--radius-md)', overflow: 'hidden' } as React.CSSProperties,
 
-  // Real-time stale indicator (SCRUM-108)
-  staleBadge: { display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'var(--color-warning-bg)', color: 'var(--color-warning)', borderRadius: 'var(--radius-sm)', fontSize: '10px', fontWeight: 700, marginLeft: '6px' } as React.CSSProperties,
-
   // Idle timer banners
-  warningBanner: { padding: '12px 16px', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 600, marginBottom: '16px' } as React.CSSProperties,
-  expiredBanner: { padding: '16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', marginBottom: '16px' } as React.CSSProperties,
+  warningBanner: { padding: '12px 16px', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 600, marginBottom: '14px' } as React.CSSProperties,
+  expiredBanner: { padding: '16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', marginBottom: '14px' } as React.CSSProperties,
   expiredTitle:  { margin: '0 0 6px', fontSize: '14px', fontWeight: 700, color: '#b91c1c' } as React.CSSProperties,
   expiredMsg:    { margin: '0 0 12px', fontSize: '13px', color: '#b91c1c' } as React.CSSProperties,
   restartBtn:    { padding: '8px 18px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600, fontSize: '13px' } as React.CSSProperties,
@@ -105,6 +135,7 @@ const s = {
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface FieldErrors { quantity?: string; limitPrice?: string; gtdDate?: string; symbol?: string }
 interface ErrorDetail { field: string; code: string; message: string }
+interface AlertItem   { type: 'success' | 'warning' | 'danger'; message: string }
 
 interface SubmitError {
   type: 'MARKET_CLOSED' | 'RISK_REJECTED' | 'INVALID_GTD_DATE' | 'VALIDATION_ERROR' | 'GENERIC'
@@ -128,6 +159,7 @@ const OrderEntryPage: React.FC = () => {
   const [tif,                setTif]                = useState<TimeInForce>('DAY')
   const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
   const [routingDestination, setRoutingDestination] = useState(DEFAULT_VENUE)
+  const [advancedOpen,       setAdvancedOpen]       = useState(false)
 
   const [instruments,  setInstruments]  = useState<Instrument[]>([])
   const [quote,        setQuote]        = useState<Instrument | null>(null)
@@ -172,6 +204,11 @@ const OrderEntryPage: React.FC = () => {
     setOrderType('LIMIT')
     setRoutingDestination(DEFAULT_VENUE)
   }, [isExpired])
+
+  // Auto-expand Advanced section when GTD is selected
+  useEffect(() => {
+    if (tif === 'GTD') setAdvancedOpen(true)
+  }, [tif])
 
   // Computed values for the GTD date picker
   const tomorrow: Date = useMemo(() => {
@@ -254,6 +291,19 @@ const OrderEntryPage: React.FC = () => {
   const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
   const heldQty    = holding ? holding.quantity : 0
 
+  // P&L for current holding of selected symbol
+  const pnl = holding && quote
+    ? (parseFloat(quote.lastPrice) - parseFloat(holding.avgPrice)) * holding.quantity
+    : null
+  const pnlPct = holding && quote
+    ? ((parseFloat(quote.lastPrice) - parseFloat(holding.avgPrice)) / parseFloat(holding.avgPrice)) * 100
+    : null
+
+  // Spread from live or REST quote
+  const spreadStr = quote
+    ? fmtDec2(parseFloat(liveAsk ?? quote.askPrice) - parseFloat(liveBid ?? quote.bidPrice))
+    : null
+
   const sellHoldingsError: string | null =
     side === 'SELL' && portfolio !== null && !isNaN(qty) && qty > 0 && qty > heldQty
       ? `Sell quantity cannot exceed available holding of ${heldQty} units`
@@ -278,6 +328,32 @@ const OrderEntryPage: React.FC = () => {
   }
 
   const allChecksPass = Object.values(checks).every(Boolean)
+
+  // Contextual alerts
+  const alerts: AlertItem[] = useMemo(() => {
+    const result: AlertItem[] = []
+    if (quote?.halted) {
+      result.push({ type: 'danger', message: 'Symbol is halted — orders will not execute' })
+    }
+    if (side === 'BUY' && orderValue > 0) {
+      if (buyingPower >= orderValue) {
+        result.push({ type: 'success', message: 'Margin sufficiency confirmed' })
+      } else {
+        result.push({ type: 'danger', message: 'Insufficient buying power for this order' })
+      }
+    }
+    if (bpUsedPct > 80 && side === 'BUY' && orderValue > 0) {
+      result.push({ type: 'warning', message: `High buying power utilization: ${bpUsedPct.toFixed(1)}% used` })
+    }
+    if (quote?.dayHigh && quote?.lastPrice) {
+      const last = parseFloat(quote.lastPrice)
+      const high = parseFloat(quote.dayHigh)
+      if (high > 0 && last >= high * 0.95) {
+        result.push({ type: 'warning', message: 'Price close to day high — upper circuit risk' })
+      }
+    }
+    return result
+  }, [quote, side, orderValue, buyingPower, bpUsedPct])
 
   const handleSubmit = async () => {
     setFieldErrors({})
@@ -317,8 +393,6 @@ const OrderEntryPage: React.FC = () => {
         setSubmitError({ type: 'INVALID_GTD_DATE', message })
         setFieldErrors((f) => ({ ...f, gtdDate: message }))
       } else {
-        // 400 VALIDATION_ERROR — map backend field names to FieldErrors keys
-        // backend uses `expiryDate` Java field name; UI uses `gtdDate`
         const FIELD_MAP: Record<string, keyof FieldErrors> = {
           quantity:   'quantity',
           limitPrice: 'limitPrice',
@@ -351,7 +425,7 @@ const OrderEntryPage: React.FC = () => {
         ? 'linear-gradient(135deg, #f59e0b, #d97706)'
         : 'linear-gradient(135deg, #db2777, #be185d)'
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
 
@@ -386,7 +460,7 @@ const OrderEntryPage: React.FC = () => {
           onClick={handleInteraction}
           onChange={handleInteraction}
         >
-          <h2 style={s.cardTitle}>Order Details</h2>
+          <h2 style={{ ...s.cardTitle, fontSize: '15px', fontWeight: 600, textTransform: 'none', letterSpacing: 'normal' }}>Order Details</h2>
 
           {/* Idle timer — countdown warning */}
           {secondsRemaining <= 15 && !isExpired && (
@@ -464,58 +538,62 @@ const OrderEntryPage: React.FC = () => {
             {fieldErrors.symbol && <div style={s.errorText}>{fieldErrors.symbol}</div>}
           </div>
 
-          {/* Side */}
+          {/* Side selector */}
           <div style={s.fieldGroup}>
             <label style={s.label}>Side</label>
             <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(side === 'BUY',        '#2563eb')} onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
-              <button style={s.toggleBtn(side === 'SELL',       '#be185d')} onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
-              <button style={s.toggleBtn(side === 'SHORT_SELL', '#d97706')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
+              <button style={s.toggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
+              <button style={s.toggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
+              <button style={s.toggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
             </div>
           </div>
 
-          {/* Order Type */}
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Order Type</label>
-            <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired}>MARKET</button>
-              <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired}>LIMIT</button>
-            </div>
-          </div>
+          {/* Grouped fields: Order Type + Quantity + Limit Price */}
+          <div style={s.fieldBox}>
 
-          {/* Quantity */}
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Quantity</label>
-            <input
-              style={fieldErrors.quantity || sellHoldingsError ? s.inputError : s.input}
-              type="number" min="1" step="1"
-              placeholder="Number of shares"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              disabled={isExpired}
-            />
-            {(fieldErrors.quantity || sellHoldingsError) && (
-              <div style={s.errorText}>{fieldErrors.quantity ?? sellHoldingsError}</div>
+            {/* Order Type */}
+            <div style={{ ...s.fieldGroup, marginBottom: '12px' }}>
+              <label style={s.label}>Order Type</label>
+              <div style={s.toggleGroup}>
+                <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired}>MARKET</button>
+                <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired}>LIMIT</button>
+              </div>
+            </div>
+
+            {/* Quantity */}
+            <div style={{ ...s.fieldGroup, marginBottom: orderType === 'LIMIT' ? '12px' : 0 }}>
+              <label style={s.label}>Quantity</label>
+              <input
+                style={fieldErrors.quantity || sellHoldingsError ? s.inputError : s.input}
+                type="number" min="1" step="1"
+                placeholder="Number of shares"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                disabled={isExpired}
+              />
+              {(fieldErrors.quantity || sellHoldingsError) && (
+                <div style={s.errorText}>{fieldErrors.quantity ?? sellHoldingsError}</div>
+              )}
+            </div>
+
+            {/* Limit Price — visible only when LIMIT */}
+            {orderType === 'LIMIT' && (
+              <div style={{ ...s.fieldGroup, marginBottom: 0 }}>
+                <label style={s.label}>Limit Price ($)</label>
+                <input
+                  style={fieldErrors.limitPrice ? s.inputError : s.input}
+                  type="number" min="0.01" step="0.01"
+                  placeholder="0.00"
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  disabled={isExpired}
+                />
+                {fieldErrors.limitPrice && <div style={s.errorText}>{fieldErrors.limitPrice}</div>}
+              </div>
             )}
           </div>
 
-          {/* Limit Price */}
-          {orderType === 'LIMIT' && (
-            <div style={s.fieldGroup}>
-              <label style={s.label}>Limit Price ($)</label>
-              <input
-                style={fieldErrors.limitPrice ? s.inputError : s.input}
-                type="number" min="0.01" step="0.01"
-                placeholder="0.00"
-                value={limitPrice}
-                onChange={(e) => setLimitPrice(e.target.value)}
-                disabled={isExpired}
-              />
-              {fieldErrors.limitPrice && <div style={s.errorText}>{fieldErrors.limitPrice}</div>}
-            </div>
-          )}
-
-          {/* TIF */}
+          {/* Time in Force */}
           <div style={s.fieldGroup}>
             <label style={s.label}>Time in Force</label>
             <div style={s.toggleGroup}>
@@ -532,57 +610,71 @@ const OrderEntryPage: React.FC = () => {
             </div>
           </div>
 
-          {/* GTD Date Picker */}
-          {tif === 'GTD' && (
-            <div style={s.fieldGroup}>
-              <label style={s.label}>GTD Date</label>
-              <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
-                <DatePicker
-                  selected={gtdDate}
-                  onChange={(date: Date | null) => {
-                    setGtdDate(date)
-                    setFieldErrors((f) => ({ ...f, gtdDate: undefined }))
-                  }}
-                  filterDate={filterWeekdays}
-                  excludeDates={holidayDates}
-                  minDate={tomorrow}
-                  dateFormat="MMM dd, yyyy"
-                  placeholderText="Select GTD date"
-                  className="gtd-datepicker-input"
-                />
+          {/* Advanced section — collapsed by default; auto-expands when GTD selected */}
+          <button
+            data-testid="advanced-toggle"
+            style={s.advancedToggle}
+            onClick={() => setAdvancedOpen(v => !v)}
+          >
+            {advancedOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            Advanced
+          </button>
+
+          {advancedOpen && (
+            <>
+              {/* GTD Date Picker */}
+              {tif === 'GTD' && (
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>GTD Date</label>
+                  <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
+                    <DatePicker
+                      selected={gtdDate}
+                      onChange={(date: Date | null) => {
+                        setGtdDate(date)
+                        setFieldErrors((f) => ({ ...f, gtdDate: undefined }))
+                      }}
+                      filterDate={filterWeekdays}
+                      excludeDates={holidayDates}
+                      minDate={tomorrow}
+                      dateFormat="MMM dd, yyyy"
+                      placeholderText="Select GTD date"
+                      className="gtd-datepicker-input"
+                    />
+                  </div>
+                  {fieldErrors.gtdDate && <div style={s.errorText}>{fieldErrors.gtdDate}</div>}
+                </div>
+              )}
+
+              {/* Route To */}
+              <div style={s.fieldGroup}>
+                <label style={s.label}>Route To</label>
+                <select
+                  style={s.select}
+                  value={SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination}
+                  onChange={(e) => setRoutingDestination(e.target.value)}
+                  disabled={isExpired || SOR_VENUES.length === 0}
+                  title={SOR_VENUES.length === 0 ? 'No venues configured' : undefined}
+                  aria-label="Route To"
+                >
+                  {SOR_VENUES.length === 0 ? (
+                    <option value={DEFAULT_VENUE}>{DEFAULT_VENUE}</option>
+                  ) : (
+                    SOR_VENUES.map((venue) => (
+                      <option key={venue} value={venue}>{venue}</option>
+                    ))
+                  )}
+                </select>
               </div>
-              {fieldErrors.gtdDate && <div style={s.errorText}>{fieldErrors.gtdDate}</div>}
-            </div>
+            </>
           )}
 
-          {/* Route To */}
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Route To</label>
-            <select
-              style={s.select}
-              value={SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination}
-              onChange={(e) => setRoutingDestination(e.target.value)}
-              disabled={isExpired || SOR_VENUES.length === 0}
-              title={SOR_VENUES.length === 0 ? 'No venues configured' : undefined}
-              aria-label="Route To"
-            >
-              {SOR_VENUES.length === 0 ? (
-                <option value={DEFAULT_VENUE}>{DEFAULT_VENUE}</option>
-              ) : (
-                SOR_VENUES.map((venue) => (
-                  <option key={venue} value={venue}>{venue}</option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {/* Submit */}
+          {/* PLACE ORDER button */}
           <button
             style={{
-              width: '100%', padding: '12px',
+              width: '100%', padding: '13px',
               borderRadius: 'var(--radius-md)', border: 'none',
               background: submitBg, color: '#fff',
-              fontSize: '15px', fontWeight: 700,
+              fontSize: '15px', fontWeight: 700, letterSpacing: '0.03em',
               cursor: submitting || !allChecksPass || isExpired || symbolNotFound ? 'not-allowed' : 'pointer',
               marginTop: '8px', transition: 'opacity 0.2s',
             }}
@@ -592,22 +684,122 @@ const OrderEntryPage: React.FC = () => {
             {submitting ? (
               <>
                 <span className="btn-spinner" aria-label="Loading" />
-                Submitting…
+                Placing…
               </>
-            ) : 'Submit Order'}
+            ) : 'PLACE ORDER'}
           </button>
         </div>
 
-        {/* ── Right: Preview + Validation + Quote ── */}
+        {/* ── Right: Market Context Panels ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Order Preview — side-accented top border */}
+          {/* Market Intelligence */}
+          <div style={s.card}>
+            <h2 style={s.cardTitle}>Market Intelligence</h2>
+            {!quote && !quoteLoading && (
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see market data.</div>
+            )}
+            {quoteLoading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton" style={{ height: '28px', width: '80px' }} />
+                <div className="skeleton" style={{ height: '36px', width: '120px' }} />
+              </div>
+            )}
+            {quote && !quoteLoading && (
+              <>
+                <div style={{ marginBottom: '4px' }}>
+                  <div style={s.ltpLabel}>LTP</div>
+                  <div style={s.ltpPrice}>
+                    ${quote.lastPrice}
+                    {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
+                  </div>
+                  <div style={s.ltpMeta}>
+                    {quote.symbol}
+                    {(quote.change || quote.changePct) && (
+                      <span style={{
+                        marginLeft: '8px',
+                        color: parseFloat(quote.change ?? '0') >= 0 ? 'var(--color-success)' : 'var(--color-error)',
+                        fontWeight: 600,
+                      }}>
+                        {parseFloat(quote.change ?? '0') >= 0 ? '+' : ''}{quote.change}
+                        {quote.changePct && ` (${parseFloat(quote.changePct) >= 0 ? '+' : ''}${quote.changePct}%)`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={s.miGrid}>
+                  {[
+                    {
+                      id: 'bid',
+                      label: (
+                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          Bid
+                          {isStale && symbol && (
+                            <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                          )}
+                        </span>
+                      ),
+                      value: `$${liveBid ?? quote.bidPrice}`,
+                    },
+                    { id: 'ask',    label: 'Ask',    value: `$${liveAsk ?? quote.askPrice}` },
+                    { id: 'spread', label: 'Spread', value: spreadStr ?? '—' },
+                    { id: 'vol',    label: 'Volume', value: quote.volume != null ? quote.volume.toLocaleString() : '—' },
+                    { id: 'high',   label: 'High',   value: quote.dayHigh ? `$${fmtDec2(quote.dayHigh)}` : '—' },
+                    { id: 'low',    label: 'Low',    value: quote.dayLow  ? `$${fmtDec2(quote.dayLow)}`  : '—' },
+                  ].map(({ id, label, value }) => (
+                    <div key={id} style={s.miItem}>
+                      <div style={s.miLabel}>{label}</div>
+                      <div style={s.miValue}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Position */}
+          {holding && quote && (
+            <div style={s.card}>
+              <h2 style={s.cardTitle}>Position</h2>
+              <div style={s.row}>
+                <span style={s.rowLabel}>Holdings</span>
+                <span style={s.rowValue()}>{heldQty.toLocaleString()} {symbol}</span>
+              </div>
+              <div style={s.row}>
+                <span style={s.rowLabel}>Avg Price</span>
+                <span style={s.rowValue()}>${fmtDec2(holding.avgPrice)}</span>
+              </div>
+              <div style={s.row}>
+                <span style={s.rowLabel}>Market Value</span>
+                <span style={s.rowValue()}>{fmt(holding.marketValue)}</span>
+              </div>
+              {pnl !== null && pnlPct !== null && (
+                <div style={s.row}>
+                  <span style={s.rowLabel}>P&L</span>
+                  <span style={s.rowValue(true, pnl >= 0 ? 'var(--color-success)' : 'var(--color-error)')}>
+                    {fmtPnl(pnl, pnlPct)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Margin & Costs */}
           <div style={{ ...s.card, borderTop: `3px solid ${sideAccent}`, paddingTop: '21px' }}>
-            <h2 style={s.cardTitle}>Order Preview</h2>
+            <h2 style={s.cardTitle}>Margin &amp; Costs</h2>
 
             <div style={s.row}>
-              <span style={{ ...s.rowLabel, color: sideAccent, fontWeight: 600 }}>Estimated Value</span>
+              <span style={{ ...s.rowLabel, color: sideAccent, fontWeight: 600 }}>Order Value</span>
               <span style={{ ...s.rowValue(true), color: sideAccent }}>{orderValue > 0 ? fmt(orderValue) : '—'}</span>
+            </div>
+            <div style={s.row}>
+              <span style={s.rowLabel}>Estimated Charges</span>
+              <span style={s.rowValue()}>$0.00</span>
+            </div>
+            <div style={s.divider} />
+            <div style={s.row}>
+              <span style={s.rowLabel}>Buying Power</span>
+              <span style={s.rowValue(true, 'var(--color-success)')}>{portfolio ? fmt(portfolio.buyingPower) : '—'}</span>
             </div>
             <div style={s.row}>
               <span style={s.rowLabel}>Cash Balance</span>
@@ -617,17 +809,12 @@ const OrderEntryPage: React.FC = () => {
               <span style={s.rowLabel}>Reserved Cash</span>
               <span style={s.rowValue()}>{portfolio ? fmt(portfolio.reservedCash) : '—'}</span>
             </div>
-            <div style={s.row}>
-              <span style={s.rowLabel}>Buying Power</span>
-              <span style={s.rowValue(true, 'var(--color-success)')}>{portfolio ? fmt(portfolio.buyingPower) : '—'}</span>
-            </div>
             {tif === 'GTD' && gtdDisplayStr && (
               <div style={s.row}>
                 <span style={s.rowLabel}>Expires</span>
                 <span style={s.rowValue()}>{gtdDisplayStr} at 4:00 PM ET</span>
               </div>
             )}
-
             {orderValue > 0 && (
               <>
                 <div style={s.divider} />
@@ -656,16 +843,33 @@ const OrderEntryPage: React.FC = () => {
             )}
           </div>
 
+          {/* Alerts */}
+          {alerts.length > 0 && (
+            <div style={s.card}>
+              <h2 style={s.cardTitle}>Alerts</h2>
+              <div style={alerts.length > 3 ? { maxHeight: '120px', overflowY: 'auto' } : undefined}>
+                {alerts.map((alert, i) => (
+                  <div key={i} style={s.alertBadge(alert.type)}>
+                    {alert.type === 'success' && <CheckCircle size={13} strokeWidth={2.5} />}
+                    {alert.type === 'warning' && <AlertTriangle size={13} strokeWidth={2.5} />}
+                    {alert.type === 'danger'  && <XCircle      size={13} strokeWidth={2.5} />}
+                    {alert.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Validation */}
           <div style={s.card}>
             <h2 style={s.cardTitle}>Validation</h2>
             {[
-              { label: 'Symbol entered',                                                                                                                    pass: checks.symbol       },
-              { label: 'Quantity > 0',                                                                                                                      pass: checks.quantity     },
-              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                                                       pass: checks.limitPrice   },
-              { label: tif === 'GTD' ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',                                                pass: checks.gtdDate      },
-              { label: 'Symbol not halted',                                                                                                                 pass: checks.notHalted    },
-              { label: side !== 'SELL' ? 'Holdings check — N/A for BUY / SHORT_SELL' : `Sufficient holdings (holding: ${heldQty.toLocaleString()} ${symbol || '—'})`,  pass: checks.sellHoldings },
+              { label: 'Symbol entered',                                                                                                                      pass: checks.symbol       },
+              { label: 'Quantity > 0',                                                                                                                        pass: checks.quantity     },
+              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                                                         pass: checks.limitPrice   },
+              { label: tif === 'GTD' ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',                                                  pass: checks.gtdDate      },
+              { label: 'Symbol not halted',                                                                                                                   pass: checks.notHalted    },
+              { label: side !== 'SELL' ? 'Holdings check — N/A for BUY / SHORT_SELL' : `Sufficient holdings (holding: ${heldQty.toLocaleString()} ${symbol || '—'})`, pass: checks.sellHoldings },
             ].map(({ label, pass }) => (
               <div key={label} style={s.checkRow}>
                 {pass
@@ -675,53 +879,6 @@ const OrderEntryPage: React.FC = () => {
                 <span style={s.checkText(pass)}>{label}</span>
               </div>
             ))}
-          </div>
-
-          {/* Market Quote */}
-          <div style={s.card}>
-            <h2 style={s.cardTitle}>Market Quote</h2>
-            {!quote && !quoteLoading && (
-              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
-            )}
-            {quoteLoading && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div className="skeleton" style={{ height: '28px', width: '80px' }} />
-                <div className="skeleton" style={{ height: '36px', width: '120px' }} />
-              </div>
-            )}
-            {quote && !quoteLoading && (
-              <>
-                <div style={s.quoteSymbol}>
-                  {quote.symbol}
-                  {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
-                </div>
-                <div style={s.quotePrice}>${quote.lastPrice}</div>
-                <div style={s.quoteMeta}>
-                  {[
-                    {
-                      id:    'bid',
-                      label: (
-                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                          Bid
-                          {isStale && symbol && (
-                            <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
-                          )}
-                        </span>
-                      ),
-                      value: `$${liveBid ?? quote.bidPrice}`,
-                    },
-                    { id: 'ask',    label: 'Ask',     value: `$${liveAsk ?? quote.askPrice}` },
-                    { id: 'minqty', label: 'Min Qty', value: quote.minQuantity?.toLocaleString() ?? '—' },
-                    { id: 'maxqty', label: 'Max Qty', value: quote.maxQuantity?.toLocaleString() ?? '—' },
-                  ].map(({ id, label, value }) => (
-                    <div key={id} style={s.quoteItem}>
-                      <div style={s.quoteItemLabel}>{label}</div>
-                      <div style={s.quoteItemVal}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
 
         </div>
