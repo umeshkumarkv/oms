@@ -69,8 +69,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,6 +115,7 @@ class OrderServiceTest {
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setCashBalance("100000.00");
         clientData.setBuyingPower("95000.00");
         clientData.setMaxOpenOrders(10);
         clientData.setHoldings(Collections.emptyList());
@@ -160,6 +159,9 @@ class OrderServiceTest {
 
         // Default: no open SELL commitments (zero shares committed to in-flight SELL orders)
         when(orderRepository.sumOpenSellQuantity(any(), any(), any())).thenReturn(0L);
+
+        // Default: no open BUY commitments (zero value committed to in-flight BUY orders)
+        when(orderRepository.sumOpenBuyOrderValues(any(), any())).thenReturn(null);
 
         // Default repository: save passes through with generated ID
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
@@ -587,20 +589,20 @@ class OrderServiceTest {
                 .isInstanceOf(ServiceUnavailableException.class);
     }
 
-    // --- Cash reservation ---
+    // --- BUY cash validation (SCRUM-135: combined settled+in-flight view) ---
 
     @Test
-    void shouldReserveCashBeforeOrderPersistOnBuyLimitOrder() {
-        // limitPrice=150.00, qty=10 → orderValue=1500.00
+    void shouldValidateBuyOrderUsingCombinedViewAndSaveWithoutCallingReserveCash() {
+        // cashBalance=100000, committed=0, orderValue=1500 (10 * 150) → passes; reserveCash never called
         orderService.submitOrder(limitBuyRequest(), userId);
 
-        org.mockito.InOrder inOrder = inOrder(clientServiceClient, orderRepository);
-        inOrder.verify(clientServiceClient).reserveCash(eq(clientId), eq(new BigDecimal("1500.00")));
-        inOrder.verify(orderRepository).save(any(Order.class));
+        verify(orderRepository).save(any(Order.class));
+        verify(clientServiceClient, never()).reserveCash(any(), any());
+        verify(orderRepository).sumOpenBuyOrderValues(eq(clientId), any());
     }
 
     @Test
-    void shouldSkipCashReservationForSellOrder() {
+    void shouldSkipBuyValidationForSellOrder() {
         when(clientServiceClient.getClient(clientId)).thenReturn(clientResponseWithHoldings(10));
 
         SubmitOrderRequest request = marketBuyRequest();
@@ -609,13 +611,15 @@ class OrderServiceTest {
         orderService.submitOrder(request, userId);
 
         verify(clientServiceClient, never()).reserveCash(any(), any());
+        verify(orderRepository, never()).sumOpenBuyOrderValues(any(), any());
         verify(orderRepository).save(any(Order.class));
     }
 
     @Test
-    void shouldRejectBuyOrderWhenReserveCashReturns422() {
-        doThrow(new InsufficientBuyingPowerException())
-                .when(clientServiceClient).reserveCash(eq(clientId), any(BigDecimal.class));
+    void shouldRejectBuyOrderWhenAvailableCashInsufficientAfterCommitments() {
+        // cashBalance=100000, committed=99000, orderValue=1500 → available=1000 < 1500, rejects
+        when(orderRepository.sumOpenBuyOrderValues(any(), any()))
+                .thenReturn(new BigDecimal("99000.00"));
 
         assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
                 .isInstanceOf(InsufficientBuyingPowerException.class);
@@ -624,12 +628,13 @@ class OrderServiceTest {
     }
 
     @Test
-    void shouldReturn503WhenClientServiceUnavailableOnCashReservation() {
-        doThrow(new ServiceUnavailableException("client-service"))
-                .when(clientServiceClient).reserveCash(eq(clientId), any(BigDecimal.class));
+    void shouldRejectBuyOrderWhenFullyCashCommitted() {
+        // cashBalance=100000, committed=100000, orderValue=1500 → available=0 < 1500, rejects
+        when(orderRepository.sumOpenBuyOrderValues(any(), any()))
+                .thenReturn(new BigDecimal("100000.00"));
 
         assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
-                .isInstanceOf(ServiceUnavailableException.class);
+                .isInstanceOf(InsufficientBuyingPowerException.class);
         verify(orderRepository, never()).save(any());
     }
 
@@ -727,6 +732,7 @@ class OrderServiceTest {
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setCashBalance("100000.00");
         clientData.setBuyingPower("95000.00");
         clientData.setMaxOpenOrders(10);
         clientData.setHoldings(List.of(holding));
@@ -743,7 +749,7 @@ class OrderServiceTest {
         verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
         RiskEvaluationRequestedEvent event = captor.getValue();
 
-        assertThat(event.getBuyingPower()).isEqualTo("95000.00");
+        assertThat(event.getBuyingPower()).isEqualTo("100000.00"); // SCRUM-135: availableCash = cashBalance(100000) - committed(0)
         assertThat(event.getHoldingsForSymbol()).isEqualTo(100);
         assertThat(event.getKycStatus()).isEqualTo("VERIFIED");
         assertThat(event.getTradingEnabled()).isTrue();
@@ -761,6 +767,7 @@ class OrderServiceTest {
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setCashBalance("100000.00");
         clientData.setBuyingPower("50000.00");
         clientData.setMaxOpenOrders(5);
         clientData.setHoldings(Collections.emptyList());
@@ -782,6 +789,7 @@ class OrderServiceTest {
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setCashBalance("100000.00");
         clientData.setBuyingPower("50000.00");
         clientData.setHoldings(null);
         ClientResponse clientResponse = new ClientResponse();
@@ -862,23 +870,25 @@ class OrderServiceTest {
     }
 
     @Test
-    void shouldSetBuyingPowerToZeroStringWhenPortfolioReturnNullBuyingPower() {
+    void shouldRejectBuyOrderWhenPortfolioReturnNullCashBalance() {
+        // SCRUM-135: availableCash = cashBalance - committed. When cashBalance is null it
+        // defaults to ZERO, so a BUY order with any positive orderValue must be rejected.
         ClientResponse.ClientData clientData = new ClientResponse.ClientData();
         clientData.setStatus("ACTIVE");
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setCashBalance(null);   // null cashBalance → defaults to ZERO
         clientData.setBuyingPower(null);
         clientData.setHoldings(Collections.emptyList());
         ClientResponse clientResponse = new ClientResponse();
         clientResponse.setData(clientData);
         when(clientServiceClient.getClient(clientId)).thenReturn(clientResponse);
 
-        orderService.submitOrder(marketBuyRequest(), userId);
-
-        ArgumentCaptor<RiskEvaluationRequestedEvent> captor = ArgumentCaptor.forClass(RiskEvaluationRequestedEvent.class);
-        verify(orderEventProducer).publishRiskEvaluationRequested(captor.capture());
-        assertThat(captor.getValue().getBuyingPower()).isEqualTo("0");
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(InsufficientBuyingPowerException.class);
+        verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
     }
 
     // --- SCRUM-123: SHORT_SELL validation ---
@@ -1027,6 +1037,67 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.submitOrder(request, userId))
                 .isInstanceOf(InsufficientHoldingsException.class);
         verify(orderRepository, never()).save(any());
+    }
+
+    // --- SCRUM-135: BUY combined-view validation (availableCash = cashBalance - openBuyCommitments) ---
+
+    @Test
+    void shouldPassBuyOrderWhenNoPriorCommitmentsAndCashCoversOrderValue() {
+        // cashBalance=100000, committed=0, orderValue=1500 (10 * 150) → available=100000, passes
+        when(orderRepository.sumOpenBuyOrderValues(any(), any())).thenReturn(null);
+
+        SubmitOrderResponse response = orderService.submitOrder(marketBuyRequest(), userId);
+
+        assertThat(response.getData().getStatus()).isEqualTo(OrderStatus.NEW.name());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldPassBuyOrderWhenQuantityFitsWithinRemainingCashAfterPartialCommitment() {
+        // cashBalance=100000, committed=50000, orderValue=1500 → available=50000, passes
+        when(orderRepository.sumOpenBuyOrderValues(any(), any()))
+                .thenReturn(new BigDecimal("50000.00"));
+
+        SubmitOrderResponse response = orderService.submitOrder(marketBuyRequest(), userId);
+
+        assertThat(response.getData().getStatus()).isEqualTo(OrderStatus.NEW.name());
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void shouldRejectDoubleBuyWhenSecondOrderExceedsRemainingCashAfterFirstCommitment() {
+        // cashBalance=100000, committed=99000 (first BUY open), orderValue=1500 → available=1000 < 1500, rejects
+        when(orderRepository.sumOpenBuyOrderValues(any(), any()))
+                .thenReturn(new BigDecimal("99000.00"));
+
+        assertThatThrownBy(() -> orderService.submitOrder(marketBuyRequest(), userId))
+                .isInstanceOf(InsufficientBuyingPowerException.class);
+        verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
+    }
+
+    @Test
+    void shouldNeverCallReserveCashOnClientServiceForAnyOrderSide() {
+        // BUY — must not call reserveCash
+        orderService.submitOrder(marketBuyRequest(), userId);
+        verify(clientServiceClient, never()).reserveCash(any(), any());
+    }
+
+    @Test
+    void shouldUseOpenStatusesOnlyForBuyCommitmentQuery() {
+        // Verifies sumOpenBuyOrderValues is called with OPEN_STATUSES (non-terminal only)
+        ArgumentCaptor<List> statusCaptor = ArgumentCaptor.forClass(List.class);
+        when(orderRepository.sumOpenBuyOrderValues(eq(clientId), statusCaptor.capture())).thenReturn(null);
+
+        orderService.submitOrder(marketBuyRequest(), userId);
+
+        List capturedStatuses = statusCaptor.getValue();
+        assertThat(capturedStatuses).contains(OrderStatus.NEW, OrderStatus.VALIDATED,
+                OrderStatus.RISK_CHECK_PASSED, OrderStatus.ACCEPTED,
+                OrderStatus.SENT_TO_EXECUTION, OrderStatus.PARTIALLY_FILLED);
+        assertThat(capturedStatuses).doesNotContain(
+                OrderStatus.FILLED, OrderStatus.REJECTED, OrderStatus.EXPIRED,
+                OrderStatus.RISK_REJECTED, OrderStatus.CANCELLED);
     }
 
     // --- GET /orders ---
@@ -1315,6 +1386,7 @@ class OrderServiceTest {
         clientData.setTradingEnabled(true);
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
+        clientData.setCashBalance("100000.00");
         clientData.setBuyingPower("95000.00");
         clientData.setMaxOpenOrders(10);
         clientData.setHoldings(quantity > 0 ? List.of(holding) : Collections.emptyList());

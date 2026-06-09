@@ -199,8 +199,10 @@ public class OrderService {
                 ? BigDecimal.valueOf(((Number) metrics[1]).doubleValue()).setScale(4, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(4);
 
-        String buyingPower = clientResponse.getData().getBuyingPower() != null
-                ? clientResponse.getData().getBuyingPower() : "0";
+        // Read settled cashBalance from client-service portfolio.
+        // For BUY orders, in-flight commitments are subtracted below to produce availableCash.
+        BigDecimal cashBalance = clientResponse.getData().getCashBalance() != null
+                ? new BigDecimal(clientResponse.getData().getCashBalance()) : BigDecimal.ZERO;
         List<ClientResponse.HoldingData> holdings = clientResponse.getData().getHoldings();
         int holdingsForSymbol = (holdings == null) ? 0 : holdings.stream()
                 .filter(h -> h.getSymbol().equals(request.getSymbol()))
@@ -224,10 +226,18 @@ public class OrderService {
             }
         }
 
-        // --- Reserve cash for BUY orders before persisting ---
-        if (OrderSide.valueOf(request.getSide()) == OrderSide.BUY) {
-            boolean reserved = clientServiceClient.reserveCash(request.getClientId(), orderValue);
-            if (!reserved) throw new InsufficientBuyingPowerException();
+        // --- L2 check #13: BUY — availableCash = settled cashBalance - in-flight BUY commitments ---
+        // Combines both views: client-service (settled) + own DB (in-flight open BUY orders).
+        // Replaces the PATCH /reserved-cash call. Client-service no longer owns in-flight state.
+        BigDecimal availableCash = cashBalance;
+        if (requestedSide == OrderSide.BUY) {
+            BigDecimal committedBuyValue = orderRepository.sumOpenBuyOrderValues(
+                    request.getClientId(), OPEN_STATUSES);
+            if (committedBuyValue == null) committedBuyValue = BigDecimal.ZERO;
+            availableCash = cashBalance.subtract(committedBuyValue).setScale(2, RoundingMode.HALF_UP);
+            if (availableCash.compareTo(orderValue) < 0) {
+                throw new InsufficientBuyingPowerException();
+            }
         }
 
         // --- Create and persist order in NEW state ---
@@ -280,7 +290,7 @@ public class OrderService {
                 .timeInForce(savedOrder.getTimeInForce().name())
                 .orderValue(orderValue.toPlainString())
                 .marginCallActive(clientResponse.getData().getMarginCallActive())
-                .buyingPower(buyingPower)
+                .buyingPower(availableCash.toPlainString())
                 .holdingsForSymbol(holdingsForSymbol)
                 .kycStatus(clientResponse.getData().getKycStatus())
                 .kycExpiryDate(clientResponse.getData().getKycExpiryDate() != null
