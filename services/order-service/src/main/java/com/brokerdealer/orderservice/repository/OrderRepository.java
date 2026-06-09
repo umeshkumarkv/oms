@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -48,6 +49,15 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     long sumOpenSellQuantity(@Param("clientId") UUID clientId,
                              @Param("symbol") String symbol,
                              @Param("openStatuses") List<OrderStatus> openStatuses);
+
+    // Sum of orderValue for open (non-terminal) BUY orders for a client.
+    // Used by Level 2 check #13 to compute availableCash = cashBalance - committed.
+    @Query("SELECT SUM(o.orderValue) FROM Order o " +
+           "WHERE o.clientId = :clientId " +
+           "AND o.side = com.brokerdealer.orderservice.domain.OrderSide.BUY " +
+           "AND o.status IN :openStatuses")
+    BigDecimal sumOpenBuyOrderValues(@Param("clientId") UUID clientId,
+                                      @Param("openStatuses") List<OrderStatus> openStatuses);
 
     // Count orders grouped by status for a given ET date range
     @Query("SELECT o.status, COUNT(o) FROM Order o " +

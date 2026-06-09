@@ -22,7 +22,8 @@ public class ClientResponse {
         private String kycStatus;
         private LocalDate kycExpiryDate;
         private Boolean marginCallActive;
-        private String buyingPower;      // BigDecimal as String — cashBalance - reservedCash
+        private String cashBalance;      // BigDecimal as String — settled cash (confirmed fills only)
+        private String buyingPower;      // BigDecimal as String — cashBalance - reservedCash (legacy, kept for display)
         private Integer maxOpenOrders;
         private List<HoldingData> holdings;
     }
