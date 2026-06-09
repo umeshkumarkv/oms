@@ -61,8 +61,8 @@ const s = {
   btn: (variant: 'primary' | 'danger' | 'secondary' | 'ghost', disabled?: boolean) => {
     const base = { padding: '7px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', border: 'none', transition: 'opacity 0.15s', opacity: disabled ? 0.5 : 1 }
     const map = {
-      primary:   { background: 'var(--color-primary)', color: '#fff' },
-      danger:    { background: 'var(--color-error)',   color: '#fff' },
+      primary:   { background: 'var(--color-primary)', color: 'var(--color-surface)' },
+      danger:    { background: 'var(--color-error)',   color: 'var(--color-surface)' },
       secondary: { background: 'var(--color-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' },
       ghost:     { background: 'transparent',          color: 'var(--color-text-secondary)' },
     }
@@ -84,7 +84,7 @@ const s = {
     position: 'fixed' as const, bottom: '24px', right: '24px',
     padding: '12px 18px', borderRadius: '8px',
     background: type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
-    color: '#fff', fontSize: '13px', fontWeight: 500,
+    color: 'var(--color-surface)', fontSize: '13px', fontWeight: 500,
     boxShadow: '0 4px 16px rgba(0,0,0,0.2)', zIndex: 9999,
     maxWidth: '360px',
   }),

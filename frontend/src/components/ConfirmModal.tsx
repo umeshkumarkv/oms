@@ -59,7 +59,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             fontSize: '13px', fontWeight: 600, cursor: 'pointer',
             border: 'none', transition: 'opacity 0.15s',
             background: danger ? 'var(--color-error)' : 'var(--color-primary)',
-            color: '#fff',
+            color: 'var(--color-surface)',
           }}
           onClick={onConfirm}
         >
