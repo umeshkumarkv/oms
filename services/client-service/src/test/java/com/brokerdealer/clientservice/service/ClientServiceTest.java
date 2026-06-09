@@ -3,11 +3,14 @@ package com.brokerdealer.clientservice.service;
 import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.*;
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
+import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
+import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
 import com.brokerdealer.clientservice.exception.InvalidReservationException;
+import com.brokerdealer.clientservice.exception.ValidationException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
 import com.brokerdealer.clientservice.repository.HoldingRepository;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,6 +45,9 @@ class ClientServiceTest {
 
     @Mock
     MarketDataClient marketDataClient;
+
+    @Mock
+    RedisTemplate<String, Object> redisTemplate;
 
     @InjectMocks
     ClientService clientService;
@@ -328,5 +335,81 @@ class ClientServiceTest {
         ClientProfileResponse result = clientService.getClient(id);
 
         assertThat(result.getKycStatus()).isEqualTo(KycStatus.EXPIRED);
+    }
+
+    @Test
+    void shouldReturnPortfolioWithDefaultRoute() {
+        UUID id = UUID.fromString("a1000000-0000-0000-0000-000000000001");
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        client.setDefaultRoute(DefaultRoute.NYSE);
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(holdingRepository.findByClientId(id)).thenReturn(Collections.emptyList());
+
+        PortfolioResponse result = clientService.getPortfolio(id);
+
+        assertThat(result.getDefaultRoute()).isEqualTo(DefaultRoute.NYSE);
+    }
+
+    private UpdateDefaultRouteRequest buildUpdateDefaultRouteRequest(String defaultRoute) {
+        UpdateDefaultRouteRequest req = new UpdateDefaultRouteRequest();
+        req.setDefaultRoute(defaultRoute);
+        return req;
+    }
+
+    @Test
+    void shouldUpdateDefaultRouteToNyse() {
+        UUID id = UUID.randomUUID();
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        client.setDefaultRoute(DefaultRoute.NASDAQ);
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+        when(clientRepository.save(any(Client.class))).thenReturn(client);
+
+        UpdateDefaultRouteResponse result = clientService.updateDefaultRoute(id, buildUpdateDefaultRouteRequest("NYSE"));
+
+        assertThat(result.getClientId()).isEqualTo(id);
+        assertThat(result.getDefaultRoute()).isEqualTo(DefaultRoute.NYSE);
+        verify(clientRepository).save(client);
+    }
+
+    @Test
+    void shouldUpdateDefaultRouteToAllValidValues() {
+        for (DefaultRoute route : DefaultRoute.values()) {
+            UUID id = UUID.randomUUID();
+            Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+            client.setDefaultRoute(DefaultRoute.NASDAQ);
+
+            when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+            when(clientRepository.save(any(Client.class))).thenReturn(client);
+
+            UpdateDefaultRouteResponse result = clientService.updateDefaultRoute(id, buildUpdateDefaultRouteRequest(route.name()));
+
+            assertThat(result.getDefaultRoute()).isEqualTo(route);
+        }
+    }
+
+    @Test
+    void shouldThrowValidationExceptionForInvalidRouteValue() {
+        UUID id = UUID.randomUUID();
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+
+        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
+
+        assertThatThrownBy(() -> clientService.updateDefaultRoute(id, buildUpdateDefaultRouteRequest("LONDON")))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("INVALID_ROUTE");
+    }
+
+    @Test
+    void shouldThrowClientNotFoundWhenUpdatingDefaultRouteForUnknownId() {
+        UUID id = UUID.randomUUID();
+        when(clientRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> clientService.updateDefaultRoute(id, buildUpdateDefaultRouteRequest("NYSE")))
+                .isInstanceOf(ClientNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo("CLIENT_NOT_FOUND");
     }
 }

@@ -69,6 +69,10 @@ public class Client {
     @Column(name = "avg_order_qty")
     private Integer avgOrderQty;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_route", nullable = false, length = 20)
+    private DefaultRoute defaultRoute;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
