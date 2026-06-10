@@ -64,6 +64,8 @@ export interface PendingChange {
   changeType:        PendingChangeType
   proposedEnabled:   boolean | null
   proposedThreshold: string | null
+  currentEnabled:    boolean | null
+  currentThreshold:  string | null
   makerUserId:       string
   makerUsername:     string
   status:            PendingChangeStatus
