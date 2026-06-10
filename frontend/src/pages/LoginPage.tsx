@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
   const [bannerVisible, setBannerVisible] = useState(() => !!(sessionExpired || routeSessionExpired))
 
   useEffect(() => {
-    if (user) navigate('/dashboard', { replace: true })
+    if (user) navigate(user.role === 'ADMIN' ? '/admin' : '/dashboard', { replace: true })
   }, [user, navigate])
 
   useEffect(() => {
@@ -59,7 +59,7 @@ const LoginPage: React.FC = () => {
         displayName: data.displayName,
       })
       setBannerVisible(false)
-      navigate('/dashboard', { replace: true })
+      navigate(data.role === 'ADMIN' ? '/admin' : '/dashboard', { replace: true })
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number } }
       if (axiosErr?.response?.status === 401) {

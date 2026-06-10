@@ -68,6 +68,23 @@ describe('LoginPage', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true }))
   })
 
+  it('shouldRedirectAdminToAdminPanelOnSuccessfulLogin', async () => {
+    vi.mocked(authApi.login).mockResolvedValue({
+      token: 'test-token',
+      expiresAt: '2026-12-31T00:00:00Z',
+      role: 'ADMIN',
+      userId: '00000000-0000-0000-0000-000000000002',
+      displayName: 'risk.manager',
+    })
+
+    renderLoginPage()
+    await userEvent.type(screen.getByLabelText(/username/i), 'risk.manager')
+    await userEvent.type(screen.getByLabelText(/password/i), 'Demo@1234')
+    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/admin', { replace: true }))
+  })
+
   it('shows loading state while request is in flight', async () => {
     let resolveLogin!: (v: authApi.LoginResponse) => void
     vi.mocked(authApi.login).mockReturnValue(

@@ -39,6 +39,7 @@ const renderProtectedRoute = (user: AuthUser | null, allowedRoles?: string[]) =>
         </Route>
         <Route path="/" element={<div>Login Page</div>} />
         <Route path="/dashboard" element={<div>Dashboard Page</div>} />
+        <Route path="/admin" element={<div>Admin Panel Page</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -75,9 +76,9 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Order Entry Page')).not.toBeInTheDocument()
   })
 
-  it('shouldRedirectToDashboardForAdminRole', () => {
+  it('shouldRedirectAdminRoleToAdminPanel', () => {
     renderProtectedRoute(makeUser('ADMIN'), ['TRADER'])
-    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Panel Page')).toBeInTheDocument()
     expect(screen.queryByText('Order Entry Page')).not.toBeInTheDocument()
   })
 
@@ -142,6 +143,7 @@ const renderRouteAsRole = (role: string, path: string, _pageLabel: string) => {
         </Route>
         <Route path="/" element={<div>Login Page</div>} />
         <Route path="/dashboard" element={<div>Dashboard Page</div>} />
+        <Route path="/admin" element={<div>Admin Panel Page</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -154,25 +156,25 @@ describe('Route guards for ADMIN role', () => {
 
   it('shouldRedirectAdminFromOrders', () => {
     renderRouteAsRole('ADMIN', '/orders', 'Order Blotter Page')
-    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Panel Page')).toBeInTheDocument()
     expect(screen.queryByText('Order Blotter Page')).not.toBeInTheDocument()
   })
 
   it('shouldRedirectAdminFromPortfolio', () => {
     renderRouteAsRole('ADMIN', '/portfolio', 'Portfolio Page')
-    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Panel Page')).toBeInTheDocument()
     expect(screen.queryByText('Portfolio Page')).not.toBeInTheDocument()
   })
 
   it('shouldRedirectAdminFromAudit', () => {
     renderRouteAsRole('ADMIN', '/audit', 'Audit Trail Page')
-    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Panel Page')).toBeInTheDocument()
     expect(screen.queryByText('Audit Trail Page')).not.toBeInTheDocument()
   })
 
   it('shouldRedirectAdminFromMarket', () => {
     renderRouteAsRole('ADMIN', '/market', 'Market Data Page')
-    expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Panel Page')).toBeInTheDocument()
     expect(screen.queryByText('Market Data Page')).not.toBeInTheDocument()
   })
 
