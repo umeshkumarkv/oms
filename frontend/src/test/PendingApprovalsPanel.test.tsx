@@ -116,13 +116,23 @@ describe('PendingApprovalsPanel — rendering pending changes', () => {
     expect(screen.getByText('750000')).toBeTruthy()            // New Value column
   })
 
-  it('shouldRenderDashInCurrentValueColumnWhenBothCurrentFieldsAreNull', async () => {
+  it('shouldRenderDashInCurrentValueColumnWhenCurrentThresholdIsNullForThresholdChange', async () => {
     vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
       makePendingChange({ changeType: 'UPDATE_THRESHOLD', proposedThreshold: '750000', currentEnabled: null, currentThreshold: null }),
     ])
     renderPanel()
     expect(await screen.findByText('750000')).toBeTruthy()
     expect(screen.getAllByText('—').length).toBeGreaterThan(0) // From column shows — without crashing
+  })
+
+  it('shouldRenderCurrentThresholdNotCurrentEnabledForUpdateThresholdChangeWhenBothFieldsPresent', async () => {
+    vi.mocked(riskApi.getPendingChanges).mockResolvedValue([
+      makePendingChange({ changeType: 'UPDATE_THRESHOLD', proposedThreshold: '1000', currentEnabled: true, currentThreshold: '500' }),
+    ])
+    renderPanel()
+    expect(await screen.findByText('500')).toBeTruthy()   // From column — must use currentThreshold
+    expect(screen.getByText('1000')).toBeTruthy()          // To column
+    expect(screen.queryByText('Enabled')).toBeNull()       // currentEnabled must NOT drive From column for UPDATE_THRESHOLD
   })
 
   it('shouldRenderApprovedStatusBadgeForReviewedChange', async () => {
