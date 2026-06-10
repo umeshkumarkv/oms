@@ -151,7 +151,7 @@ describe('OrderEntryPage — submit body', () => {
     renderPage()
 
     // Default is DAY — just verify no gtdDate in submit
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     // The submit button is disabled until all checks pass — this test
     // verifies the tif field is 'DAY' and gtdDate is undefined in a DAY order
     expect(vi.mocked(submitOrder)).not.toHaveBeenCalled()
@@ -161,14 +161,14 @@ describe('OrderEntryPage — submit body', () => {
 describe('OrderEntryPage — submit button spinner', () => {
   it('shouldNotShowSpinnerWhenNotSubmitting', async () => {
     const { container } = renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     expect(container.querySelector('.btn-spinner')).toBeNull()
   })
 
   it('shouldShowSubmitOrderTextWhenNotSubmitting', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
-    expect(screen.queryByText('Submitting…')).toBeNull()
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    expect(screen.queryByText('Placing…')).toBeNull()
   })
 })
 
@@ -268,7 +268,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     const qtyInput = screen.getByPlaceholderText('Number of shares')
     await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
 
-    expect(screen.getByText('Submit Order')).toBeDisabled()
+    expect(screen.getByText('PLACE ORDER')).toBeDisabled()
   })
 
   it('shouldShowSellHoldingsErrorImmediatelyWithoutBlur', async () => {
@@ -340,7 +340,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
   it('shouldPassBuyOrderUnaffectedAfterSellValidationAdded', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     // BUY is default — no sell validation check should interfere
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
     expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
@@ -411,36 +411,42 @@ describe('OrderEntryPage — SHORT_SELL', () => {
 
 // ── SOR dropdown ─────────────────────────────────────────────────────────────
 
+// Helper: expand the Advanced collapsible section (Route To and GTD Date live inside it)
+const expandAdvanced = async () => {
+  const toggle = await screen.findByTestId('advanced-toggle')
+  await act(async () => { fireEvent.click(toggle) })
+}
+
 describe('OrderEntryPage — SOR dropdown', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
   it('shouldShowRouteTolabel', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
+    await expandAdvanced()
+    expect(screen.getByText('Route To')).toBeInTheDocument()
   })
 
   it('shouldHaveNysePreselectedByDefault', async () => {
     renderPage()
-    await waitFor(() => {
-      const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
-      expect(dropdown.value).toBe('NYSE')
-    })
+    await expandAdvanced()
+    const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
+    expect(dropdown.value).toBe('NYSE')
   })
 
   it('shouldShowAllVenuesInDropdown', async () => {
     renderPage()
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument()
-      expect(screen.getByRole('option', { name: 'NASDAQ' })).toBeInTheDocument()
-      expect(screen.getByRole('option', { name: 'ARCA' })).toBeInTheDocument()
-      expect(screen.getByRole('option', { name: 'BATS' })).toBeInTheDocument()
-      expect(screen.getByRole('option', { name: 'DARK_POOL' })).toBeInTheDocument()
-    })
+    await expandAdvanced()
+    expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'NASDAQ' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'ARCA' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'BATS' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'DARK_POOL' })).toBeInTheDocument()
   })
 
   it('shouldUpdateSelectedVenueWhenDropdownChanges', async () => {
     renderPage()
-    const dropdown = await screen.findByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
+    await expandAdvanced()
+    const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     await act(async () => { fireEvent.change(dropdown, { target: { value: 'NASDAQ' } }) })
     expect(dropdown.value).toBe('NASDAQ')
   })
@@ -448,10 +454,9 @@ describe('OrderEntryPage — SOR dropdown', () => {
   it('shouldDisableDropdownWhenWindowIsExpired', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => {
-      const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
-      expect(dropdown).toBeDisabled()
-    })
+    await expandAdvanced()
+    const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
+    expect(dropdown).toBeDisabled()
   })
 })
 
@@ -472,7 +477,8 @@ describe('OrderEntryPage — SOR dropdown — empty venues fallback', () => {
 
   it('shouldStillRenderRouteToLabelWhenVenuesEmpty', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
+    await expandAdvanced()
+    expect(screen.getByText('Route To')).toBeInTheDocument()
   })
 })
 
@@ -486,7 +492,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldNotShowCountdownWarningWhenSecondsAbove15', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 
@@ -509,7 +515,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldShowCountdownWarningExactlyAt15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 15, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     expect(screen.getByText('⚠ Order window will expire in 15 seconds')).toBeInTheDocument()
   })
 
@@ -517,7 +523,7 @@ describe('OrderEntryPage — idle timer', () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText('Submit Order')).toBeDisabled()
+      expect(screen.getByText('PLACE ORDER')).toBeDisabled()
     )
   })
 
@@ -541,7 +547,7 @@ describe('OrderEntryPage — idle timer', () => {
     const resetTimer = vi.fn()
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer })
     renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('e.g. AAPL'), { key: 'a' }) })
     expect(resetTimer).toHaveBeenCalled()
   })
@@ -549,7 +555,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldNotShowWarningBannerWhenNotExpiredAndAbove15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 16, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('Submit Order')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 })
@@ -650,7 +656,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
       { timeout: 1500 }
     )
-    expect(screen.getByText('Submit Order')).toBeDisabled()
+    expect(screen.getByText('PLACE ORDER')).toBeDisabled()
   })
 
   it('shouldClearSymbolNotFoundErrorImmediatelyOnInputChange', async () => {
