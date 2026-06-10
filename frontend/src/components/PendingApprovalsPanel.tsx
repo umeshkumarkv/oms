@@ -9,9 +9,8 @@ import './PendingApprovalsPanel.css'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getFromValue(change: PendingChange): string {
-  if (change.changeType === 'ENABLE')  return 'Disabled'
-  if (change.changeType === 'DISABLE') return 'Enabled'
-  return '—'
+  if (change.changeType === 'UPDATE_THRESHOLD') return change.currentThreshold ?? '—'
+  return change.currentEnabled !== null ? (change.currentEnabled ? 'Enabled' : 'Disabled') : '—'
 }
 
 function getToValue(change: PendingChange): string {
