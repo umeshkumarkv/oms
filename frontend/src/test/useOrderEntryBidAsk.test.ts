@@ -168,4 +168,43 @@ describe('useOrderEntryBidAsk', () => {
     act(() => { vi.advanceTimersByTime(6001) })
     expect(result.current.isStale).toBe(false)
   })
+
+  // ── LTP (Last Traded Price) — SCRUM-127 ───────────────────────────────────────
+
+  it('shouldReturnNullLtpBeforeFirstTickArrives', () => {
+    mockUseMarketSocket.mockReturnValue(NO_TICKS)
+    const { result } = renderHook(() => useOrderEntryBidAsk('AAPL'))
+    expect(result.current.ltp).toBeNull()
+  })
+
+  it('shouldReturnFormattedLtpWhenTickReceived', () => {
+    // withTick sets price = (bid + ask) / 2 = (174.9 + 175.1) / 2 = 175.0
+    mockUseMarketSocket.mockReturnValue(
+      withTick('AAPL', 174.9, 175.1, '2026-05-15T10:00:01Z'),
+    )
+    const { result } = renderHook(() => useOrderEntryBidAsk('AAPL'))
+    expect(result.current.ltp).toBe('175.00')
+  })
+
+  it('shouldUpdateLtpWhenNewTickArrives', () => {
+    mockUseMarketSocket.mockReturnValue(NO_TICKS)
+    const { result, rerender } = renderHook(
+      ({ symbol }) => useOrderEntryBidAsk(symbol),
+      { initialProps: { symbol: 'AAPL' } },
+    )
+    expect(result.current.ltp).toBeNull()
+
+    // withTick price = (200.0 + 202.5) / 2 = 201.25
+    mockUseMarketSocket.mockReturnValue(
+      withTick('AAPL', 200.0, 202.5, '2026-05-15T10:00:05Z'),
+    )
+    act(() => { rerender({ symbol: 'AAPL' }) })
+    expect(result.current.ltp).toBe('201.25')
+  })
+
+  it('shouldReturnNullLtpWhenSymbolIsEmpty', () => {
+    mockUseMarketSocket.mockReturnValue(NO_TICKS)
+    const { result } = renderHook(() => useOrderEntryBidAsk(''))
+    expect(result.current.ltp).toBeNull()
+  })
 })

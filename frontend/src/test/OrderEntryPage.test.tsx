@@ -13,7 +13,7 @@ vi.mock('../hooks/useIdleTimer', () => ({
 }))
 
 // ── Mock useOrderEntryBidAsk (SCRUM-108) — default: no live data, not stale ───
-const mockUseOrderEntryBidAsk = vi.fn((_symbol: string) => ({ bid: null as string | null, ask: null as string | null, isStale: false }))
+const mockUseOrderEntryBidAsk = vi.fn((_symbol: string) => ({ bid: null as string | null, ask: null as string | null, ltp: null as string | null, isStale: false }))
 vi.mock('../hooks/useOrderEntryBidAsk', () => ({
   useOrderEntryBidAsk: (symbol: string) => mockUseOrderEntryBidAsk(symbol),
 }))
@@ -584,7 +584,7 @@ const renderAndLoadQuote = async () => {
 describe('OrderEntryPage — real-time Bid/Ask (SCRUM-108)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, isStale: false })
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, ltp: null, isStale: false })
   })
 
   it('shouldHideStaleBadgeWhenIsStaleFalse', async () => {
@@ -593,26 +593,28 @@ describe('OrderEntryPage — real-time Bid/Ask (SCRUM-108)', () => {
     expect(screen.queryByText('⚠ Stale')).toBeNull()
   })
 
-  it('shouldShowStaleBadgeInBidLabelWhenIsStaleTrueAndSymbolEntered', async () => {
-    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, isStale: true })
+  it('shouldShowStaleBadgeOnLtpBidAndAskWhenIsStaleTrueAndSymbolEntered', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, ltp: null, isStale: true })
     await renderAndLoadQuote()
-    expect(screen.getByLabelText('Price data is stale')).toBeInTheDocument()
+    // Stale badge appears on LTP, Bid, and Ask (SCRUM-127)
+    const staleBadges = screen.getAllByLabelText('Price data is stale')
+    expect(staleBadges).toHaveLength(3)
   })
 
   it('shouldDisplayLiveBidPriceFromHookInMarketQuoteCard', async () => {
-    mockUseOrderEntryBidAsk.mockReturnValue({ bid: '174.99', ask: null, isStale: false })
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: '174.99', ask: null, ltp: null, isStale: false })
     await renderAndLoadQuote()
     expect(screen.getByText('$174.99')).toBeInTheDocument()
   })
 
   it('shouldDisplayLiveAskPriceFromHookInMarketQuoteCard', async () => {
-    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: '175.01', isStale: false })
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: '175.01', ltp: null, isStale: false })
     await renderAndLoadQuote()
     expect(screen.getByText('$175.01')).toBeInTheDocument()
   })
 
   it('shouldFallBackToRestQuoteBidAskWhenHookReturnsNullBidAsk', async () => {
-    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, isStale: false })
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, ltp: null, isStale: false })
     await renderAndLoadQuote()
     expect(screen.getByText('$174.50')).toBeInTheDocument()
     expect(screen.getByText('$175.50')).toBeInTheDocument()
@@ -695,5 +697,34 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     await waitFor(() => expect(vi.mocked(getInstrument)).toHaveBeenCalled(), { timeout: 1500 })
     await act(async () => {})
     expect(screen.queryByText('Symbol not found. Please search and select a valid instrument.')).toBeNull()
+  })
+})
+
+// ── Real-time LTP — SCRUM-127 ─────────────────────────────────────────────────
+
+describe('OrderEntryPage — real-time LTP (SCRUM-127)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, ltp: null, isStale: false })
+  })
+
+  it('shouldDisplayLiveLtpFromHookInMarketIntelligencePanel', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, ltp: '201.25', isStale: false })
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockResolvedValue(aaplQuote)
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+    })
+    // liveLtp='201.25' overrides REST quote.lastPrice='175.00'
+    await waitFor(() => expect(screen.getByText('$201.25')).toBeInTheDocument(), { timeout: 1500 })
+  })
+
+  it('shouldFallBackToRestQuoteLtpWhenHookReturnsNullLtp', async () => {
+    mockUseOrderEntryBidAsk.mockReturnValue({ bid: null, ask: null, ltp: null, isStale: false })
+    await renderAndLoadQuote()
+    // liveLtp is null → falls back to quote.lastPrice='175.00'
+    expect(screen.getByText('$175.00')).toBeInTheDocument()
   })
 })

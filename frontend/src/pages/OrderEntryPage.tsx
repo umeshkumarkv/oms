@@ -178,7 +178,7 @@ const OrderEntryPage: React.FC = () => {
   const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Real-time Bid/Ask (SCRUM-108) ────────────────────────────────────────────
-  const { bid: liveBid, ask: liveAsk, isStale } = useOrderEntryBidAsk(symbol)
+  const { bid: liveBid, ask: liveAsk, ltp: liveLtp, isStale } = useOrderEntryBidAsk(symbol)
 
   // ── Idle timer ────────────────────────────────────────────────────────────────
   const { secondsRemaining, isExpired, resetTimer } = useIdleTimer(60)
@@ -710,7 +710,10 @@ const OrderEntryPage: React.FC = () => {
                 <div style={{ marginBottom: '4px' }}>
                   <div style={s.ltpLabel}>LTP</div>
                   <div style={s.ltpPrice}>
-                    ${quote.lastPrice}
+                    ${liveLtp ?? quote.lastPrice}
+                    {isStale && symbol && (
+                      <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                    )}
                     {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
                   </div>
                   <div style={s.ltpMeta}>
@@ -741,7 +744,18 @@ const OrderEntryPage: React.FC = () => {
                       ),
                       value: `$${liveBid ?? quote.bidPrice}`,
                     },
-                    { id: 'ask',    label: 'Ask',    value: `$${liveAsk ?? quote.askPrice}` },
+                    {
+                      id:    'ask',
+                      label: (
+                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          Ask
+                          {isStale && symbol && (
+                            <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                          )}
+                        </span>
+                      ),
+                      value: `$${liveAsk ?? quote.askPrice}`,
+                    },
                     { id: 'spread', label: 'Spread', value: spreadStr ?? '—' },
                     { id: 'vol',    label: 'Volume', value: quote.volume != null ? quote.volume.toLocaleString() : '—' },
                     { id: 'high',   label: 'High',   value: quote.dayHigh ? `$${fmtDec2(quote.dayHigh)}` : '—' },

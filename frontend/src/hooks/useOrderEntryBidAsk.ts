@@ -6,6 +6,7 @@ const STALE_THRESHOLD_MS = 5_000
 interface OrderEntryBidAsk {
   bid:     string | null
   ask:     string | null
+  ltp:     string | null
   isStale: boolean
 }
 
@@ -59,8 +60,9 @@ export function useOrderEntryBidAsk(symbol: string): OrderEntryBidAsk {
   }, [wsLive, symbol])
 
   return {
-    bid:     tick ? tick.bid.toFixed(2) : null,
-    ask:     tick ? tick.ask.toFixed(2) : null,
+    bid:     tick ? tick.bid.toFixed(2)   : null,
+    ask:     tick ? tick.ask.toFixed(2)   : null,
+    ltp:     tick ? tick.price.toFixed(2) : null,
     isStale: Boolean(symbol) && isStale,
   }
 }
