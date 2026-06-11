@@ -71,6 +71,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/market/indices:
+    get:
+      summary: Get mocked market indices (S&P 500, Nasdaq, Dow Jones) with percent change from open
+      operationId: getMarketIndices
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of market indices with percent change from open
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketIndicesResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — role not permitted (ADMIN role is blocked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/market/instruments:
     get:
       summary: List all instruments
@@ -313,6 +339,31 @@ components:
               items:
                 $ref: '#/components/schemas/MoverEntry'
               maxItems: 5
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    IndexEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "S&P 500"
+        currentValue:
+          type: string
+          description: BigDecimal 4dp plain string
+          example: "5321.8400"
+        percentChange:
+          type: string
+          description: BigDecimal 2dp — positive for gain, negative for loss
+          example: "0.65"
+
+    MarketIndicesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexEntry'
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 

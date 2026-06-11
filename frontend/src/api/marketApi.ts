@@ -12,7 +12,7 @@ export const getInstruments = async (): Promise<Instrument[]> => {
 }
 
 export const getInstrument = async (symbol: string): Promise<Instrument | null> => {
-  const res = await http.get(`/market/${symbol}`)
+  const res = await http.get(`/market/instrument/${symbol}`)
   return res.data.data
 }
 

@@ -1,6 +1,7 @@
 package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
+import com.brokerdealer.marketdataservice.dto.response.IndexEntryResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,7 @@ import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
+import com.brokerdealer.marketdataservice.repository.MarketIndexRepository;
 import com.brokerdealer.marketdataservice.websocket.MarketDataWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -53,6 +56,7 @@ public class MarketDataService {
     private static final String CACHE_KEY_PREFIX = "market:price:";
     private static final String SEARCH_CACHE_KEY_PREFIX = "market:search:";
     private static final String MOVERS_CACHE_KEY = "market:movers";
+    private static final String INDICES_CACHE_KEY = "market:indices";
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static final Duration SEARCH_CACHE_TTL = Duration.ofSeconds(10);
     private static final int SEARCH_MAX_LIMIT = 20;
@@ -71,6 +75,7 @@ public class MarketDataService {
     private final InstrumentSearchMapper instrumentSearchMapper;
     private final MarketHolidayRepository marketHolidayRepository;
     private final MarketHolidayMapper marketHolidayMapper;
+    private final MarketIndexRepository marketIndexRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final MarketDataWebSocketHandler webSocketHandler;
     private final ObjectMapper objectMapper;
@@ -281,6 +286,34 @@ public class MarketDataService {
 
         redisTemplate.opsForValue().set(MOVERS_CACHE_KEY, response, CACHE_TTL);
         log.debug("Cache populated: market movers");
+        return response;
+    }
+
+    public List<IndexEntryResponse> getMarketIndices() {
+        log.debug("Fetching market indices");
+
+        Object cached = redisTemplate.opsForValue().get(INDICES_CACHE_KEY);
+        if (cached != null) {
+            log.debug("Cache hit: market indices");
+            return objectMapper.convertValue(cached, new TypeReference<List<IndexEntryResponse>>() {});
+        }
+
+        List<IndexEntryResponse> response = marketIndexRepository.findAllByOrderByNameAsc()
+                .stream()
+                .map(index -> IndexEntryResponse.builder()
+                        .name(index.getName())
+                        .currentValue(index.getCurrentValue().toPlainString())
+                        .percentChange(computeOpenPricePct(index.getCurrentValue(), index.getOpenValue()).toPlainString())
+                        .build())
+                .toList();
+
+        if (response.isEmpty()) {
+            log.debug("No index rows found — returning empty list");
+            return Collections.emptyList();
+        }
+
+        redisTemplate.opsForValue().set(INDICES_CACHE_KEY, response, CACHE_TTL);
+        log.debug("Cache populated: market indices, count={}", response.size());
         return response;
     }
 

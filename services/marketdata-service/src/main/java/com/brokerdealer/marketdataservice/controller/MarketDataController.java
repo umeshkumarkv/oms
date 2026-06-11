@@ -1,5 +1,6 @@
 package com.brokerdealer.marketdataservice.controller;
 
+import com.brokerdealer.marketdataservice.dto.response.IndexEntryResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
@@ -76,6 +77,13 @@ public class MarketDataController {
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
+    @GetMapping("/indices")
+    public ResponseEntity<Map<String, Object>> getMarketIndices() {
+        log.debug("GET /api/v1/market/indices");
+        List<IndexEntryResponse> data = marketDataService.getMarketIndices();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
     @GetMapping("/ticks/history")
     public ResponseEntity<Map<String, Object>> getTickHistory(@RequestParam String symbol) {
         log.debug("GET /api/v1/market/ticks/history?symbol={}", symbol);
@@ -85,9 +93,9 @@ public class MarketDataController {
 
     // --- catch-all path variable — must remain last ---
 
-    @GetMapping("/{symbol}")
+    @GetMapping("/instrument/{symbol}")
     public ResponseEntity<Map<String, Object>> getInstrument(@PathVariable String symbol) {
-        log.debug("GET /api/v1/market/{}", symbol);
+        log.debug("GET /api/v1/market/instrument/{}", symbol);
         InstrumentResponse data = marketDataService.getInstrument(symbol);
         return ResponseEntity.ok(buildSuccessResponse(data));
     }

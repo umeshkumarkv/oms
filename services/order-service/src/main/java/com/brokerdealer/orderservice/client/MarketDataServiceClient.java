@@ -28,7 +28,7 @@ public class MarketDataServiceClient {
 
     @CircuitBreaker(name = "marketdata-service", fallbackMethod = "getInstrumentFallback")
     public InstrumentResponse getInstrument(String symbol) {
-        String url = marketDataServiceUrl + "/api/v1/market/" + symbol;
+        String url = marketDataServiceUrl + "/api/v1/market/instrument/" + symbol;
         log.debug("Calling marketdata-service: GET {}", url);
         try {
             ResponseEntity<InstrumentResponse> response = restTemplate.getForEntity(url, InstrumentResponse.class);

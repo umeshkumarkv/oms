@@ -22,7 +22,7 @@ public class MarketDataClient {
 
     @CircuitBreaker(name = "marketdata", fallbackMethod = "getLastPriceFallback")
     public BigDecimal getLastPrice(String symbol) {
-        String url = marketDataBaseUrl + "/api/v1/market/" + symbol;
+        String url = marketDataBaseUrl + "/api/v1/market/instrument/" + symbol;
         log.debug("Fetching market price: symbol={}", symbol);
         @SuppressWarnings("unchecked")
         Map<String, Object> response = restTemplate.getForObject(url, Map.class);

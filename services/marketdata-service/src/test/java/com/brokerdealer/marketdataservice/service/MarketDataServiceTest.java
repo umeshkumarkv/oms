@@ -2,6 +2,8 @@ package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
 import com.brokerdealer.marketdataservice.domain.MarketHoliday;
+import com.brokerdealer.marketdataservice.domain.MarketIndex;
+import com.brokerdealer.marketdataservice.dto.response.IndexEntryResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
@@ -15,6 +17,7 @@ import com.brokerdealer.marketdataservice.mapper.InstrumentSummaryMapper;
 import com.brokerdealer.marketdataservice.mapper.MarketHolidayMapper;
 import com.brokerdealer.marketdataservice.repository.InstrumentRepository;
 import com.brokerdealer.marketdataservice.repository.MarketHolidayRepository;
+import com.brokerdealer.marketdataservice.repository.MarketIndexRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -61,6 +64,9 @@ class MarketDataServiceTest {
 
     @Mock
     private MarketHolidayMapper marketHolidayMapper;
+
+    @Mock
+    private MarketIndexRepository marketIndexRepository;
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
@@ -758,6 +764,87 @@ class MarketDataServiceTest {
                 .cusip(cusip)
                 .lastPrice("175.00")
                 .tradable(true)
+                .build();
+    }
+
+    // --- getMarketIndices ---
+
+    @Test
+    void shouldReturnThreeIndicesWithCorrectPercentChange() {
+        List<MarketIndex> indices = List.of(
+                buildMarketIndex("Dow Jones",  new BigDecimal("41234.5600"), new BigDecimal("40987.2000")),
+                buildMarketIndex("Nasdaq",     new BigDecimal("16892.3000"), new BigDecimal("16745.8000")),
+                buildMarketIndex("S&P 500",    new BigDecimal("5321.8400"),  new BigDecimal("5287.5000"))
+        );
+        when(marketIndexRepository.findAllByOrderByNameAsc()).thenReturn(indices);
+
+        List<IndexEntryResponse> result = marketDataService.getMarketIndices();
+
+        assertThat(result).hasSize(3);
+        // S&P 500: (5321.84 - 5287.50) / 5287.50 * 100 = 0.65%
+        IndexEntryResponse sp500 = result.stream().filter(i -> "S&P 500".equals(i.getName())).findFirst().orElseThrow();
+        assertThat(new BigDecimal(sp500.getPercentChange())).isEqualByComparingTo(new BigDecimal("0.65"));
+        assertThat(sp500.getCurrentValue()).isEqualTo("5321.8400");
+        verify(valueOperations).set(eq("market:indices"), any(List.class), any(Duration.class));
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenMarketIndicesTableHasNoRows() {
+        when(marketIndexRepository.findAllByOrderByNameAsc()).thenReturn(List.of());
+
+        List<IndexEntryResponse> result = marketDataService.getMarketIndices();
+
+        assertThat(result).isEmpty();
+        verify(valueOperations, never()).set(any(), any(), any(Duration.class));
+    }
+
+    @Test
+    void shouldReturnCachedIndicesOnCacheHit() {
+        List<IndexEntryResponse> cached = List.of(
+                IndexEntryResponse.builder().name("S&P 500").currentValue("5321.8400").percentChange("0.65").build()
+        );
+        when(valueOperations.get("market:indices")).thenReturn(cached);
+
+        List<IndexEntryResponse> result = marketDataService.getMarketIndices();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getName()).isEqualTo("S&P 500");
+        verifyNoInteractions(marketIndexRepository);
+    }
+
+    @Test
+    void shouldPopulateIndicesCacheAfterDbRead() {
+        List<MarketIndex> indices = List.of(
+                buildMarketIndex("S&P 500", new BigDecimal("5321.8400"), new BigDecimal("5287.5000"))
+        );
+        when(marketIndexRepository.findAllByOrderByNameAsc()).thenReturn(indices);
+
+        marketDataService.getMarketIndices();
+
+        verify(valueOperations).set(eq("market:indices"), any(List.class), eq(Duration.ofSeconds(30)));
+    }
+
+    @Test
+    void shouldComputeNegativePercentChangeWhenCurrentValueBelowOpenValue() {
+        List<MarketIndex> indices = List.of(
+                buildMarketIndex("Dow Jones", new BigDecimal("40000.0000"), new BigDecimal("41000.0000"))
+        );
+        when(marketIndexRepository.findAllByOrderByNameAsc()).thenReturn(indices);
+
+        List<IndexEntryResponse> result = marketDataService.getMarketIndices();
+
+        assertThat(result).hasSize(1);
+        BigDecimal pct = new BigDecimal(result.get(0).getPercentChange());
+        assertThat(pct).isLessThan(BigDecimal.ZERO);
+        // (40000 - 41000) / 41000 * 100 = -2.44%
+        assertThat(pct).isEqualByComparingTo(new BigDecimal("-2.44"));
+    }
+
+    private MarketIndex buildMarketIndex(String name, BigDecimal currentValue, BigDecimal openValue) {
+        return MarketIndex.builder()
+                .name(name)
+                .currentValue(currentValue)
+                .openValue(openValue)
                 .build();
     }
 }

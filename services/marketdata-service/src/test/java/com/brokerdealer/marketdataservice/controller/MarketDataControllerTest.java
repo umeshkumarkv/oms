@@ -1,5 +1,6 @@
 package com.brokerdealer.marketdataservice.controller;
 
+import com.brokerdealer.marketdataservice.dto.response.IndexEntryResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSummaryResponse;
 import com.brokerdealer.marketdataservice.dto.response.MarketHolidayResponse;
@@ -233,6 +234,82 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data.losers").isArray())
                 .andExpect(jsonPath("$.data.losers").isEmpty())
                 .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    // --- GET /api/v1/market/indices ---
+
+    @Test
+    void shouldReturn200WithThreeIndicesForGetIndices() throws Exception {
+        List<IndexEntryResponse> indices = List.of(
+                IndexEntryResponse.builder().name("S&P 500").currentValue("5321.8400").percentChange("0.65").build(),
+                IndexEntryResponse.builder().name("Nasdaq").currentValue("16892.3000").percentChange("0.87").build(),
+                IndexEntryResponse.builder().name("Dow Jones").currentValue("41234.5600").percentChange("0.60").build()
+        );
+
+        when(marketDataService.getMarketIndices()).thenReturn(indices);
+
+        mockMvc.perform(get("/api/v1/market/indices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].name").value("S&P 500"))
+                .andExpect(jsonPath("$.data[0].currentValue").value("5321.8400"))
+                .andExpect(jsonPath("$.data[0].percentChange").value("0.65"))
+                .andExpect(jsonPath("$.data[1].name").value("Nasdaq"))
+                .andExpect(jsonPath("$.data[2].name").value("Dow Jones"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithEmptyArrayWhenNoIndexRows() throws Exception {
+        when(marketDataService.getMarketIndices()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/market/indices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn200WithNegativePercentChangeForGetIndices() throws Exception {
+        List<IndexEntryResponse> indices = List.of(
+                IndexEntryResponse.builder().name("Dow Jones").currentValue("40000.0000").percentChange("-2.44").build()
+        );
+
+        when(marketDataService.getMarketIndices()).thenReturn(indices);
+
+        mockMvc.perform(get("/api/v1/market/indices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].percentChange").value("-2.44"));
+    }
+
+    @Test
+    void shouldReturn200WithCorrectEnvelopeForGetIndices() throws Exception {
+        when(marketDataService.getMarketIndices()).thenReturn(List.of(
+                IndexEntryResponse.builder().name("S&P 500").currentValue("5321.8400").percentChange("0.65").build()
+        ));
+
+        mockMvc.perform(get("/api/v1/market/indices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").exists())
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithIndicesIncludingAllThreeRequiredFields() throws Exception {
+        List<IndexEntryResponse> indices = List.of(
+                IndexEntryResponse.builder().name("S&P 500").currentValue("5321.8400").percentChange("0.65").build()
+        );
+        when(marketDataService.getMarketIndices()).thenReturn(indices);
+
+        mockMvc.perform(get("/api/v1/market/indices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].name").exists())
+                .andExpect(jsonPath("$.data[0].currentValue").exists())
+                .andExpect(jsonPath("$.data[0].percentChange").exists());
     }
 
     @Test

@@ -43,6 +43,7 @@ None — marketdata-service does not consume any Kafka topic.
 |--------------------------|------------|--------------------------------------|
 | market:price:{symbol}    | 30 seconds | Mock price data for instruments      |
 | market:movers            | 30 seconds | Top 5 gainers and losers by % change |
+| market:indices           | 30 seconds | Mocked index values (S&P 500, Nasdaq, Dow Jones) with percent change |
 
 Cache-aside pattern. No explicit invalidation — auto-expiry only.
 
@@ -58,6 +59,7 @@ See openapi.yaml for full schema.
 | GET    | /api/v1/market/hours        | No                     | Market open/close status       |
 | GET    | /api/v1/market/instruments  | No                     | List all instruments           |
 | GET    | /api/v1/market/movers       | TRADER, OPERATIONS     | Top 5 gainers and losers       |
+| GET    | /api/v1/market/indices      | TRADER, OPERATIONS     | Mocked S&P 500, Nasdaq, Dow Jones % change |
 
 ---
 
@@ -79,6 +81,16 @@ Instrument:
 - minQuantity: Integer
 - maxQuantity: Integer
 - dataTimestamp: Instant
+
+---
+
+MarketIndex:
+- id: UUID (PK)
+- name: String (non-null, unique, max 100) — "S&P 500", "Nasdaq", "Dow Jones"
+- currentValue: BigDecimal (precision 19 scale 4, non-null)
+- openValue: BigDecimal (precision 19 scale 4, non-null)
+- percentChange: computed on read — (currentValue - openValue) / openValue * 100, scale 2 HALF_UP, never stored
+- createdAt: Instant, updatedAt: Instant
 
 ---
 
