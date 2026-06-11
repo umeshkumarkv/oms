@@ -91,6 +91,11 @@ resilience4j:
       execution-service:
         timeout-duration: 2s
 
+dashboard:
+  risk-alerts:
+    clients-near-limit-threshold: 800000
+    large-order-notional-threshold: 500000
+
 logging:
   level:
     com.brokerdealer: INFO

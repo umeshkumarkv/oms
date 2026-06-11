@@ -32,6 +32,7 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
     private static final String ROLE_HEADER = "X-User-Role";
     private static final Set<String> ALL_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS", "ADMIN");
     private static final Set<String> ORDER_READ_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS");
+    private static final Set<String> DASHBOARD_ROLES = Set.of("TRADER", "OPERATIONS", "ADMIN");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -79,6 +80,10 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         // GET /api/v1/orders or /api/v1/orders/{id} — VIEWER, TRADER, OPERATIONS only
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/orders")) {
             return ORDER_READ_ROLES.contains(role);
+        }
+        // GET /api/v1/dashboard/** — TRADER, OPERATIONS, ADMIN
+        if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/dashboard")) {
+            return DASHBOARD_ROLES.contains(role);
         }
         return false;
     }
