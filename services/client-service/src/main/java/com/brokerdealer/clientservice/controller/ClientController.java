@@ -2,6 +2,7 @@ package com.brokerdealer.clientservice.controller;
 
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
+import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
@@ -30,6 +31,14 @@ public class ClientController {
     public ResponseEntity<Map<String, Object>> getAllClients() {
         log.debug("GET /api/v1/clients");
         List<ClientProfileResponse> data = clientService.getAllClients();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<Map<String, Object>> getActiveClients(
+            @RequestParam(defaultValue = "10") int limit) {
+        log.debug("GET /api/v1/clients/active limit={}", limit);
+        List<ActiveClientResponse> data = clientService.getActiveClients(limit);
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 

@@ -6,6 +6,7 @@ import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.domain.Holding;
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
+import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
@@ -23,12 +24,16 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +51,60 @@ public class ClientService {
         return clientRepository.findAll().stream()
                 .map(clientMapper::toProfileResponse)
                 .toList();
+    }
+
+    public List<ActiveClientResponse> getActiveClients(int limit) {
+        if (limit < 1 || limit > 50) {
+            throw new ValidationException("VALIDATION_ERROR", "limit must be between 1 and 50");
+        }
+        String cacheKey = "client:active-ranked:today:" + limit;
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, String>> cachedList = (List<Map<String, String>>) cached;
+                return cachedList.stream()
+                        .map(m -> ActiveClientResponse.builder()
+                                .clientId(UUID.fromString(m.get("clientId")))
+                                .clientName(m.get("clientName"))
+                                .turnoverToday(m.get("turnoverToday"))
+                                .availableCash(m.get("availableCash"))
+                                .build())
+                        .toList();
+            }
+        } catch (Exception e) {
+            log.warn("Redis read failed for key={}: {}", cacheKey, e.getMessage());
+        }
+
+        List<Client> clients = clientRepository.findTopByTurnoverTodayDesc(PageRequest.of(0, limit));
+        List<ActiveClientResponse> result = clients.stream()
+                .map(c -> {
+                    BigDecimal availableCash = c.getCashBalance()
+                            .subtract(c.getReservedCash())
+                            .setScale(2, RoundingMode.HALF_UP);
+                    return ActiveClientResponse.builder()
+                            .clientId(c.getId())
+                            .clientName(c.getName())
+                            .turnoverToday(c.getTurnoverToday().setScale(2, RoundingMode.HALF_UP).toPlainString())
+                            .availableCash(availableCash.toPlainString())
+                            .build();
+                })
+                .toList();
+
+        try {
+            List<Map<String, String>> cacheValue = result.stream()
+                    .map(r -> Map.of(
+                            "clientId", r.getClientId().toString(),
+                            "clientName", r.getClientName(),
+                            "turnoverToday", r.getTurnoverToday(),
+                            "availableCash", r.getAvailableCash()))
+                    .toList();
+            redisTemplate.opsForValue().set(cacheKey, cacheValue, 30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Redis write failed for key={}: {}", cacheKey, e.getMessage());
+        }
+
+        return result;
     }
 
     public ClientProfileResponse getClient(UUID id) {
@@ -202,11 +261,13 @@ public class ClientService {
                         .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
                 client.setCashBalance(client.getCashBalance().subtract(fillValue)
                         .setScale(2, RoundingMode.HALF_UP));
+                client.setTurnoverToday(client.getTurnoverToday().add(fillValue).setScale(2, RoundingMode.HALF_UP));
                 upsertHolding(clientId, symbol, executedQty, executedPrice);
                 log.info("BUY fill applied: clientId={} symbol={} qty={} fillType={}", clientId, symbol, executedQty, fillType);
             }
         } else if ("SELL".equals(side) && !"REJECTED".equals(fillType)) {
             client.setCashBalance(client.getCashBalance().add(fillValue).setScale(2, RoundingMode.HALF_UP));
+            client.setTurnoverToday(client.getTurnoverToday().add(fillValue).setScale(2, RoundingMode.HALF_UP));
             reduceHolding(clientId, symbol, executedQty);
             log.info("SELL fill applied: clientId={} symbol={} qty={}", clientId, symbol, executedQty);
         }
