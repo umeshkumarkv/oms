@@ -192,6 +192,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/dashboard/risk-alerts:
+    get:
+      summary: Get risk alert counts for today (ET)
+      operationId: getRiskAlerts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Risk alert counts for today's ET session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskAlertsResponse'
+              example:
+                data:
+                  clientsNearLimit: 3
+                  cashRejectCount: 7
+                  largeOrdersAwaitingReview: 2
+                  pendingVenueAck: 1
+                meta:
+                  timestamp: "2026-06-10T14:30:00Z"
+                  requestId: "550e8400-e29b-41d4-a716-446655440000"
+        '401':
+          description: Unauthorized — missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — role not permitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/orders/{id}:
     get:
       summary: Get order by ID
@@ -364,6 +399,31 @@ components:
           description: Map of OrderStatus enum value to count for today
           additionalProperties:
             type: integer
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    RiskAlertsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            clientsNearLimit:
+              type: integer
+              description: Distinct clients whose total order notional today exceeds the configured threshold
+              example: 3
+            cashRejectCount:
+              type: integer
+              description: Orders in RISK_REJECTED status today (ET date boundary)
+              example: 7
+            largeOrdersAwaitingReview:
+              type: integer
+              description: Active orders (ACCEPTED or SENT_TO_EXECUTION) with orderValue exceeding the large-order threshold
+              example: 2
+            pendingVenueAck:
+              type: integer
+              description: Orders in SENT_TO_EXECUTION state with no update for more than 30 seconds
+              example: 1
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 

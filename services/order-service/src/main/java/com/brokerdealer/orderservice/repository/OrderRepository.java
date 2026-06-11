@@ -65,4 +65,36 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
            "GROUP BY o.status")
     List<Object[]> countByStatusForDateRange(@Param("startOfDay") Instant startOfDay,
                                               @Param("endOfDay") Instant endOfDay);
+
+    // Dashboard — distinct client IDs whose total orderValue today exceeds the threshold.
+    // Native query required: JPQL does not support subqueries in FROM clause.
+    @Query(value = """
+            SELECT client_id FROM order_schema.orders
+            WHERE created_at >= :startOfDay AND created_at < :endOfDay
+            GROUP BY client_id
+            HAVING SUM(order_value) > :threshold
+            """, nativeQuery = true)
+    List<java.util.UUID> findClientIdsWithHighNotionalToday(@Param("startOfDay") Instant startOfDay,
+                                                            @Param("endOfDay") Instant endOfDay,
+                                                            @Param("threshold") BigDecimal threshold);
+
+    // Dashboard — count of orders in a given status within today's ET date range
+    @Query("SELECT COUNT(o) FROM Order o " +
+           "WHERE o.status = :status " +
+           "AND o.createdAt >= :startOfDay AND o.createdAt < :endOfDay")
+    long countByStatusAndDateRange(@Param("status") OrderStatus status,
+                                   @Param("startOfDay") Instant startOfDay,
+                                   @Param("endOfDay") Instant endOfDay);
+
+    // Dashboard — count of active orders (any status in list) whose orderValue exceeds the threshold
+    @Query("SELECT COUNT(o) FROM Order o " +
+           "WHERE o.status IN :statuses AND o.orderValue > :threshold")
+    long countActiveOrdersByStatusesAndMinOrderValue(@Param("statuses") List<OrderStatus> statuses,
+                                                     @Param("threshold") BigDecimal threshold);
+
+    // Dashboard — count of orders in a given status whose updatedAt is before a cutoff instant
+    @Query("SELECT COUNT(o) FROM Order o " +
+           "WHERE o.status = :status AND o.updatedAt < :cutoff")
+    long countByStatusAndUpdatedAtBefore(@Param("status") OrderStatus status,
+                                         @Param("cutoff") Instant cutoff);
 }
