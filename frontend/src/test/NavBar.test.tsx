@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import NavBar from '../components/NavBar'
@@ -46,6 +47,9 @@ describe('NavBar', () => {
       login: vi.fn(),
       logout: vi.fn(),
       clearSessionExpired: vi.fn(),
+    })
+    vi.mocked(marketApi.getMarketHours).mockResolvedValue({
+      marketOpen: true, openTime: '09:30', closeTime: '16:00', timezone: 'America/New_York',
     })
   })
 
@@ -99,5 +103,77 @@ describe('NavBar', () => {
     await waitFor(() => {
       expect(screen.getByText(/^\d{2} [A-Z][a-z]{2} \d{4}$/)).toBeInTheDocument()
     })
+  })
+
+  it('shouldShowMarketOpenPillWhenApiReturnsMarketOpenTrue', async () => {
+    vi.mocked(marketApi.getHolidays).mockResolvedValue([])
+    vi.mocked(marketApi.getMarketHours).mockResolvedValue({
+      marketOpen: true, openTime: '09:30', closeTime: '16:00', timezone: 'America/New_York',
+    })
+    renderNavBar()
+    await waitFor(() => expect(screen.getByText('MARKET OPEN')).toBeInTheDocument())
+  })
+
+  it('shouldShowMarketClosedPillWhenApiReturnsMarketOpenFalse', async () => {
+    vi.mocked(marketApi.getHolidays).mockResolvedValue([])
+    vi.mocked(marketApi.getMarketHours).mockResolvedValue({
+      marketOpen: false, openTime: '09:30', closeTime: '16:00', timezone: 'America/New_York',
+    })
+    renderNavBar()
+    await waitFor(() => expect(screen.getByText('MARKET CLOSED')).toBeInTheDocument())
+  })
+
+  it('shouldHidePillWhileMarketStatusIsLoading', () => {
+    vi.mocked(marketApi.getHolidays).mockReturnValue(new Promise(() => {}))
+    vi.mocked(marketApi.getMarketHours).mockReturnValue(new Promise(() => {}))
+    renderNavBar()
+    expect(screen.queryByText('MARKET OPEN')).toBeNull()
+    expect(screen.queryByText('MARKET CLOSED')).toBeNull()
+    expect(screen.queryByText('MARKET STATUS UNAVAILABLE')).toBeNull()
+  })
+
+  it('shouldShowUnavailablePillWhenApiThrows', async () => {
+    vi.mocked(marketApi.getHolidays).mockResolvedValue([])
+    vi.mocked(marketApi.getMarketHours).mockRejectedValue(new Error('network error'))
+    renderNavBar()
+    await waitFor(() => expect(screen.getByText('MARKET STATUS UNAVAILABLE')).toBeInTheDocument())
+  })
+
+  it('shouldShowWarningTooltipOnHoverWhenApiThrows', async () => {
+    vi.mocked(marketApi.getHolidays).mockResolvedValue([])
+    vi.mocked(marketApi.getMarketHours).mockRejectedValue(new Error('network error'))
+    renderNavBar()
+    await waitFor(() => expect(screen.getByText('MARKET STATUS UNAVAILABLE')).toBeInTheDocument())
+    await act(async () => {
+      await userEvent.hover(screen.getByText('MARKET STATUS UNAVAILABLE'))
+    })
+    expect(screen.getByText('Market status unavailable')).toBeInTheDocument()
+    expect(screen.getByText(/verify the market is open before placing orders/i)).toBeInTheDocument()
+  })
+
+  it('shouldRefreshMarketStatusEvery60Seconds', async () => {
+    vi.useFakeTimers()
+    vi.mocked(marketApi.getHolidays).mockResolvedValue([])
+    vi.mocked(marketApi.getMarketHours).mockResolvedValue({
+      marketOpen: true, openTime: '09:30', closeTime: '16:00', timezone: 'America/New_York',
+    })
+    renderNavBar()
+    await act(async () => { await Promise.resolve() })
+    expect(vi.mocked(marketApi.getMarketHours)).toHaveBeenCalledTimes(1)
+    await act(async () => { vi.advanceTimersByTime(60_000) })
+    await act(async () => { await Promise.resolve() })
+    expect(vi.mocked(marketApi.getMarketHours)).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
+
+  it('shouldNotRenderLocalMarketStatusLabel', async () => {
+    vi.mocked(marketApi.getHolidays).mockResolvedValue([])
+    vi.mocked(marketApi.getMarketHours).mockResolvedValue({
+      marketOpen: true, openTime: '09:30', closeTime: '16:00', timezone: 'America/New_York',
+    })
+    renderNavBar()
+    await waitFor(() => expect(screen.getByText('MARKET OPEN')).toBeInTheDocument())
+    expect(screen.queryByText('OPEN', { exact: true })).toBeNull()
+    expect(screen.queryByText('CLOSED', { exact: true })).toBeNull()
   })
 })

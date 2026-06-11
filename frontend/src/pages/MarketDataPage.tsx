@@ -179,15 +179,6 @@ const s = {
   title:       { margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
   headerRight: { display: 'flex', alignItems: 'center', gap: '10px' } as React.CSSProperties,
 
-  pill: (open: boolean) => ({
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-    background: open ? 'var(--color-success-bg)' : 'var(--color-border-light)',
-    color:      open ? 'var(--color-success-text)' : 'var(--color-text-secondary)',
-    border:    `1px solid ${open ? 'var(--color-success-border)' : 'var(--color-border)'}`,
-    letterSpacing: '0.03em',
-  } as React.CSSProperties),
-
   wsPill: (live: boolean) => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
     padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
@@ -1027,12 +1018,6 @@ const MarketDataPage: React.FC = () => {
           <h1 style={s.title}>Market Data</h1>
         </div>
         <div style={s.headerRight}>
-          {config && (
-            <span style={s.pill(open)}>
-              <span style={s.pillDot(open ? 'var(--color-success)' : 'var(--color-text-muted)')} />
-              {open ? 'MARKET OPEN' : 'MARKET CLOSED'}
-            </span>
-          )}
           <span style={s.wsPill(wsLive)}>
             <span style={s.pillDot(wsLive ? 'var(--color-primary)' : 'var(--color-warning)')} />
             {wsLive ? 'Live' : `Polling ${(config?.pollingIntervalMs ?? 5000) / 1000}s`}

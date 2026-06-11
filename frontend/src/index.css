@@ -28,6 +28,14 @@
   --color-warning-border-light: #fde68a; /* amber-200 — soft warning border */
   --color-warning-text:   #92400e;   /* amber-800 — text on warning bg */
   --color-warning-dark:   #b45309;   /* amber-700 — ws offline / secondary warning */
+  --color-warning-pill-bg:     rgba(217,119,6,0.12); /* market status unavailable pill fill */
+  --color-warning-pill-border: rgba(217,119,6,0.35); /* market status unavailable pill border */
+
+  /* Tooltip (dark nav surface) */
+  --color-tooltip-bg:    #1e293b;   /* slate-800 — tooltip panel background */
+  --color-tooltip-title: #fbbf24;   /* amber-400 — tooltip heading */
+  --color-tooltip-text:  #cbd5e1;   /* slate-300 — tooltip body text */
+
   --color-error:          #dc2626;
   --color-error-bg:       #fee2e2;
   --color-error-text:     #b91c1c;   /* red-700 — text on error bg */

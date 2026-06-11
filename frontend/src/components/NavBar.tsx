@@ -2,15 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Bell, Calendar, Menu, TrendingUp, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getHolidays } from '../api/marketApi'
-
-const getMarketStatus = (): { open: boolean; label: string } => {
-  const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
-  const day  = etNow.getDay()
-  const mins = etNow.getHours() * 60 + etNow.getMinutes()
-  const open = day >= 1 && day <= 5 && mins >= 9 * 60 + 30 && mins < 16 * 60
-  return { open, label: open ? 'OPEN' : 'CLOSED' }
-}
+import { getHolidays, getMarketHours } from '../api/marketApi'
 
 /** Format a Date as "YYYY-MM-DD" in ET for holiday lookup. */
 const toEtDateStr = (d: Date): string =>
@@ -49,12 +41,26 @@ interface NavBarProps {
 }
 
 const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
-  const [market,       setMarket]       = useState(getMarketStatus())
-  const [tradingDate,  setTradingDate]  = useState<string>('')
+  const [marketOpen,    setMarketOpen]    = useState<boolean | null>(null)
+  const [marketError,   setMarketError]   = useState<boolean>(false)
+  const [showTooltip,   setShowTooltip]   = useState<boolean>(false)
+  const [tradingDate,   setTradingDate]   = useState<string>('')
   const { user: authUser, logout } = useAuth()
 
   useEffect(() => {
-    const id = setInterval(() => setMarket(getMarketStatus()), 60_000)
+    const fetchStatus = () => {
+      getMarketHours()
+        .then(h => {
+          setMarketOpen(h.marketOpen)
+          setMarketError(false)
+        })
+        .catch(() => {
+          setMarketOpen(null)
+          setMarketError(true)
+        })
+    }
+    fetchStatus()
+    const id = setInterval(fetchStatus, 60_000)
     return () => clearInterval(id)
   }, [])
 
@@ -169,27 +175,71 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
       {/* Right section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
 
-        {/* Market status pill */}
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '5px',
-          padding: '3px 10px',
-          borderRadius: 'var(--radius-pill)',
-          fontSize: '11px', fontWeight: 700,
-          background: market.open ? 'rgba(52,211,153,0.12)' : 'rgba(156,163,175,0.1)',
-          color:      market.open ? '#34d399'                : '#9ca3af',
-          border:    `1px solid ${market.open ? 'rgba(52,211,153,0.35)' : 'rgba(156,163,175,0.25)'}`,
-          flexShrink: 0,
-        }}>
-          <span
-            className={market.open ? 'pulse-dot' : undefined}
-            style={{
-              width: '6px', height: '6px', borderRadius: '50%',
-              background: market.open ? '#34d399' : '#6b7280',
-              flexShrink: 0,
-            }}
-          />
-          {market.label}
-        </span>
+        {/* Market status pill — three states: error / open / closed / loading (hidden) */}
+        {marketError ? (
+          <div
+            style={{ position: 'relative', flexShrink: 0 }}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+          >
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              padding: '3px 10px',
+              borderRadius: 'var(--radius-pill)',
+              fontSize: '11px', fontWeight: 700,
+              background: 'var(--color-warning-pill-bg)',
+              color: 'var(--color-warning)',
+              border: '1px solid var(--color-warning-pill-border)',
+              cursor: 'default',
+            }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-warning)', flexShrink: 0 }} />
+              MARKET STATUS UNAVAILABLE
+            </span>
+            {showTooltip && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-tooltip-bg)',
+                border: '1px solid var(--color-warning-pill-border)',
+                boxShadow: 'var(--shadow-md)',
+                zIndex: 200,
+                width: '260px',
+                pointerEvents: 'none',
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-tooltip-title)', marginBottom: '4px' }}>
+                  Market status unavailable
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-tooltip-text)', lineHeight: '1.5' }}>
+                  Could not reach the market hours API. Please verify the market is open before placing orders.
+                </div>
+              </div>
+            )}
+          </div>
+        ) : marketOpen !== null && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            padding: '3px 10px',
+            borderRadius: 'var(--radius-pill)',
+            fontSize: '11px', fontWeight: 700,
+            background: marketOpen ? 'rgba(52,211,153,0.12)' : 'rgba(156,163,175,0.1)',
+            color:      marketOpen ? '#34d399'                : '#9ca3af',
+            border:    `1px solid ${marketOpen ? 'rgba(52,211,153,0.35)' : 'rgba(156,163,175,0.25)'}`,
+            flexShrink: 0,
+          }}>
+            <span
+              className={marketOpen ? 'pulse-dot' : undefined}
+              style={{
+                width: '6px', height: '6px', borderRadius: '50%',
+                background: marketOpen ? '#34d399' : '#6b7280',
+                flexShrink: 0,
+              }}
+            />
+            {marketOpen ? 'MARKET OPEN' : 'MARKET CLOSED'}
+          </span>
+        )}
 
         {/* Notification bell */}
         <span title="Notifications" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>

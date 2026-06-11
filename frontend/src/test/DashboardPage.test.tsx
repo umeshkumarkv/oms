@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import DashboardPage from '../pages/DashboardPage'
+import * as marketApi from '../api/marketApi'
 
 // ── Mock API modules ──────────────────────────────────────────────────────────
 
@@ -11,7 +12,7 @@ vi.mock('../api/orderApi', () => ({
 }))
 
 vi.mock('../api/marketApi', () => ({
-  getMarketHours: vi.fn().mockResolvedValue({ marketOpen: true }),
+  getMarketHours: vi.fn(),
 }))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -100,5 +101,18 @@ describe('DashboardPage — createdAfter date scoping', () => {
     await waitFor(() => {
       expect(screen.getByText('7')).toBeDefined()
     })
+  })
+
+  it('shouldNotRenderMarketStatusPillInDashboardHeader', async () => {
+    renderDashboard()
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeInTheDocument())
+    expect(screen.queryByText('MARKET OPEN')).toBeNull()
+    expect(screen.queryByText('MARKET CLOSED')).toBeNull()
+  })
+
+  it('shouldNotCallGetMarketHoursFromDashboard', async () => {
+    renderDashboard()
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeInTheDocument())
+    expect(vi.mocked(marketApi.getMarketHours)).not.toHaveBeenCalled()
   })
 })

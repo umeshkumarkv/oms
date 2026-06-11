@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, ClipboardList, FilePlus, Radio, TrendingUp } from 'lucide-react'
 import { getOrders } from '../api/orderApi'
-import { getMarketHours } from '../api/marketApi'
 import { OrderSummary } from '../types/order.types'
-import { MarketHours } from '../types/market.types'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,15 +43,6 @@ const s = {
   title:         { margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
   headerRight:   { display: 'flex', alignItems: 'center', gap: '12px' } as React.CSSProperties,
   refreshNote:   { fontSize: '11px', color: 'var(--color-text-muted)' } as React.CSSProperties,
-
-  // Market status pill
-  pill: (open: boolean) => ({
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: '11px', fontWeight: 700,
-    background: open ? 'rgba(16,185,129,0.12)' : 'rgba(156,163,175,0.1)',
-    color:      open ? '#059669'                : 'var(--color-text-muted)',
-    border:    `1px solid ${open ? 'rgba(16,185,129,0.35)' : 'rgba(156,163,175,0.25)'}`,
-  } as React.CSSProperties),
 
   // Metric cards
   cards:     { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } as React.CSSProperties,
@@ -133,7 +122,6 @@ const DashboardPage: React.FC = () => {
 
   const [loading,       setLoading]       = useState(true)
   const [metrics,       setMetrics]       = useState<Metrics | null>(null)
-  const [marketHours,   setMarketHours]   = useState<MarketHours | null>(null)
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
   const [activityEvents] = useState<ActivityEvent[]>([])
 
@@ -143,12 +131,11 @@ const DashboardPage: React.FC = () => {
     if (showLoading) setLoading(true)
     try {
       const todayStart = new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString()
-      const [openPage, filledPage, expiredPage, gtdPage, hours] = await Promise.all([
+      const [openPage, filledPage, expiredPage, gtdPage] = await Promise.all([
         getOrders({ status: 'OPEN' }),
         getOrders({ status: 'FILLED', createdAfter: todayStart }),
         getOrders({ status: 'EXPIRED', createdAfter: todayStart }),
         getOrders({ timeInForce: 'GTD', status: 'OPEN' }),
-        getMarketHours(),
       ])
       const gtdExpiringSoon = (gtdPage.orders ?? []).filter(isExpiringSoon)
       setMetrics({
@@ -158,7 +145,6 @@ const DashboardPage: React.FC = () => {
         gtdCount:        gtdPage.totalCount,
         gtdExpiringSoon,
       })
-      setMarketHours(hours)
     } finally {
       setLoading(false)
       setLastRefreshed(new Date())
@@ -170,8 +156,6 @@ const DashboardPage: React.FC = () => {
     intervalRef.current = setInterval(() => loadData(false), REFRESH_MS)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [loadData])
-
-  const open = marketHours?.marketOpen ?? false
 
   // Quick actions config with Lucide icons
   const quickActions = [
@@ -190,15 +174,6 @@ const DashboardPage: React.FC = () => {
       <div style={s.header}>
         <h1 style={s.title}>Dashboard</h1>
         <div style={s.headerRight}>
-          {marketHours && (
-            <span style={s.pill(open)}>
-              <span
-                className={open ? 'pulse-dot' : undefined}
-                style={{ width: '6px', height: '6px', borderRadius: '50%', background: open ? '#10b981' : '#9ca3af' }}
-              />
-              {open ? 'MARKET OPEN' : 'MARKET CLOSED'}
-            </span>
-          )}
           <span style={s.refreshNote}>
             Auto-refresh 30s · Last: {lastRefreshed.toLocaleTimeString()}
           </span>
