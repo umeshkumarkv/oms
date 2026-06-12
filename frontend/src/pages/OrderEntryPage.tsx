@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Search } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useIdleTimer } from '../hooks/useIdleTimer'
@@ -57,16 +57,17 @@ const s = {
   select:     { width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', fontSize: '14px', background: '#fff', boxSizing: 'border-box' as const, color: 'var(--color-text-primary)' },
   errorText:  { fontSize: '12px', color: 'var(--color-error)', marginTop: '4px' } as React.CSSProperties,
 
-  // Grouped fields visual section
-  fieldBox:   { background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '14px', border: '1px solid var(--color-border-light)', marginBottom: '14px' } as React.CSSProperties,
-
-  // Advanced collapsible toggle
-  advancedToggle: { display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', padding: '4px 0', marginBottom: '8px' } as React.CSSProperties,
-
   // Toggle group
-  toggleGroup: { display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1.5px solid var(--color-border)' } as React.CSSProperties,
-  toggleBtn:   (active: boolean, activeColor?: string) => ({
+  toggleGroup:   { display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1.5px solid var(--color-border)' } as React.CSSProperties,
+  toggleBtn:     (active: boolean, activeColor?: string) => ({
     flex: 1, padding: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
+    background: active ? (activeColor ?? 'var(--color-primary)') : '#f9fafb',
+    color:      active ? '#fff' : 'var(--color-text-secondary)',
+    transition: 'background 0.15s, color 0.15s',
+  } as React.CSSProperties),
+  // Side toggle uses larger padding for prominence
+  sideToggleBtn: (active: boolean, activeColor?: string) => ({
+    flex: 1, padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
     background: active ? (activeColor ?? 'var(--color-primary)') : '#f9fafb',
     color:      active ? '#fff' : 'var(--color-text-secondary)',
     transition: 'background 0.15s, color 0.15s',
@@ -159,7 +160,6 @@ const OrderEntryPage: React.FC = () => {
   const [tif,                setTif]                = useState<TimeInForce>('DAY')
   const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
   const [routingDestination, setRoutingDestination] = useState(DEFAULT_VENUE)
-  const [advancedOpen,       setAdvancedOpen]       = useState(false)
 
   const [instruments,  setInstruments]  = useState<Instrument[]>([])
   const [quote,        setQuote]        = useState<Instrument | null>(null)
@@ -204,11 +204,6 @@ const OrderEntryPage: React.FC = () => {
     setOrderType('LIMIT')
     setRoutingDestination(DEFAULT_VENUE)
   }, [isExpired])
-
-  // Auto-expand Advanced section when GTD is selected
-  useEffect(() => {
-    if (tif === 'GTD') setAdvancedOpen(true)
-  }, [tif])
 
   // Computed values for the GTD date picker
   const tomorrow: Date = useMemo(() => {
@@ -485,33 +480,73 @@ const OrderEntryPage: React.FC = () => {
             <div style={s.errorBanner}>{submitError.message}</div>
           )}
 
-          {/* Client */}
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Client</label>
-            <select style={s.select} value={clientId} onChange={(e) => setClientId(e.target.value)} disabled={isExpired}>
-              {clients.length === 0
-                ? <option value="">Loading clients…</option>
-                : clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)
-              }
-            </select>
+          {/* Row 1 — Client + Route To (2-column grid) */}
+          <div
+            data-testid="client-route-row"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
+          >
+            <div>
+              <label htmlFor="client-select" style={s.label}>Client</label>
+              <select
+                id="client-select"
+                style={s.select}
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={isExpired}
+              >
+                {clients.length === 0
+                  ? <option value="">Loading clients…</option>
+                  : clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)
+                }
+              </select>
+            </div>
+            <div>
+              <label style={s.label}>Route To</label>
+              <select
+                style={s.select}
+                value={SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination}
+                onChange={(e) => setRoutingDestination(e.target.value)}
+                disabled={isExpired || SOR_VENUES.length === 0}
+                title={SOR_VENUES.length === 0 ? 'No venues configured' : undefined}
+                aria-label="Route To"
+              >
+                {SOR_VENUES.length === 0 ? (
+                  <option value={DEFAULT_VENUE}>{DEFAULT_VENUE}</option>
+                ) : (
+                  SOR_VENUES.map((venue) => (
+                    <option key={venue} value={venue}>{venue}</option>
+                  ))
+                )}
+              </select>
+            </div>
           </div>
 
-          {/* Symbol typeahead */}
+          {/* Row 2 — Symbol typeahead (full-width, search icon) */}
           <div style={{ ...s.fieldGroup, position: 'relative' }}>
             <label style={s.label}>Symbol</label>
-            <input
-              style={fieldErrors.symbol || symbolNotFound ? s.inputError : s.input}
-              placeholder="e.g. AAPL"
-              value={symbolInput}
-              onChange={(e) => {
-                const v = e.target.value.toUpperCase()
-                setSymbolInput(v)
-                setSymbol(v)
-                setSymbolNotFound(false)
-              }}
-              autoComplete="off"
-              disabled={isExpired}
-            />
+            <div style={{ position: 'relative' }}>
+              <span style={{
+                position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--color-text-muted)', pointerEvents: 'none', display: 'flex', alignItems: 'center',
+              }}>
+                <Search size={15} />
+              </span>
+              <input
+                style={fieldErrors.symbol || symbolNotFound
+                  ? { ...s.inputError, paddingLeft: '36px' }
+                  : { ...s.input,      paddingLeft: '36px' }}
+                placeholder="Search ticker — e.g. AAPL, MSFT, NVDA"
+                value={symbolInput}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase()
+                  setSymbolInput(v)
+                  setSymbol(v)
+                  setSymbolNotFound(false)
+                }}
+                autoComplete="off"
+                disabled={isExpired}
+              />
+            </div>
             {suggestions.length > 0 && symbolInput && symbolInput !== symbol && (
               <div style={{
                 position: 'absolute', top: '100%', left: 0, right: 0,
@@ -538,31 +573,52 @@ const OrderEntryPage: React.FC = () => {
             {fieldErrors.symbol && <div style={s.errorText}>{fieldErrors.symbol}</div>}
           </div>
 
-          {/* Side selector */}
+          {/* Row 3 — Side selector (full-width, prominent 11px padding) */}
           <div style={s.fieldGroup}>
             <label style={s.label}>Side</label>
-            <div style={s.toggleGroup}>
-              <button style={s.toggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
-              <button style={s.toggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
-              <button style={s.toggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
+            <div style={s.toggleGroup} role="group" aria-label="Side">
+              <button style={s.sideToggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
+              <button style={s.sideToggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
+              <button style={s.sideToggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
             </div>
           </div>
 
-          {/* Grouped fields: Order Type + Quantity + Limit Price */}
-          <div style={s.fieldBox}>
-
-            {/* Order Type */}
-            <div style={{ ...s.fieldGroup, marginBottom: '12px' }}>
+          {/* Row 4 — Order Type + Time in Force (2-column grid) */}
+          <div
+            data-testid="ordertype-tif-row"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
+          >
+            <div>
               <label style={s.label}>Order Type</label>
               <div style={s.toggleGroup}>
                 <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired}>MARKET</button>
                 <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired}>LIMIT</button>
               </div>
             </div>
+            <div>
+              <label style={s.label}>Time in Force</label>
+              <div style={s.toggleGroup}>
+                <button
+                  style={s.toggleBtn(tif === 'DAY')}
+                  onClick={() => { setTif('DAY'); setGtdDate(null) }}
+                  disabled={isExpired}
+                >DAY</button>
+                <button
+                  style={s.toggleBtn(tif === 'GTD')}
+                  onClick={() => setTif('GTD')}
+                  disabled={isExpired}
+                >GTD</button>
+              </div>
+            </div>
+          </div>
 
-            {/* Quantity */}
-            <div style={{ ...s.fieldGroup, marginBottom: orderType === 'LIMIT' ? '12px' : 0 }}>
-              <label style={s.label}>Quantity</label>
+          {/* Row 5 — Quantity + Limit Price (2-column grid; Limit Price absent when MARKET) */}
+          <div
+            data-testid="qty-limit-row"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
+          >
+            <div>
+              <label style={s.label}>Quantity (Shares)</label>
               <input
                 style={fieldErrors.quantity || sellHoldingsError ? s.inputError : s.input}
                 type="number" min="1" step="1"
@@ -575,12 +631,11 @@ const OrderEntryPage: React.FC = () => {
                 <div style={s.errorText}>{fieldErrors.quantity ?? sellHoldingsError}</div>
               )}
             </div>
-
-            {/* Limit Price — visible only when LIMIT */}
             {orderType === 'LIMIT' && (
-              <div style={{ ...s.fieldGroup, marginBottom: 0 }}>
+              <div>
                 <label style={s.label}>Limit Price ($)</label>
                 <input
+                  aria-label="Limit Price"
                   style={fieldErrors.limitPrice ? s.inputError : s.input}
                   type="number" min="0.01" step="0.01"
                   placeholder="0.00"
@@ -593,82 +648,30 @@ const OrderEntryPage: React.FC = () => {
             )}
           </div>
 
-          {/* Time in Force */}
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Time in Force</label>
-            <div style={s.toggleGroup}>
-              <button
-                style={s.toggleBtn(tif === 'DAY')}
-                onClick={() => { setTif('DAY'); setGtdDate(null) }}
-                disabled={isExpired}
-              >DAY</button>
-              <button
-                style={s.toggleBtn(tif === 'GTD')}
-                onClick={() => setTif('GTD')}
-                disabled={isExpired}
-              >GTD</button>
-            </div>
-          </div>
-
-          {/* Advanced section — collapsed by default; auto-expands when GTD selected */}
-          <button
-            data-testid="advanced-toggle"
-            style={s.advancedToggle}
-            onClick={() => setAdvancedOpen(v => !v)}
-          >
-            {advancedOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            Advanced
-          </button>
-
-          {advancedOpen && (
-            <>
-              {/* GTD Date Picker */}
-              {tif === 'GTD' && (
-                <div style={s.fieldGroup}>
-                  <label style={s.label}>GTD Date</label>
-                  <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
-                    <DatePicker
-                      selected={gtdDate}
-                      onChange={(date: Date | null) => {
-                        setGtdDate(date)
-                        setFieldErrors((f) => ({ ...f, gtdDate: undefined }))
-                      }}
-                      filterDate={filterWeekdays}
-                      excludeDates={holidayDates}
-                      minDate={tomorrow}
-                      dateFormat="MMM dd, yyyy"
-                      placeholderText="Select GTD date"
-                      className="gtd-datepicker-input"
-                    />
-                  </div>
-                  {fieldErrors.gtdDate && <div style={s.errorText}>{fieldErrors.gtdDate}</div>}
-                </div>
-              )}
-
-              {/* Route To */}
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Route To</label>
-                <select
-                  style={s.select}
-                  value={SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination}
-                  onChange={(e) => setRoutingDestination(e.target.value)}
-                  disabled={isExpired || SOR_VENUES.length === 0}
-                  title={SOR_VENUES.length === 0 ? 'No venues configured' : undefined}
-                  aria-label="Route To"
-                >
-                  {SOR_VENUES.length === 0 ? (
-                    <option value={DEFAULT_VENUE}>{DEFAULT_VENUE}</option>
-                  ) : (
-                    SOR_VENUES.map((venue) => (
-                      <option key={venue} value={venue}>{venue}</option>
-                    ))
-                  )}
-                </select>
+          {/* Row 6 — GTD Date Picker (inline, conditional on tif === 'GTD') */}
+          {tif === 'GTD' && (
+            <div style={s.fieldGroup}>
+              <label style={s.label}>GTD Date</label>
+              <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
+                <DatePicker
+                  selected={gtdDate}
+                  onChange={(date: Date | null) => {
+                    setGtdDate(date)
+                    setFieldErrors((f) => ({ ...f, gtdDate: undefined }))
+                  }}
+                  filterDate={filterWeekdays}
+                  excludeDates={holidayDates}
+                  minDate={tomorrow}
+                  dateFormat="MMM dd, yyyy"
+                  placeholderText="Select GTD date"
+                  className="gtd-datepicker-input"
+                />
               </div>
-            </>
+              {fieldErrors.gtdDate && <div style={s.errorText}>{fieldErrors.gtdDate}</div>}
+            </div>
           )}
 
-          {/* PLACE ORDER button */}
+          {/* Submit button */}
           <button
             style={{
               width: '100%', padding: '13px',
@@ -690,7 +693,7 @@ const OrderEntryPage: React.FC = () => {
           </button>
         </div>
 
-        {/* ── Right: Market Context Panels ── */}
+        {/* ── Right: Market Context Panels (unchanged — SCRUM-187) ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           {/* Market Intelligence */}

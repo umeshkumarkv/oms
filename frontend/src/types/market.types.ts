@@ -3,6 +3,7 @@ export interface Instrument {
   bidPrice: string
   askPrice: string
   lastPrice: string
+  open?: string
   tradable: boolean
   halted: boolean
   minQuantity: number

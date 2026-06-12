@@ -204,7 +204,7 @@ const renderAndWaitForPortfolio = async () => {
 
 // Helper: type a symbol into the symbol input (synchronous state update — holdings derived from this)
 const setSymbol = (value: string) => {
-  fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value } })
+  fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value } })
 }
 
 describe('OrderEntryPage — sell quantity vs holdings validation', () => {
@@ -410,33 +410,26 @@ describe('OrderEntryPage — SHORT_SELL', () => {
 })
 
 // ── SOR dropdown ─────────────────────────────────────────────────────────────
-
-// Helper: expand the Advanced collapsible section (Route To and GTD Date live inside it)
-const expandAdvanced = async () => {
-  const toggle = await screen.findByTestId('advanced-toggle')
-  await act(async () => { fireEvent.click(toggle) })
-}
+// Route To is now in the top row of the left panel — no Advanced expansion needed.
 
 describe('OrderEntryPage — SOR dropdown', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
   it('shouldShowRouteTolabel', async () => {
     renderPage()
-    await expandAdvanced()
-    expect(screen.getByText('Route To')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
   })
 
   it('shouldHaveNysePreselectedByDefault', async () => {
     renderPage()
-    await expandAdvanced()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
     const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     expect(dropdown.value).toBe('NYSE')
   })
 
   it('shouldShowAllVenuesInDropdown', async () => {
     renderPage()
-    await expandAdvanced()
-    expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument())
     expect(screen.getByRole('option', { name: 'NASDAQ' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'ARCA' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'BATS' })).toBeInTheDocument()
@@ -445,7 +438,7 @@ describe('OrderEntryPage — SOR dropdown', () => {
 
   it('shouldUpdateSelectedVenueWhenDropdownChanges', async () => {
     renderPage()
-    await expandAdvanced()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
     const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     await act(async () => { fireEvent.change(dropdown, { target: { value: 'NASDAQ' } }) })
     expect(dropdown.value).toBe('NASDAQ')
@@ -454,7 +447,7 @@ describe('OrderEntryPage — SOR dropdown', () => {
   it('shouldDisableDropdownWhenWindowIsExpired', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
-    await expandAdvanced()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
     const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     expect(dropdown).toBeDisabled()
   })
@@ -477,8 +470,7 @@ describe('OrderEntryPage — SOR dropdown — empty venues fallback', () => {
 
   it('shouldStillRenderRouteToLabelWhenVenuesEmpty', async () => {
     renderPage()
-    await expandAdvanced()
-    expect(screen.getByText('Route To')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
   })
 })
 
@@ -548,7 +540,7 @@ describe('OrderEntryPage — idle timer', () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer })
     renderPage()
     await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
-    await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('e.g. AAPL'), { key: 'a' }) })
+    await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { key: 'a' }) })
     expect(resetTimer).toHaveBeenCalled()
   })
 
@@ -575,7 +567,7 @@ const renderAndLoadQuote = async () => {
   renderPage()
   await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
   await act(async () => {
-    fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+    fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'AAPL' } })
   })
   // Wait for debounce (400ms) and async quote resolution
   await waitFor(() => screen.getByText('$175.00'), { timeout: 1500 })
@@ -635,7 +627,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPL' } })
     })
     await waitFor(
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
@@ -652,7 +644,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPL' } })
     })
     await waitFor(
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
@@ -670,7 +662,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPL' } })
     })
     await waitFor(
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
@@ -678,7 +670,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     )
 
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPLE' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPLE' } })
     })
     expect(screen.queryByText('Symbol not found. Please search and select a valid instrument.')).toBeNull()
   })
@@ -692,7 +684,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'AAPL' } })
     })
     await waitFor(() => expect(vi.mocked(getInstrument)).toHaveBeenCalled(), { timeout: 1500 })
     await act(async () => {})
@@ -715,10 +707,11 @@ describe('OrderEntryPage — real-time LTP (SCRUM-127)', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'AAPL' } })
     })
     // liveLtp='201.25' overrides REST quote.lastPrice='175.00'
     await waitFor(() => expect(screen.getByText('$201.25')).toBeInTheDocument(), { timeout: 1500 })
+
   })
 
   it('shouldFallBackToRestQuoteLtpWhenHookReturnsNullLtp', async () => {
@@ -726,5 +719,81 @@ describe('OrderEntryPage — real-time LTP (SCRUM-127)', () => {
     await renderAndLoadQuote()
     // liveLtp is null → falls back to quote.lastPrice='175.00'
     expect(screen.getByText('$175.00')).toBeInTheDocument()
+  })
+})
+
+// ── Redesign layout — SCRUM-185 ───────────────────────────────────────────────
+
+describe('OrderEntryPage — redesign layout (SCRUM-185)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldRenderClientAndRouteToInSameContainer', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Client' })).toBeInTheDocument())
+    const clientSelect  = screen.getByRole('combobox', { name: 'Client' })
+    const routeToSelect = screen.getByRole('combobox', { name: 'Route To' })
+    expect(clientSelect.closest('[data-testid="client-route-row"]')).not.toBeNull()
+    expect(routeToSelect.closest('[data-testid="client-route-row"]')).not.toBeNull()
+    expect(clientSelect.closest('[data-testid="client-route-row"]')).toBe(
+      routeToSelect.closest('[data-testid="client-route-row"]')
+    )
+  })
+
+  it('shouldShowRouteToDropdownWithoutExpandingAdvancedSection', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
+  })
+
+  it('shouldNotRenderAdvancedToggleButton', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    expect(screen.queryByTestId('advanced-toggle')).toBeNull()
+  })
+
+  it('shouldRenderSymbolInputWithSearchPlaceholder', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldRenderOrderTypeAndTifInSameGridRow', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('MARKET')).toBeInTheDocument())
+    const marketBtn = screen.getByText('MARKET')
+    const dayBtn    = screen.getByText('DAY')
+    expect(marketBtn.closest('[data-testid="ordertype-tif-row"]')).not.toBeNull()
+    expect(dayBtn.closest('[data-testid="ordertype-tif-row"]')).not.toBeNull()
+    expect(marketBtn.closest('[data-testid="ordertype-tif-row"]')).toBe(
+      dayBtn.closest('[data-testid="ordertype-tif-row"]')
+    )
+  })
+
+  it('shouldRenderQuantityAndLimitPriceInSameGridRowForLimitOrder', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput   = screen.getByPlaceholderText('Number of shares')
+    const limitInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    expect(qtyInput.closest('[data-testid="qty-limit-row"]')).not.toBeNull()
+    expect(limitInput.closest('[data-testid="qty-limit-row"]')).not.toBeNull()
+    expect(qtyInput.closest('[data-testid="qty-limit-row"]')).toBe(
+      limitInput.closest('[data-testid="qty-limit-row"]')
+    )
+  })
+
+  it('shouldHideLimitPriceInputWhenMarketOrderSelected', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('MARKET')).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByText('MARKET')) })
+    expect(screen.queryByRole('spinbutton', { name: 'Limit Price' })).toBeNull()
+  })
+
+  it('shouldShowGtdDatePickerInlineWithoutAdvancedSection', async () => {
+    renderPage()
+    const gtdBtn = await screen.findByText('GTD')
+    await act(async () => { fireEvent.click(gtdBtn) })
+    expect(screen.getByText('GTD Date')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Select GTD date')).toBeInTheDocument()
+    expect(screen.queryByTestId('advanced-toggle')).toBeNull()
   })
 })
