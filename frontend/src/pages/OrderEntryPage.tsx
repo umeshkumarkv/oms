@@ -68,8 +68,8 @@ const s = {
   // Side toggle uses larger padding for prominence
   sideToggleBtn: (active: boolean, activeColor?: string) => ({
     flex: 1, padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
-    background: active ? (activeColor ?? 'var(--color-primary)') : '#f9fafb',
-    color:      active ? '#fff' : 'var(--color-text-secondary)',
+    background: active ? (activeColor ?? 'var(--color-primary)') : 'var(--color-bg)',
+    color:      active ? 'var(--color-surface)' : 'var(--color-text-secondary)',
     transition: 'background 0.15s, color 0.15s',
   } as React.CSSProperties),
 
