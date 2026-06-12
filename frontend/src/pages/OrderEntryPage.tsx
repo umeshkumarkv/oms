@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, CheckCircle, XCircle, Search } from 'lucide-react'
+import { AlertTriangle, Search } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useIdleTimer } from '../hooks/useIdleTimer'
@@ -25,9 +25,6 @@ const fmtDec2 = (v: string | number): string => {
   if (isNaN(n)) return '—'
   return n.toFixed(2)
 }
-
-const fmtPnl = (value: number, pct: number): string =>
-  `${fmt(value)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`
 
 const tomorrowStr = (): string => {
   const d = new Date()
@@ -147,8 +144,6 @@ const s = {
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface FieldErrors { quantity?: string; limitPrice?: string; gtdDate?: string; symbol?: string }
 interface ErrorDetail { field: string; code: string; message: string }
-interface AlertItem   { type: 'success' | 'warning' | 'danger'; message: string }
-
 interface SubmitError {
   type: 'MARKET_CLOSED' | 'RISK_REJECTED' | 'INVALID_GTD_DATE' | 'VALIDATION_ERROR' | 'GENERIC'
   message: string
@@ -234,13 +229,6 @@ const OrderEntryPage: React.FC = () => {
     [gtdDate]
   )
 
-  const gtdDisplayStr: string | null = useMemo(
-    () => gtdDate
-      ? gtdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      : null,
-    [gtdDate]
-  )
-
   useEffect(() => {
     getInstruments().then(setInstruments)
     getHolidays().then(setHolidays).catch(() => {})
@@ -297,19 +285,6 @@ const OrderEntryPage: React.FC = () => {
   const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
   const heldQty    = holding ? holding.quantity : 0
 
-  // P&L for current holding of selected symbol
-  const pnl = holding && quote
-    ? (parseFloat(quote.lastPrice) - parseFloat(holding.avgPrice)) * holding.quantity
-    : null
-  const pnlPct = holding && quote
-    ? ((parseFloat(quote.lastPrice) - parseFloat(holding.avgPrice)) / parseFloat(holding.avgPrice)) * 100
-    : null
-
-  // Spread from live or REST quote
-  const spreadStr = quote
-    ? fmtDec2(parseFloat(liveAsk ?? quote.askPrice) - parseFloat(liveBid ?? quote.bidPrice))
-    : null
-
   const sellHoldingsError: string | null =
     side === 'SELL' && portfolio !== null && !isNaN(qty) && qty > 0 && qty > heldQty
       ? `Sell quantity cannot exceed available holding of ${heldQty} units`
@@ -334,32 +309,6 @@ const OrderEntryPage: React.FC = () => {
   }
 
   const allChecksPass = Object.values(checks).every(Boolean)
-
-  // Contextual alerts
-  const alerts: AlertItem[] = useMemo(() => {
-    const result: AlertItem[] = []
-    if (quote?.halted) {
-      result.push({ type: 'danger', message: 'Symbol is halted — orders will not execute' })
-    }
-    if (side === 'BUY' && orderValue > 0) {
-      if (buyingPower >= orderValue) {
-        result.push({ type: 'success', message: 'Margin sufficiency confirmed' })
-      } else {
-        result.push({ type: 'danger', message: 'Insufficient buying power for this order' })
-      }
-    }
-    if (bpUsedPct > 80 && side === 'BUY' && orderValue > 0) {
-      result.push({ type: 'warning', message: `High buying power utilization: ${bpUsedPct.toFixed(1)}% used` })
-    }
-    if (quote?.dayHigh && quote?.lastPrice) {
-      const last = parseFloat(quote.lastPrice)
-      const high = parseFloat(quote.dayHigh)
-      if (high > 0 && last >= high * 0.95) {
-        result.push({ type: 'warning', message: 'Price close to day high — upper circuit risk' })
-      }
-    }
-    return result
-  }, [quote, side, orderValue, buyingPower, bpUsedPct])
 
   const orderSummaryText = useMemo<string | null>(() => {
     if (!allChecksPass || !symbol || !clientId) return null
@@ -435,8 +384,6 @@ const OrderEntryPage: React.FC = () => {
     }
   }
 
-  // Side-aware accent color
-  const sideAccent = side === 'BUY' ? 'var(--color-buy)' : side === 'SHORT_SELL' ? 'var(--color-warning)' : 'var(--color-sell)'
   const submitBg   = submitting || !allChecksPass || symbolNotFound
     ? '#9ca3af'
     : side === 'BUY'
@@ -738,130 +685,17 @@ const OrderEntryPage: React.FC = () => {
           </button>
         </div>
 
-        {/* ── Right: Market Context Panels (unchanged — SCRUM-187) ── */}
+        {/* ── Right: ORDER PREVIEW + MARKET QUOTE (SCRUM-187) ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Market Intelligence */}
+          {/* ORDER PREVIEW */}
           <div style={s.card}>
-            <h2 style={s.cardTitle}>Market Intelligence</h2>
-            {!quote && !quoteLoading && (
-              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see market data.</div>
-            )}
-            {quoteLoading && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div className="skeleton" style={{ height: '28px', width: '80px' }} />
-                <div className="skeleton" style={{ height: '36px', width: '120px' }} />
-              </div>
-            )}
-            {quote && !quoteLoading && (
-              <>
-                <div style={{ marginBottom: '4px' }}>
-                  <div style={s.ltpLabel}>LTP</div>
-                  <div style={s.ltpPrice}>
-                    ${liveLtp ?? quote.lastPrice}
-                    {isStale && symbol && (
-                      <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
-                    )}
-                    {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
-                  </div>
-                  <div style={s.ltpMeta}>
-                    {quote.symbol}
-                    {(quote.change || quote.changePct) && (
-                      <span style={{
-                        marginLeft: '8px',
-                        color: parseFloat(quote.change ?? '0') >= 0 ? 'var(--color-success)' : 'var(--color-error)',
-                        fontWeight: 600,
-                      }}>
-                        {parseFloat(quote.change ?? '0') >= 0 ? '+' : ''}{quote.change}
-                        {quote.changePct && ` (${parseFloat(quote.changePct) >= 0 ? '+' : ''}${quote.changePct}%)`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div style={s.miGrid}>
-                  {[
-                    {
-                      id: 'bid',
-                      label: (
-                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                          Bid
-                          {isStale && symbol && (
-                            <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
-                          )}
-                        </span>
-                      ),
-                      value: `$${liveBid ?? quote.bidPrice}`,
-                    },
-                    {
-                      id:    'ask',
-                      label: (
-                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                          Ask
-                          {isStale && symbol && (
-                            <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
-                          )}
-                        </span>
-                      ),
-                      value: `$${liveAsk ?? quote.askPrice}`,
-                    },
-                    { id: 'spread', label: 'Spread', value: spreadStr ?? '—' },
-                    { id: 'vol',    label: 'Volume', value: quote.volume != null ? quote.volume.toLocaleString() : '—' },
-                    { id: 'high',   label: 'High',   value: quote.dayHigh ? `$${fmtDec2(quote.dayHigh)}` : '—' },
-                    { id: 'low',    label: 'Low',    value: quote.dayLow  ? `$${fmtDec2(quote.dayLow)}`  : '—' },
-                  ].map(({ id, label, value }) => (
-                    <div key={id} style={s.miItem}>
-                      <div style={s.miLabel}>{label}</div>
-                      <div style={s.miValue}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Position */}
-          {holding && quote && (
-            <div style={s.card}>
-              <h2 style={s.cardTitle}>Position</h2>
-              <div style={s.row}>
-                <span style={s.rowLabel}>Holdings</span>
-                <span style={s.rowValue()}>{heldQty.toLocaleString()} {symbol}</span>
-              </div>
-              <div style={s.row}>
-                <span style={s.rowLabel}>Avg Price</span>
-                <span style={s.rowValue()}>${fmtDec2(holding.avgPrice)}</span>
-              </div>
-              <div style={s.row}>
-                <span style={s.rowLabel}>Market Value</span>
-                <span style={s.rowValue()}>{fmt(holding.marketValue)}</span>
-              </div>
-              {pnl !== null && pnlPct !== null && (
-                <div style={s.row}>
-                  <span style={s.rowLabel}>P&L</span>
-                  <span style={s.rowValue(true, pnl >= 0 ? 'var(--color-success)' : 'var(--color-error)')}>
-                    {fmtPnl(pnl, pnlPct)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Margin & Costs */}
-          <div style={{ ...s.card, borderTop: `3px solid ${sideAccent}`, paddingTop: '21px' }}>
-            <h2 style={s.cardTitle}>Margin &amp; Costs</h2>
-
+            <h2 style={s.cardTitle}>Order Preview</h2>
             <div style={s.row}>
-              <span style={{ ...s.rowLabel, color: sideAccent, fontWeight: 600 }}>Order Value</span>
-              <span style={{ ...s.rowValue(true), color: sideAccent }}>{orderValue > 0 ? fmt(orderValue) : '—'}</span>
-            </div>
-            <div style={s.row}>
-              <span style={s.rowLabel}>Estimated Charges</span>
-              <span style={s.rowValue()}>$0.00</span>
-            </div>
-            <div style={s.divider} />
-            <div style={s.row}>
-              <span style={s.rowLabel}>Buying Power</span>
-              <span style={s.rowValue(true, 'var(--color-success)')}>{portfolio ? fmt(portfolio.buyingPower) : '—'}</span>
+              <span style={s.rowLabel}>Estimated Value</span>
+              <span style={s.rowValue(true, 'var(--color-primary)')}>
+                {orderValue > 0 ? fmt(orderValue) : '—'}
+              </span>
             </div>
             <div style={s.row}>
               <span style={s.rowLabel}>Cash Balance</span>
@@ -871,33 +705,34 @@ const OrderEntryPage: React.FC = () => {
               <span style={s.rowLabel}>Reserved Cash</span>
               <span style={s.rowValue()}>{portfolio ? fmt(portfolio.reservedCash) : '—'}</span>
             </div>
-            {tif === 'GTD' && gtdDisplayStr && (
-              <div style={s.row}>
-                <span style={s.rowLabel}>Expires</span>
-                <span style={s.rowValue()}>{gtdDisplayStr} at 4:00 PM ET</span>
-              </div>
-            )}
-            {orderValue > 0 && (
-              <>
-                <div style={s.divider} />
-                <div style={s.row}>
-                  <span style={s.rowLabel}>Post-order Cash</span>
-                  <span style={s.rowValue(true, postOrderCash < 0 ? 'var(--color-error)' : 'var(--color-text-primary)')}>{fmt(postOrderCash)}</span>
-                </div>
-                {side === 'BUY' && (
-                  <div style={s.row}>
-                    <span style={s.rowLabel}>Buying Power Used</span>
-                    <span style={s.rowValue(false, bpUsedPct > 80 ? 'var(--color-warning)' : 'var(--color-text-secondary)')}>{bpUsedPct.toFixed(1)}%</span>
-                  </div>
-                )}
-                {side === 'SELL' && (
-                  <div style={s.row}>
-                    <span style={s.rowLabel}>Shares Held</span>
-                    <span style={s.rowValue()}>{heldQty.toLocaleString()} {symbol}</span>
-                  </div>
-                )}
-              </>
-            )}
+            <div style={s.row}>
+              <span style={s.rowLabel}>Buying Power</span>
+              <span style={s.rowValue(true, 'var(--color-success)')}>
+                {portfolio ? fmt(portfolio.buyingPower) : '—'}
+              </span>
+            </div>
+            <div style={s.divider} />
+            <div style={s.row}>
+              <span style={s.rowLabel}>Post-order Cash</span>
+              <span style={s.rowValue(true, postOrderCash < 0 ? 'var(--color-error)' : 'var(--color-text-primary)')}>
+                {portfolio ? fmt(postOrderCash) : '—'}
+              </span>
+            </div>
+            <div style={s.row}>
+              <span style={s.rowLabel}>Buying Power Used</span>
+              <span style={s.rowValue()}>{portfolio ? `${bpUsedPct.toFixed(1)}%` : '—'}</span>
+            </div>
+            <div style={{ background: 'var(--color-border)', height: '6px', borderRadius: 'var(--radius-pill)', overflow: 'hidden', marginTop: '4px' }}>
+              <div
+                className="bp-progress-bar"
+                style={{
+                  height: '100%',
+                  width: `${portfolio ? Math.min(bpUsedPct, 100) : 0}%`,
+                  background: bpUsedPct > 80 ? 'var(--color-warning)' : 'var(--color-success)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
             {side === 'SELL' && !portfolio && clientId && (
               <div style={{ ...s.errorText, marginTop: '4px' }}>
                 Portfolio data unavailable — holding check skipped
@@ -905,42 +740,85 @@ const OrderEntryPage: React.FC = () => {
             )}
           </div>
 
-          {/* Alerts */}
-          {alerts.length > 0 && (
-            <div style={s.card}>
-              <h2 style={s.cardTitle}>Alerts</h2>
-              <div style={alerts.length > 3 ? { maxHeight: '120px', overflowY: 'auto' } : undefined}>
-                {alerts.map((alert, i) => (
-                  <div key={i} style={s.alertBadge(alert.type)}>
-                    {alert.type === 'success' && <CheckCircle size={13} strokeWidth={2.5} />}
-                    {alert.type === 'warning' && <AlertTriangle size={13} strokeWidth={2.5} />}
-                    {alert.type === 'danger'  && <XCircle      size={13} strokeWidth={2.5} />}
-                    {alert.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Validation */}
+          {/* MARKET QUOTE */}
           <div style={s.card}>
-            <h2 style={s.cardTitle}>Validation</h2>
-            {[
-              { label: 'Symbol entered',                                                                                                                      pass: checks.symbol       },
-              { label: 'Quantity > 0',                                                                                                                        pass: checks.quantity     },
-              { label: orderType === 'LIMIT' ? 'Limit price > 0' : 'Market order — no price needed',                                                         pass: checks.limitPrice   },
-              { label: tif === 'GTD' ? 'GTD date is a future trading day' : 'DAY order — no expiry needed',                                                  pass: checks.gtdDate      },
-              { label: 'Symbol not halted',                                                                                                                   pass: checks.notHalted    },
-              { label: side !== 'SELL' ? 'Holdings check — N/A for BUY / SHORT_SELL' : `Sufficient holdings (holding: ${heldQty.toLocaleString()} ${symbol || '—'})`, pass: checks.sellHoldings },
-            ].map(({ label, pass }) => (
-              <div key={label} style={s.checkRow}>
-                {pass
-                  ? <CheckCircle size={14} strokeWidth={2} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
-                  : <XCircle    size={14} strokeWidth={2} style={{ color: 'var(--color-error)',   flexShrink: 0 }} />
-                }
-                <span style={s.checkText(pass)}>{label}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Market Quote</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{symbol || '—'}</span>
+            </div>
+            {!symbol && !quoteLoading && (
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
+            )}
+            {quoteLoading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton" style={{ height: '28px', width: '80px' }} />
+                <div className="skeleton" style={{ height: '36px', width: '120px' }} />
               </div>
-            ))}
+            )}
+            {quote && !quoteLoading && (
+              <>
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={s.ltpPrice}>
+                    ${liveLtp ?? quote.lastPrice}
+                    {isStale && symbol && (
+                      <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                    )}
+                    {quote.halted && <span style={s.haltedBadge}>HALTED</span>}
+                  </div>
+                  {(quote.change || quote.changePct) && (
+                    <div style={{
+                      fontSize: '13px',
+                      color: parseFloat(quote.change ?? '0') >= 0 ? 'var(--color-success)' : 'var(--color-error)',
+                      fontWeight: 600,
+                      marginBottom: '10px',
+                    }}>
+                      {parseFloat(quote.change ?? '0') >= 0 ? '+' : ''}{quote.change}
+                      {quote.changePct && ` (${parseFloat(quote.changePct) >= 0 ? '+' : ''}${quote.changePct}%)`}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                  <div style={s.miItem}>
+                    <div style={s.miLabel}>OPEN</div>
+                    <div style={s.miValue}>{quote.open ?? '—'}</div>
+                  </div>
+                  <div style={s.miItem}>
+                    <div style={s.miLabel}>PREV CLOSE</div>
+                    <div style={s.miValue}>{quote.previousClose ?? '—'}</div>
+                  </div>
+                  <div style={s.miItem}>
+                    <div style={s.miLabel}>
+                      BID{isStale && symbol && (
+                        <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                      )}
+                    </div>
+                    <div style={{ ...s.miValue, color: 'var(--color-success)' }}>${liveBid ?? quote.bidPrice}</div>
+                  </div>
+                  <div style={s.miItem}>
+                    <div style={s.miLabel}>
+                      ASK{isStale && symbol && (
+                        <span style={s.staleBadge} aria-label="Price data is stale"><AlertTriangle size={10} strokeWidth={2.5} />Stale</span>
+                      )}
+                    </div>
+                    <div style={{ ...s.miValue, color: 'var(--color-error)' }}>${liveAsk ?? quote.askPrice}</div>
+                  </div>
+                  <div style={s.miItem}>
+                    <div style={s.miLabel}>DAY HIGH</div>
+                    <div style={s.miValue}>{quote.dayHigh ? `$${fmtDec2(quote.dayHigh)}` : '—'}</div>
+                  </div>
+                  <div style={s.miItem}>
+                    <div style={s.miLabel}>DAY LOW</div>
+                    <div style={s.miValue}>{quote.dayLow ? `$${fmtDec2(quote.dayLow)}` : '—'}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--color-border-light)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Last Traded Price (LTP)</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtDec2(liveLtp ?? quote.lastPrice)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
         </div>

@@ -122,16 +122,16 @@ describe('OrderEntryPage — GTD date picker', () => {
 
   it('shouldShowDayOrderValidationLabelWhenDaySelected', async () => {
     renderPage()
-    await waitFor(() =>
-      expect(screen.getByText('DAY order — no expiry needed')).toBeInTheDocument()
-    )
+    // Validation card removed (SCRUM-187) — DAY TIF reflected in submit button state
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
   })
 
   it('shouldShowGtdDateValidationLabelWhenGtdSelected', async () => {
     renderPage()
     const gtdBtn = await screen.findByText('GTD')
     await act(async () => { fireEvent.click(gtdBtn) })
-    expect(screen.getByText('GTD date is a future trading day')).toBeInTheDocument()
+    // Validation card removed (SCRUM-187) — GTD picker still appears when GTD selected
+    expect(screen.getByPlaceholderText('Select GTD date')).toBeInTheDocument()
   })
 })
 
@@ -289,7 +289,8 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
   it('shouldShowValidationCheckRowHoldingsNaForBuy', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument())
+    // Validation card removed (SCRUM-187) — BUY side never shows a holdings error
+    await waitFor(() => expect(screen.queryByText(/cannot exceed available holding/)).toBeNull())
   })
 
   it('shouldShowSellHoldingsCheckRowWhenSideIsSell', async () => {
@@ -298,12 +299,10 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
     await renderAndWaitForPortfolio()
     setSymbol('AAPL')
-
     await act(async () => { fireEvent.click(screen.getByText('SELL')) })
 
-    await waitFor(() =>
-      expect(screen.getByText(/Sufficient holdings \(holding:/)).toBeInTheDocument()
-    )
+    // Validation card removed (SCRUM-187) — holdings enforcement surfaces via submit button
+    await waitFor(() => expect(screen.getByText('Order Preview')).toBeInTheDocument())
   })
 
   it('shouldShowSellHoldingsFailRowWhenQtyExceedsHolding', async () => {
@@ -312,14 +311,14 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
     await renderAndWaitForPortfolio()
     setSymbol('AAPL')
-
     await act(async () => { fireEvent.click(screen.getByText('SELL')) })
 
     const qtyInput = screen.getByPlaceholderText('Number of shares')
     await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
 
+    // Validation card removed (SCRUM-187) — sell failure shown as inline qty error
     await waitFor(() =>
-      expect(screen.getByText(/Sufficient holdings \(holding: 100/)).toBeInTheDocument()
+      expect(screen.getByText('Sell quantity cannot exceed available holding of 100 units')).toBeInTheDocument()
     )
   })
 
@@ -341,9 +340,8 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
   it('shouldPassBuyOrderUnaffectedAfterSellValidationAdded', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
-    // BUY is default — no sell validation check should interfere
+    // BUY is default — no sell validation error should appear
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
-    expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
   })
 })
 
@@ -384,12 +382,10 @@ describe('OrderEntryPage — SHORT_SELL', () => {
   it('shouldShowHoldingsNaForShortSell', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('SHORT SELL')).toBeInTheDocument())
-
     await act(async () => { fireEvent.click(screen.getByText('SHORT SELL')) })
 
-    await waitFor(() =>
-      expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
-    )
+    // Validation card removed (SCRUM-187) — SHORT_SELL never shows holdings error
+    await waitFor(() => expect(screen.queryByText(/cannot exceed available holding/)).toBeNull())
   })
 
   it('shouldNotDisableSubmitForShortSellQtyAboveHolding', async () => {
@@ -839,5 +835,45 @@ describe('OrderEntryPage — order summary and submit label states (SCRUM-186)',
     })
     await waitFor(() => expect(screen.getByText('Review & Submit Order')).toBeInTheDocument())
     expect(screen.getByText('Review & Submit Order')).not.toBeDisabled()
+  })
+})
+
+// ── SCRUM-187: Right panel redesign ──────────────────────────────────────────
+
+describe('OrderEntryPage — right panel redesign (SCRUM-187)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowOrderPreviewCardWithEstimatedValueLabel', async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Order Preview')).toBeInTheDocument()
+      expect(screen.getByText('Estimated Value')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldShowBuyingPowerProgressBarElement', async () => {
+    const { container } = renderPage()
+    await waitFor(() => expect(screen.getByText('Order Preview')).toBeInTheDocument())
+    expect(container.querySelector('.bp-progress-bar')).not.toBeNull()
+  })
+
+  it('shouldShowMarketQuoteCardHeading', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText(/market quote/i)).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowMarketQuotePlaceholderWhenNoSymbol', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Enter a symbol to see the current quote.')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowLtpInMarketQuoteAfterSymbolEntered', async () => {
+    await renderAndLoadQuote()
+    expect(screen.getByText(/market quote/i)).toBeInTheDocument()
+    expect(screen.getByText('$175.00')).toBeInTheDocument()
   })
 })
