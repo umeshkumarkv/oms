@@ -6,6 +6,7 @@ import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.domain.KycStatus;
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
+import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
@@ -393,5 +394,99 @@ class ClientControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("CLIENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    // --- /active endpoint tests ---
+
+    @Test
+    void shouldReturn200WithActiveClientsForOperationsRole() throws Exception {
+        List<ActiveClientResponse> response = List.of(
+                ActiveClientResponse.builder()
+                        .clientId(CLIENT_001)
+                        .clientName("Alice Corp")
+                        .turnoverToday("50000.00")
+                        .availableCash("95000.00")
+                        .build());
+        when(clientService.getActiveClients(10)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .header("X-User-Role", "OPERATIONS")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].clientId").value(CLIENT_001.toString()))
+                .andExpect(jsonPath("$.data[0].clientName").value("Alice Corp"))
+                .andExpect(jsonPath("$.data[0].turnoverToday").value("50000.00"))
+                .andExpect(jsonPath("$.data[0].availableCash").value("95000.00"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithActiveClientsForAdminRole() throws Exception {
+        when(clientService.getActiveClients(5)).thenReturn(List.of(
+                ActiveClientResponse.builder()
+                        .clientId(CLIENT_001)
+                        .clientName("Alice Corp")
+                        .turnoverToday("50000.00")
+                        .availableCash("95000.00")
+                        .build()));
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .param("limit", "5")
+                        .header("X-User-Role", "ADMIN")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void shouldReturn200WithEmptyArrayWhenNoActiveClients() throws Exception {
+        when(clientService.getActiveClients(10)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .header("X-User-Role", "OPERATIONS")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void shouldReturn400WhenLimitIsZero() throws Exception {
+        when(clientService.getActiveClients(0))
+                .thenThrow(new ValidationException("VALIDATION_ERROR", "limit must be between 1 and 50"));
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .param("limit", "0")
+                        .header("X-User-Role", "OPERATIONS")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn400WhenLimitExceedsFifty() throws Exception {
+        when(clientService.getActiveClients(51))
+                .thenThrow(new ValidationException("VALIDATION_ERROR", "limit must be between 1 and 50"));
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .param("limit", "51")
+                        .header("X-User-Role", "OPERATIONS")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn200WithDefaultLimitWhenLimitNotProvided() throws Exception {
+        when(clientService.getActiveClients(10)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .header("X-User-Role", "OPERATIONS")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
     }
 }
