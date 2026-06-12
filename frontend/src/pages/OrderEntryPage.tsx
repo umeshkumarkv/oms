@@ -73,6 +73,17 @@ const s = {
     transition: 'background 0.15s, color 0.15s',
   } as React.CSSProperties),
 
+  // Order Summary (SCRUM-186)
+  summaryBox:         { background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' } as React.CSSProperties,
+  summaryPlaceholder: { color: 'var(--color-text-muted)', fontSize: '13px' } as React.CSSProperties,
+  summaryValue:       { fontSize: '12px', color: 'var(--color-text-secondary)' } as React.CSSProperties,
+  sideBadge: (side: OrderSide) => ({
+    display: 'inline-block', padding: '1px 6px',
+    borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 700,
+    color: 'var(--color-surface)',
+    background: side === 'BUY' ? 'var(--color-buy)' : side === 'SELL' ? 'var(--color-sell)' : 'var(--color-warning)',
+  } as React.CSSProperties),
+
   // Shared row layout
   divider:  { borderTop: '1px solid var(--color-border-light)', margin: '12px 0' } as React.CSSProperties,
   row:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } as React.CSSProperties,
@@ -349,6 +360,20 @@ const OrderEntryPage: React.FC = () => {
     }
     return result
   }, [quote, side, orderValue, buyingPower, bpUsedPct])
+
+  const orderSummaryText = useMemo<string | null>(() => {
+    if (!allChecksPass || !symbol || !clientId) return null
+    const priceStr = orderType === 'MARKET'
+      ? 'Market'
+      : `Limit $${parseFloat(limitPrice).toFixed(2)}`
+    const qtyStr = qty.toLocaleString('en-US')
+    return `${qtyStr} ${symbol} @ ${priceStr} · ${tif} · Route ${routingDestination}`
+  }, [allChecksPass, symbol, clientId, qty, orderType, limitPrice, tif, routingDestination])
+
+  const orderSummaryValue = useMemo<string | null>(() => {
+    if (!orderSummaryText || orderValue <= 0) return null
+    return `Est. value ${fmt(orderValue)} · Post-order cash ${fmt(postOrderCash)}`
+  }, [orderSummaryText, orderValue, postOrderCash])
 
   const handleSubmit = async () => {
     setFieldErrors({})
@@ -671,6 +696,24 @@ const OrderEntryPage: React.FC = () => {
             </div>
           )}
 
+          {/* Order Summary (SCRUM-186) */}
+          <div style={s.fieldGroup}>
+            <label style={s.label}>Order Summary</label>
+            <div data-testid="order-summary-box" style={s.summaryBox}>
+              {!orderSummaryText ? (
+                <span style={s.summaryPlaceholder}>Complete the order details to preview your summary.</span>
+              ) : (
+                <>
+                  <div>
+                    <span style={s.sideBadge(side)}>{side.replace('_', ' ')}</span>
+                    {' '}{orderSummaryText}
+                  </div>
+                  {orderSummaryValue && <div style={s.summaryValue}>{orderSummaryValue}</div>}
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Submit button */}
           <button
             style={{
@@ -689,7 +732,9 @@ const OrderEntryPage: React.FC = () => {
                 <span className="btn-spinner" aria-label="Loading" />
                 Placing…
               </>
-            ) : 'PLACE ORDER'}
+            ) : isExpired ? 'Order Window Expired'
+              : !allChecksPass || symbolNotFound ? 'Complete required fields'
+              : 'Review & Submit Order'}
           </button>
         </div>
 

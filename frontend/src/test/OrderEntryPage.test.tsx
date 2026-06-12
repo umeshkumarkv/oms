@@ -151,7 +151,7 @@ describe('OrderEntryPage — submit body', () => {
     renderPage()
 
     // Default is DAY — just verify no gtdDate in submit
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     // The submit button is disabled until all checks pass — this test
     // verifies the tif field is 'DAY' and gtdDate is undefined in a DAY order
     expect(vi.mocked(submitOrder)).not.toHaveBeenCalled()
@@ -161,13 +161,13 @@ describe('OrderEntryPage — submit body', () => {
 describe('OrderEntryPage — submit button spinner', () => {
   it('shouldNotShowSpinnerWhenNotSubmitting', async () => {
     const { container } = renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(container.querySelector('.btn-spinner')).toBeNull()
   })
 
   it('shouldShowSubmitOrderTextWhenNotSubmitting', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByText('Placing…')).toBeNull()
   })
 })
@@ -268,7 +268,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     const qtyInput = screen.getByPlaceholderText('Number of shares')
     await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
 
-    expect(screen.getByText('PLACE ORDER')).toBeDisabled()
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
   })
 
   it('shouldShowSellHoldingsErrorImmediatelyWithoutBlur', async () => {
@@ -340,7 +340,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
   it('shouldPassBuyOrderUnaffectedAfterSellValidationAdded', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     // BUY is default — no sell validation check should interfere
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
     expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
@@ -484,7 +484,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldNotShowCountdownWarningWhenSecondsAbove15', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 
@@ -507,7 +507,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldShowCountdownWarningExactlyAt15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 15, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.getByText('⚠ Order window will expire in 15 seconds')).toBeInTheDocument()
   })
 
@@ -515,7 +515,7 @@ describe('OrderEntryPage — idle timer', () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText('PLACE ORDER')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Order Window Expired' })).toBeDisabled()
     )
   })
 
@@ -523,7 +523,7 @@ describe('OrderEntryPage — idle timer', () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText('Order Window Expired')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toBeInTheDocument()
     )
   })
 
@@ -539,7 +539,7 @@ describe('OrderEntryPage — idle timer', () => {
     const resetTimer = vi.fn()
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { key: 'a' }) })
     expect(resetTimer).toHaveBeenCalled()
   })
@@ -547,7 +547,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldNotShowWarningBannerWhenNotExpiredAndAbove15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 16, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 })
@@ -650,7 +650,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
       { timeout: 1500 }
     )
-    expect(screen.getByText('PLACE ORDER')).toBeDisabled()
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
   })
 
   it('shouldClearSymbolNotFoundErrorImmediatelyOnInputChange', async () => {
@@ -746,7 +746,7 @@ describe('OrderEntryPage — redesign layout (SCRUM-185)', () => {
 
   it('shouldNotRenderAdvancedToggleButton', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByTestId('advanced-toggle')).toBeNull()
   })
 
@@ -795,5 +795,49 @@ describe('OrderEntryPage — redesign layout (SCRUM-185)', () => {
     expect(screen.getByText('GTD Date')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Select GTD date')).toBeInTheDocument()
     expect(screen.queryByTestId('advanced-toggle')).toBeNull()
+  })
+})
+
+// ── Order Summary + Submit label states — SCRUM-186 ───────────────────────────
+
+describe('OrderEntryPage — order summary and submit label states (SCRUM-186)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowOrderSummaryPlaceholderWhenFormIncomplete', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Complete the order details to preview your summary.')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowFormattedOrderSummaryWhenFormIsComplete', async () => {
+    await renderAndLoadQuote()
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Number of shares'), { target: { value: '100' } })
+    })
+    await waitFor(() => {
+      const box = document.querySelector('[data-testid="order-summary-box"]')
+      expect(box?.textContent).not.toContain('Complete the order details')
+      expect(box?.textContent).toContain('AAPL')
+      expect(box?.textContent).toContain('100')
+      expect(box?.textContent).toContain('Limit')
+      expect(box?.textContent).toContain('DAY')
+      expect(box?.textContent).toContain('Route')
+    })
+  })
+
+  it('shouldShowCompleteRequiredFieldsLabelOnSubmitButtonWhenIncomplete', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
+  })
+
+  it('shouldShowReviewAndSubmitLabelOnSubmitButtonWhenFormComplete', async () => {
+    await renderAndLoadQuote()
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Number of shares'), { target: { value: '100' } })
+    })
+    await waitFor(() => expect(screen.getByText('Review & Submit Order')).toBeInTheDocument())
+    expect(screen.getByText('Review & Submit Order')).not.toBeDisabled()
   })
 })
