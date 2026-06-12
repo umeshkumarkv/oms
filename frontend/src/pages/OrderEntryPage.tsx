@@ -44,7 +44,7 @@ const s = {
   page:       { fontFamily: "'Inter', system-ui, sans-serif", padding: '24px', minHeight: 'calc(100vh - 52px)', background: 'var(--color-bg)' } as React.CSSProperties,
   header:     { marginBottom: '20px' } as React.CSSProperties,
   title:      { margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' } as React.CSSProperties,
-  grid:       { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' } as React.CSSProperties,
+  grid:       { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' } as React.CSSProperties,
   card:       { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: '24px', border: '1px solid var(--color-border-light)' } as React.CSSProperties,
   cardTitle:  { margin: '0 0 16px', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' } as React.CSSProperties,
   fieldGroup: { marginBottom: '14px' } as React.CSSProperties,
@@ -741,7 +741,7 @@ const OrderEntryPage: React.FC = () => {
           </div>
 
           {/* MARKET QUOTE */}
-          <div style={s.card}>
+          <div style={{ ...s.card, flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Market Quote</span>
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{symbol || '—'}</span>
