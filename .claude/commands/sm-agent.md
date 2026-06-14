@@ -1,13 +1,17 @@
 # Scrum Master Agent — SCRUM-63
 
 Run a daily sprint health check, detect blockers, and produce a standup summary with JIRA comments on flagged tickets.
+At sprint close, run `/sm-agent release-notes` to produce the full release pack for the Go/No-Go meeting.
 
 ## Usage
 ```
-/sm-agent
+/sm-agent                — daily standup health check
+/sm-agent release-notes  — sprint-close: Release Notes → Confluence + Go/No-Go meeting pack
 ```
 
-Run each morning or on demand.
+---
+
+## Daily Mode — /sm-agent
 
 ## Phase 0 — Fetch Sprint State
 
@@ -153,8 +157,131 @@ Print the full standup summary.
 List any JIRA comments posted.
 Highlight the most urgent item needing human action today.
 
-## Hard Stops — always pause and ask the user
+## Hard Stops — daily mode
 
 - JIRA API returns an error fetching sprint data
 - Cannot determine which sprint is active (multiple open sprints)
 - A blocker chain creates a circular dependency (A blocks B blocks A)
+
+---
+
+## Sprint Close Mode — /sm-agent release-notes
+
+Run at sprint close after:
+1. `/qa-agent sprint` — Test Plan + Test Results published to Confluence
+2. `/devops-agent security-report` — Security Report published to Confluence
+
+This command assembles the full release pack for the Go/No-Go meeting and publishes Release Notes to Confluence.
+The Go/No-Go **decision** is made by humans in the meeting — this agent prepares the pack, not the verdict.
+
+### Step 1 — Verify sprint is complete
+```
+searchJiraIssuesUsingJql(
+  "project = SCRUM AND sprint in openSprints() AND status != Done AND status != 'In Review'",
+  fields: ["summary", "status"]
+)
+```
+If any story is In Progress or To Do — STOP. Tell the user which stories are incomplete.
+
+### Step 2 — Collect all sprint stories
+```
+searchJiraIssuesUsingJql(
+  "project = SCRUM AND sprint in openSprints() ORDER BY created ASC",
+  fields: ["summary", "status", "assignee", "labels", "components"]
+)
+```
+
+### Step 3 — Collect release artifact links from Confluence
+Search for pages created this sprint:
+```
+searchConfluenceUsingCql("space = SCRUM AND title ~ 'Sprint Test Plan' AND created >= {sprint-start-date}")
+searchConfluenceUsingCql("space = SCRUM AND title ~ 'Sprint Test Results' AND created >= {sprint-start-date}")
+searchConfluenceUsingCql("space = SCRUM AND title ~ 'Security Report' AND created >= {sprint-start-date}")
+```
+If any page is missing — warn the user but do not stop:
+- Missing Test Plan/Results → note "Not run — run `/qa-agent sprint`"
+- Missing Security Report → note "Not run — run `/devops-agent security-report`"
+
+### Step 4 — Publish Release Notes to Confluence
+```
+createConfluencePage(
+  spaceKey: "SCRUM",
+  parentPageTitle: "Releases",
+  title: "Release Notes — {sprint name} — {date}",
+  body: {see template below}
+)
+```
+
+Release Notes template:
+```
+h2. {Sprint Name} · {start date} → {end date}
+Published: {ISO 8601 date}
+Prepared by: SM Agent · Human sign-off required before deployment
+
+h2. What's New — Stories Delivered
+|| Story || Summary || Service || Status ||
+| SCRUM-{n} | {summary} | {service} | Done |
+
+h2. Defects Fixed
+{Stories tagged as bug-fix, or "None"}
+
+h2. Known Issues / Deferred
+{Stories moved out of sprint or not completed, or "None"}
+
+h2. Release Artifacts
+|| Document || Link || Status ||
+| Sprint Test Plan | {confluence-url} | {Available / Missing} |
+| Sprint Test Results | {confluence-url} | {Available / Missing} |
+| Security Report (Veracode + BlackDuck) | {confluence-url} | {Available / Missing} |
+
+h2. Go/No-Go Checklist — For Human Meeting
+|| # || Gate || Source || Status ||
+| 1 | All sprint ACs validated and passed | Sprint Test Results | [ ] Confirmed |
+| 2 | Regression suite: 0 failures across all services | Sprint Test Results | [ ] Confirmed |
+| 3 | Veracode SAST: no Critical or High findings | Security Report | [ ] Confirmed |
+| 4 | BlackDuck SCA: no Critical CVEs in direct dependencies | Security Report | [ ] Confirmed |
+| 5 | JaCoCo ≥ 80% on all services — CI green on develop | GitHub Actions | [ ] Confirmed |
+| 6 | All sprint PRs merged to develop | GitHub | [ ] Confirmed |
+| 7 | No open P1/P2 defects from QA | JIRA | [ ] Confirmed |
+| 8 | Stakeholder sign-off received | Meeting | [ ] Confirmed |
+
+h2. Decision
+_To be completed in the Go/No-Go meeting._
+GO [ ]  ·  NO-GO [ ]
+Reason: _______________
+Approved by: _______________
+Date: _______________
+```
+
+### Step 5 — Post JIRA comment on the sprint Epic
+```
+SM Agent ({date}): Sprint close release pack ready.
+
+Release Notes:   {confluence-url}
+Test Plan:       {url or "Not run — run /qa-agent sprint"}
+Test Results:    {url or "Not run — run /qa-agent sprint"}
+Security Report: {url or "Not run — run /devops-agent security-report"}
+
+Go/No-Go checklist is in the Release Notes page.
+Human sign-off required before UAT deployment.
+```
+
+### Step 6 — Report to user
+```
+SM Agent — Release Pack Complete
+Sprint : {sprint name}
+Stories: {n} delivered
+
+Release Notes  : {confluence-url}
+Test Plan      : {url or MISSING}
+Test Results   : {url or MISSING}
+Security Report: {url or MISSING}
+
+NEXT STEP: Schedule Go/No-Go meeting.
+           Human team reviews checklist in Release Notes and signs off.
+```
+
+## Hard Stops — release-notes mode
+
+- Stories still In Progress — cannot produce release pack until sprint is complete
+- Confluence page creation fails — report the error; do not post the JIRA comment without a valid page URL

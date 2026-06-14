@@ -1,11 +1,17 @@
 # QA Agent — SCRUM-60
 
-Validate all acceptance criteria for a JIRA story against the running system and post a structured pass/fail report.
+Validate all acceptance criteria for a JIRA story against the running system and post a structured pass/fail report to JIRA.
+At sprint close, run `/qa-agent sprint` to produce the full sprint-level Test Plan and Test Results on Confluence.
 
 ## Usage
 ```
-/qa-agent SCRUM-{n}
+/qa-agent SCRUM-{n}   — per-story AC validation (run after Code Review approves)
+/qa-agent sprint      — sprint-close: consolidated Test Plan + Test Results → Confluence
 ```
+
+---
+
+## Per-Story Mode — /qa-agent SCRUM-{n}
 
 ## Phase 0 — Setup (BMAD Gate — Code Review must pass before QA runs)
 
@@ -123,3 +129,113 @@ Actual: {what was returned}
 - JWT token cannot be obtained (auth-service down)
 - An AC is ambiguous and cannot be mapped to a testable assertion
 - The endpoint returns a 500 error (unexpected server error — not an AC failure)
+
+---
+
+## Sprint Test Mode — /qa-agent sprint
+
+Run at sprint close. Produces one consolidated Test Plan page and one Test Results page on Confluence covering every story in the sprint. This is the document package shared at the Go/No-Go meeting.
+
+### Step 1 — Fetch all sprint stories
+```
+searchJiraIssuesUsingJql(
+  "project = SCRUM AND sprint in openSprints() ORDER BY created ASC",
+  fields: ["summary", "status", "acceptanceCriteria", "assignee"]
+)
+```
+Only process stories in **Done** or **In Review** status. If any story is still In Progress — STOP and tell the user. Sprint testing cannot run until all stories are complete.
+
+### Step 2 — Run all ACs for all stories
+For each story, execute all AC tests exactly as Phase 1 above.
+Record per-story: story key, summary, service, AC count, pass count, fail count.
+
+### Step 3 — Run regression suite across all services
+```bash
+JAVA_HOME=/Users/umeshkumarkotaladinnevaradaraj/Library/Java/JavaVirtualMachines/corretto-21.0.5/Contents/Home \
+  mvn test -pl services/order-service,services/client-service,services/risk-service,\
+services/execution-service,services/marketdata-service,services/auth-service,\
+services/audit-service,services/notification-service -q 2>&1 | tail -30
+```
+Record: total tests run, failures, services with failures.
+
+### Step 4 — Publish Sprint Test Plan to Confluence
+```
+createConfluencePage(
+  spaceKey: "SCRUM",
+  parentPageTitle: "QA",
+  title: "Sprint Test Plan — {sprint name} — {date}",
+  body: {see template below}
+)
+```
+
+Sprint Test Plan template:
+```
+h2. Sprint: {sprint name} · {start date} → {end date}
+Published: {ISO 8601 date}
+Environment: localhost (Docker Compose)
+Executed by: QA Agent
+
+h2. Stories in Scope
+|| Story || Summary || Service || AC Count ||
+| SCRUM-{n} | {summary} | {service} | {n} |
+
+h2. Test Cases — Acceptance Criteria
+For each story:
+h3. SCRUM-{n}: {summary}
+|| # || AC || Test Method || Expected Result ||
+| 1 | {AC text} | curl {METHOD} {path} | HTTP {status} |
+
+h2. Mandatory Edge Cases (all stories)
+Unknown ID → 404 · Missing auth → 401 · Response envelope · Monetary fields as Strings
+
+h2. Regression Scope
+All 9 services · mvn test · Expected: 0 failures
+```
+
+### Step 5 — Publish Sprint Test Results to Confluence
+```
+createConfluencePage(
+  spaceKey: "SCRUM",
+  parentPageTitle: "Sprint Test Plan — {sprint name} — {date}",
+  title: "Sprint Test Results — {sprint name} — {date}",
+  body: {see template below}
+)
+```
+
+Sprint Test Results template:
+```
+h2. Sprint: {sprint name}
+Executed: {ISO 8601 timestamp}
+Overall Verdict: *ALL PASSED* / *{n} FAILURES*
+
+h2. Results by Story
+|| Story || Summary || ACs || Passed || Failed || Verdict ||
+| SCRUM-{n} | {summary} | {n} | {n} | {n} | PASS/FAIL |
+
+h2. Regression Results
+|| Service || Tests Run || Failures || Result ||
+| order-service | {n} | 0 | PASS |
+| client-service | {n} | 0 | PASS |
+...
+
+h2. Overall Regression: {PASSED / FAILED}
+Total: {n} tests · {n} failures
+
+h2. Failure Detail
+{Full curl + response evidence for every failure, or "None — all tests passed"}
+```
+
+### Step 6 — Report to user
+```
+QA Agent — Sprint Test Run Complete
+Sprint      : {sprint name}
+Stories     : {n} tested
+ACs         : {total} checked — {passed} passed · {failed} failed
+Regression  : {PASSED / FAILED} — {n} tests across 9 services
+
+Test Plan   : {confluence-url}
+Test Results: {confluence-url}
+
+Status: {READY FOR GO/NO-GO MEETING | FAILURES — resolve before meeting}
+Next step: Run /devops-agent security-report, then /sm-agent release-notes
+```
