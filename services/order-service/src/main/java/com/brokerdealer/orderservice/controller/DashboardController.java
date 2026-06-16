@@ -1,6 +1,7 @@
 package com.brokerdealer.orderservice.controller;
 
 import com.brokerdealer.orderservice.dto.response.RiskAlertsResponse;
+import com.brokerdealer.orderservice.dto.response.TradingSummaryResponse;
 import com.brokerdealer.orderservice.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,5 +19,10 @@ public class DashboardController {
     @GetMapping("/risk-alerts")
     public ResponseEntity<RiskAlertsResponse> getRiskAlerts() {
         return ResponseEntity.ok(dashboardService.getRiskAlerts());
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<TradingSummaryResponse> getTradingSummary() {
+        return ResponseEntity.ok(dashboardService.getTradingSummary());
     }
 }

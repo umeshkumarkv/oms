@@ -3,6 +3,8 @@ package com.brokerdealer.orderservice.controller;
 import com.brokerdealer.orderservice.dto.response.ResponseMeta;
 import com.brokerdealer.orderservice.dto.response.RiskAlertsData;
 import com.brokerdealer.orderservice.dto.response.RiskAlertsResponse;
+import com.brokerdealer.orderservice.dto.response.TradingSummaryData;
+import com.brokerdealer.orderservice.dto.response.TradingSummaryResponse;
 import com.brokerdealer.orderservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.orderservice.filter.RoleAuthorizationFilter;
 import com.brokerdealer.orderservice.service.DashboardService;
@@ -111,6 +113,76 @@ class DashboardControllerTest {
                         .cashRejectCount(cashRejectCount)
                         .largeOrdersAwaitingReview(largeOrders)
                         .pendingVenueAck(pendingAck)
+                        .build())
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+    }
+
+    // ── GET /api/v1/dashboard/summary ────────────────────────────────────────
+
+    @Test
+    void shouldReturn200WithSummaryEnvelopeForTraderRole() throws Exception {
+        when(dashboardService.getTradingSummary()).thenReturn(buildSummaryResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/summary")
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.turnoverToday").value("1284750.0000"))
+                .andExpect(jsonPath("$.data.ordersToday").value(17))
+                .andExpect(jsonPath("$.data.fillRate").value("76.47"))
+                .andExpect(jsonPath("$.data.buySideNotional").value("892400.0000"))
+                .andExpect(jsonPath("$.data.sellSideNotional").value("392350.0000"));
+    }
+
+    @Test
+    void shouldReturn200WithSummaryEnvelopeForOperationsRole() throws Exception {
+        when(dashboardService.getTradingSummary()).thenReturn(buildSummaryResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/summary")
+                        .header("X-User-Role", "OPERATIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.turnoverToday").value("1284750.0000"));
+    }
+
+    @Test
+    void shouldReturn200WithSummaryEnvelopeForAdminRole() throws Exception {
+        when(dashboardService.getTradingSummary()).thenReturn(buildSummaryResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/summary")
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.ordersToday").value(17));
+    }
+
+    @Test
+    void shouldReturn401WhenRoleHeaderMissingForSummary() throws Exception {
+        mockMvc.perform(get("/api/v1/dashboard/summary"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void shouldReturnSummaryStandardEnvelopeWithMetaFields() throws Exception {
+        when(dashboardService.getTradingSummary()).thenReturn(buildSummaryResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/summary")
+                        .header("X-User-Role", "OPERATIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    private TradingSummaryResponse buildSummaryResponse() {
+        return TradingSummaryResponse.builder()
+                .data(TradingSummaryData.builder()
+                        .turnoverToday("1284750.0000")
+                        .ordersToday(17)
+                        .fillRate("76.47")
+                        .buySideNotional("892400.0000")
+                        .sellSideNotional("392350.0000")
                         .build())
                 .meta(ResponseMeta.builder()
                         .timestamp(Instant.now().toString())
