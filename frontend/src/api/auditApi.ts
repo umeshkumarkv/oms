@@ -17,5 +17,5 @@ export const getAuditTrail = async (params?: {
 
 export const getOrderAudit = async (orderId: string): Promise<AuditRecord[]> => {
   const res = await http.get(`/audit/orders/${orderId}`)
-  return res.data.data
+  return res.data.data.records
 }
