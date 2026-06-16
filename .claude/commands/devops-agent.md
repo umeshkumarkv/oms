@@ -4,9 +4,10 @@ Monitor GitHub Actions pipeline failures, diagnose root cause, and auto-fix wher
 
 ## Usage
 ```
-/devops-agent pr:{n}
-/devops-agent check-pipeline
-/devops-agent branch:{branch-name}
+/devops-agent pr:{n}              — fix a failing CI pipeline run
+/devops-agent check-pipeline      — check current pipeline state
+/devops-agent branch:{branch-name} — check a specific branch
+/devops-agent security-report     — sprint-close: Veracode + BlackDuck scan → Confluence
 ```
 
 ## Phase 0 — Fetch Pipeline State
@@ -168,3 +169,108 @@ Next Step    : {CI will re-run | human must apply fix}
 - The failure is in `.github/workflows/` YAML (CI config changes need human approval)
 - Multiple failure categories present simultaneously (diagnose all, fix none without approval)
 - `mvn test` fails after the auto-fix attempt
+
+---
+
+## Sprint Security Report — /devops-agent security-report
+
+Run at sprint close against the `develop` branch. Produces one Veracode SAST report and one BlackDuck SCA report published to Confluence. Output is shared at the Go/No-Go meeting.
+
+### Step 1 — Build all services
+```bash
+JAVA_HOME=/Users/umeshkumarkotaladinnevaradaraj/Library/Java/JavaVirtualMachines/corretto-21.0.5/Contents/Home \
+  mvn package -DskipTests -q
+```
+If build fails — STOP. Resolve compilation failures first via `/devops-agent check-pipeline`.
+
+### Step 2 — Run Veracode SAST on each service JAR
+```bash
+# Download scanner (first run only)
+curl -sSO https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
+unzip -o pipeline-scan-LATEST.zip pipeline-scan.jar
+
+# Run against each service JAR
+for service in order-service client-service risk-service execution-service marketdata-service auth-service audit-service notification-service api-gateway; do
+  java -jar pipeline-scan.jar \
+    --veracode_api_id "$VERACODE_API_ID" \
+    --veracode_api_key "$VERACODE_API_KEY" \
+    --file "services/${service}/target/${service}-*.jar" \
+    --json_output true \
+    --json_output_file "veracode-${service}.json"
+done
+```
+Collect all findings. Classify as Critical/High (must fix) or Medium/Low (informational).
+
+### Step 3 — Run BlackDuck SCA on the full project
+```bash
+bash <(curl -s -L https://detect.synopsys.com/detect9.sh) \
+  --blackduck.url="$BLACKDUCK_URL" \
+  --blackduck.api.token="$BLACKDUCK_API_TOKEN" \
+  --detect.project.name="broker-dealer" \
+  --detect.project.version.name="sprint-{n}" \
+  --detect.tools=DETECTOR
+```
+Collect all CVEs. Classify Critical/High CVEs in direct dependencies as must-fix.
+
+### Step 4 — Publish Security Report to Confluence
+```
+createConfluencePage(
+  spaceKey: "SCRUM",
+  parentPageTitle: "QA",
+  title: "Security Report — Sprint {n} — {date}",
+  body: {see template below}
+)
+```
+
+Security Report template:
+```
+h2. Sprint {n} Security Scan
+Date: {ISO 8601 date}
+Branch: develop
+Tools: Veracode Pipeline Scanner · Synopsys Detect (BlackDuck)
+
+h2. Veracode SAST — Summary
+Overall: *CLEAN* / *{n} findings require attention*
+
+|| Service || Critical || High || Medium || Low ||
+| order-service | 0 | 0 | {n} | {n} |
+| client-service | 0 | 0 | {n} | {n} |
+...
+
+h3. Critical / High Findings (action required)
+|| Service || CWE || Severity || File || Line || Description || Recommended Fix ||
+| {service} | {CWE-ID} | {severity} | {file} | {line} | {description} | {fix} |
+(or: No Critical or High findings)
+
+h2. BlackDuck SCA — Summary
+Overall: *CLEAN* / *{n} CVEs require attention*
+
+|| Dependency || Version || CVE || CVSS || Severity || Fix Version ||
+| {groupId}:{artifactId} | {ver} | {CVE} | {score} | Critical/High | {fix-ver} |
+(or: No Critical or High CVEs in direct dependencies)
+
+h2. Verdict
+*CLEAN — no Critical or High findings. Ready for Go/No-Go meeting.*
+or
+*ACTION REQUIRED — {n} Critical/High findings must be resolved before release.*
+```
+
+### Step 5 — Report to user
+```
+DevOps Agent — Security Report Complete
+Sprint  : {sprint name}
+Branch  : develop
+
+Veracode SAST : {CLEAN | {n} Critical/High findings}
+BlackDuck SCA : {CLEAN | {n} Critical CVEs in direct dependencies}
+
+Report: {confluence-url}
+
+Status: {READY FOR GO/NO-GO MEETING | ACTION REQUIRED before release}
+Next step: Run /sm-agent release-notes
+```
+
+### Hard Stops — sprint security report
+- `VERACODE_API_ID`, `VERACODE_API_KEY`, `BLACKDUCK_URL`, or `BLACKDUCK_API_TOKEN` not set — tell user to configure credentials; skip scan and note in report as "Not run — credentials not configured"
+- Build fails — cannot scan without JARs; fix compilation errors first
+- Tool exits with non-security error (network, auth failure) — report the tool error, do not treat as a finding

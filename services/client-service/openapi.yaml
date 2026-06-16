@@ -9,6 +9,53 @@ servers:
     description: Local development
 
 paths:
+  /api/v1/clients/active:
+    get:
+      summary: Get top N active clients ranked by today's turnover (OPERATIONS and ADMIN only)
+      operationId: getActiveClients
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+          description: Maximum number of clients to return (default 10, max 50)
+      responses:
+        '200':
+          description: Ranked active clients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveClientsResponse'
+        '400':
+          description: Invalid limit parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: limit must be between 1 and 50
+                  details: []
+        '401':
+          description: Unauthorized — X-User-Role header missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — OPERATIONS or ADMIN role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/clients/{id}:
     get:
       summary: Get client profile by ID
@@ -264,6 +311,35 @@ components:
               format: uuid
             reservedCash:
               type: string
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ActiveClientResponse:
+      type: object
+      properties:
+        clientId:
+          type: string
+          format: uuid
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        clientName:
+          type: string
+          example: "Acme Capital"
+        turnoverToday:
+          type: string
+          description: BigDecimal as string — today's executed fill value
+          example: "125000.00"
+        availableCash:
+          type: string
+          description: BigDecimal as string — cashBalance minus reservedCash
+          example: "48500.00"
+
+    ActiveClientsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveClientResponse'
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 

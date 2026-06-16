@@ -73,6 +73,9 @@ public class Client {
     @Column(name = "default_route", nullable = false, length = 20)
     private DefaultRoute defaultRoute;
 
+    @Column(name = "turnover_today", nullable = false, precision = 18, scale = 2)
+    private BigDecimal turnoverToday;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;

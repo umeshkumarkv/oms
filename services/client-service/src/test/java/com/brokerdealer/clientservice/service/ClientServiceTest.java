@@ -4,6 +4,7 @@ import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.*;
 import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
+import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
@@ -21,12 +22,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.ValueOperations;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -68,6 +75,7 @@ class ClientServiceTest {
                 .reservedCash(BigDecimal.ZERO)
                 .dailyOrderCount(0)
                 .dailyOrderValue(BigDecimal.ZERO)
+                .turnoverToday(BigDecimal.ZERO)
                 .build();
     }
 
@@ -159,6 +167,7 @@ class ClientServiceTest {
                 .reservedCash(reservedCash)
                 .dailyOrderCount(0)
                 .dailyOrderValue(BigDecimal.ZERO)
+                .turnoverToday(BigDecimal.ZERO)
                 .build();
     }
 
@@ -411,5 +420,208 @@ class ClientServiceTest {
                 .isInstanceOf(ClientNotFoundException.class)
                 .extracting("errorCode")
                 .isEqualTo("CLIENT_NOT_FOUND");
+    }
+
+    // --- getActiveClients tests ---
+
+    @Test
+    void shouldReturnRankedActiveClientsWhenLimitIsValid() {
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        Client c1 = buildClientWithBalance(id1, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+        c1.setName("Alice Corp");
+        c1.setTurnoverToday(new BigDecimal("50000.00"));
+        Client c2 = buildClientWithBalance(id2, new BigDecimal("80000.00"), BigDecimal.ZERO);
+        c2.setName("Bob Ltd");
+        c2.setTurnoverToday(new BigDecimal("20000.00"));
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("client:active-ranked:today:10")).thenReturn(null);
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(List.of(c1, c2));
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getClientId()).isEqualTo(id1);
+        assertThat(result.get(0).getClientName()).isEqualTo("Alice Corp");
+        assertThat(result.get(0).getTurnoverToday()).isEqualTo("50000.00");
+        assertThat(result.get(0).getAvailableCash()).isEqualTo("95000.00");
+        assertThat(result.get(1).getClientId()).isEqualTo(id2);
+        assertThat(result.get(1).getTurnoverToday()).isEqualTo("20000.00");
+        assertThat(result.get(1).getAvailableCash()).isEqualTo("80000.00");
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenNoTurnovers() {
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("client:active-ranked:today:10")).thenReturn(null);
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(Collections.emptyList());
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldThrowValidationErrorWhenLimitIsZero() {
+        assertThatThrownBy(() -> clientService.getActiveClients(0))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    void shouldThrowValidationErrorWhenLimitIsNegative() {
+        assertThatThrownBy(() -> clientService.getActiveClients(-1))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    void shouldThrowValidationErrorWhenLimitExceedsFifty() {
+        assertThatThrownBy(() -> clientService.getActiveClients(51))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    void shouldReturnCachedResultWhenCacheHit() {
+        UUID id = UUID.randomUUID();
+        List<Map<String, String>> cached = List.of(Map.of(
+                "clientId", id.toString(),
+                "clientName", "Cached Corp",
+                "turnoverToday", "75000.00",
+                "availableCash", "25000.00"));
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("client:active-ranked:today:5")).thenReturn(cached);
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(5);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getClientId()).isEqualTo(id);
+        assertThat(result.get(0).getClientName()).isEqualTo("Cached Corp");
+        assertThat(result.get(0).getTurnoverToday()).isEqualTo("75000.00");
+        assertThat(result.get(0).getAvailableCash()).isEqualTo("25000.00");
+        verify(clientRepository, never()).findTopByTurnoverTodayDesc(any(Pageable.class));
+    }
+
+    @Test
+    void shouldDegradeGracefullyWhenRedisReadFails() {
+        UUID id = UUID.randomUUID();
+        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        c.setName("Fallback Corp");
+        c.setTurnoverToday(new BigDecimal("10000.00"));
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenThrow(new RuntimeException("Redis connection failed"));
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(List.of(c));
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getClientName()).isEqualTo("Fallback Corp");
+    }
+
+    @Test
+    void shouldDegradeGracefullyWhenRedisWriteFails() {
+        UUID id = UUID.randomUUID();
+        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        c.setName("WriteFailCorp");
+        c.setTurnoverToday(new BigDecimal("5000.00"));
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenReturn(null);
+        doThrow(new RuntimeException("Redis write failed"))
+                .when(valueOps).set(anyString(), any(), anyLong(), any(TimeUnit.class));
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(List.of(c));
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getClientName()).isEqualTo("WriteFailCorp");
+    }
+
+    // --- processExecutionFill turnoverToday tests ---
+
+    @Test
+    void shouldIncrementTurnoverOnBuyFillInProcessExecutionFill() {
+        UUID clientId = UUID.randomUUID();
+        Client client = buildClientWithBalance(clientId, new BigDecimal("100000.00"), new BigDecimal("10000.00"));
+        client.setTurnoverToday(new BigDecimal("20000.00"));
+
+        when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+        when(clientRepository.save(any(Client.class))).thenReturn(client);
+        when(holdingRepository.findByClientIdAndSymbol(eq(clientId), anyString())).thenReturn(Optional.empty());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("clientId", clientId.toString());
+        payload.put("side", "BUY");
+        payload.put("fillType", "FULL_FILL");
+        payload.put("executedQty", 100);
+        payload.put("executedPrice", "150.00");
+        payload.put("fillValue", "15000.00");
+        payload.put("symbol", "AAPL");
+
+        clientService.processExecutionFill(payload);
+
+        assertThat(client.getTurnoverToday()).isEqualByComparingTo(new BigDecimal("35000.00"));
+    }
+
+    @Test
+    void shouldIncrementTurnoverOnSellFillInProcessExecutionFill() {
+        UUID clientId = UUID.randomUUID();
+        Client client = buildClientWithBalance(clientId, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        client.setTurnoverToday(new BigDecimal("10000.00"));
+
+        when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+        when(clientRepository.save(any(Client.class))).thenReturn(client);
+        Holding holding = buildHolding(clientId, "TSLA", 200, "200.0000");
+        when(holdingRepository.findByClientIdAndSymbol(eq(clientId), anyString())).thenReturn(Optional.of(holding));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("clientId", clientId.toString());
+        payload.put("side", "SELL");
+        payload.put("fillType", "FULL_FILL");
+        payload.put("executedQty", 50);
+        payload.put("executedPrice", "210.00");
+        payload.put("fillValue", "10500.00");
+        payload.put("symbol", "TSLA");
+
+        clientService.processExecutionFill(payload);
+
+        assertThat(client.getTurnoverToday()).isEqualByComparingTo(new BigDecimal("20500.00"));
+    }
+
+    @Test
+    void shouldNotIncrementTurnoverOnRejectedFillInProcessExecutionFill() {
+        UUID clientId = UUID.randomUUID();
+        Client client = buildClientWithBalance(clientId, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+        client.setTurnoverToday(new BigDecimal("0.00"));
+
+        when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+        when(clientRepository.save(any(Client.class))).thenReturn(client);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("clientId", clientId.toString());
+        payload.put("side", "BUY");
+        payload.put("fillType", "REJECTED");
+        payload.put("executedQty", 100);
+        payload.put("executedPrice", "150.00");
+        payload.put("fillValue", "15000.00");
+        payload.put("symbol", "AAPL");
+        payload.put("remainingQuantity", 100);
+        payload.put("marketPriceAtFill", "150.00");
+
+        clientService.processExecutionFill(payload);
+
+        assertThat(client.getTurnoverToday()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }
