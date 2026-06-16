@@ -11,7 +11,7 @@ servers:
 paths:
   /api/v1/clients/active:
     get:
-      summary: Get top N active clients ranked by today's turnover (OPERATIONS and ADMIN only)
+      summary: Get top N active clients ranked by today's turnover (TRADER, OPERATIONS and ADMIN)
       operationId: getActiveClients
       security:
         - bearerAuth: []
@@ -50,7 +50,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Forbidden — OPERATIONS or ADMIN role required
+          description: Forbidden — TRADER, OPERATIONS or ADMIN role required
           content:
             application/json:
               schema:
@@ -332,6 +332,10 @@ components:
           type: string
           description: BigDecimal as string — cashBalance minus reservedCash
           example: "48500.00"
+        cashLimitWarning:
+          type: boolean
+          description: true if availableCash < 10% of client dailyOrderLimit; false if dailyOrderLimit is null
+          example: false
 
     ActiveClientsResponse:
       type: object

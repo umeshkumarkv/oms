@@ -447,9 +447,11 @@ class ClientServiceTest {
         assertThat(result.get(0).getClientName()).isEqualTo("Alice Corp");
         assertThat(result.get(0).getTurnoverToday()).isEqualTo("50000.00");
         assertThat(result.get(0).getAvailableCash()).isEqualTo("95000.00");
+        assertThat(result.get(0).getCashLimitWarning()).isFalse();
         assertThat(result.get(1).getClientId()).isEqualTo(id2);
         assertThat(result.get(1).getTurnoverToday()).isEqualTo("20000.00");
         assertThat(result.get(1).getAvailableCash()).isEqualTo("80000.00");
+        assertThat(result.get(1).getCashLimitWarning()).isFalse();
     }
 
     @Test
@@ -495,7 +497,8 @@ class ClientServiceTest {
                 "clientId", id.toString(),
                 "clientName", "Cached Corp",
                 "turnoverToday", "75000.00",
-                "availableCash", "25000.00"));
+                "availableCash", "25000.00",
+                "cashLimitWarning", "false"));
 
         ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
@@ -508,6 +511,7 @@ class ClientServiceTest {
         assertThat(result.get(0).getClientName()).isEqualTo("Cached Corp");
         assertThat(result.get(0).getTurnoverToday()).isEqualTo("75000.00");
         assertThat(result.get(0).getAvailableCash()).isEqualTo("25000.00");
+        assertThat(result.get(0).getCashLimitWarning()).isFalse();
         verify(clientRepository, never()).findTopByTurnoverTodayDesc(any(Pageable.class));
     }
 
@@ -547,6 +551,63 @@ class ClientServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getClientName()).isEqualTo("WriteFailCorp");
+    }
+
+    @Test
+    void shouldComputeCashLimitWarningTrueWhenAvailableCashBelowThreshold() {
+        UUID id = UUID.randomUUID();
+        // dailyOrderLimit = 100000, threshold = 10000; availableCash = 5000 → warning
+        Client c = buildClientWithBalance(id, new BigDecimal("5000.00"), BigDecimal.ZERO);
+        c.setName("Warning Corp");
+        c.setTurnoverToday(new BigDecimal("90000.00"));
+        c.setDailyOrderLimit(new BigDecimal("100000.00"));
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenReturn(null);
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(List.of(c));
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result.get(0).getCashLimitWarning()).isTrue();
+    }
+
+    @Test
+    void shouldComputeCashLimitWarningFalseWhenAvailableCashAboveThreshold() {
+        UUID id = UUID.randomUUID();
+        // dailyOrderLimit = 100000, threshold = 10000; availableCash = 50000 → no warning
+        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        c.setName("Safe Corp");
+        c.setTurnoverToday(new BigDecimal("10000.00"));
+        c.setDailyOrderLimit(new BigDecimal("100000.00"));
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenReturn(null);
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(List.of(c));
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result.get(0).getCashLimitWarning()).isFalse();
+    }
+
+    @Test
+    void shouldComputeCashLimitWarningFalseWhenDailyOrderLimitIsNull() {
+        UUID id = UUID.randomUUID();
+        // dailyOrderLimit is null → warning must always be false
+        Client c = buildClientWithBalance(id, new BigDecimal("100.00"), BigDecimal.ZERO);
+        c.setName("No Limit Corp");
+        c.setTurnoverToday(new BigDecimal("500.00"));
+        // dailyOrderLimit not set — null
+
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenReturn(null);
+        when(clientRepository.findTopByTurnoverTodayDesc(any(Pageable.class))).thenReturn(List.of(c));
+
+        List<ActiveClientResponse> result = clientService.getActiveClients(10);
+
+        assertThat(result.get(0).getCashLimitWarning()).isFalse();
     }
 
     // --- processExecutionFill turnoverToday tests ---

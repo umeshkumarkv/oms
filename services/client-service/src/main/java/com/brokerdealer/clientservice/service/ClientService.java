@@ -69,6 +69,7 @@ public class ClientService {
                                 .clientName(m.get("clientName"))
                                 .turnoverToday(m.get("turnoverToday"))
                                 .availableCash(m.get("availableCash"))
+                                .cashLimitWarning(Boolean.parseBoolean(m.get("cashLimitWarning")))
                                 .build())
                         .toList();
             }
@@ -82,11 +83,20 @@ public class ClientService {
                     BigDecimal availableCash = c.getCashBalance()
                             .subtract(c.getReservedCash())
                             .setScale(2, RoundingMode.HALF_UP);
+                    boolean cashLimitWarning = false;
+                    if (c.getDailyOrderLimit() != null
+                            && c.getDailyOrderLimit().compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal threshold = c.getDailyOrderLimit()
+                                .multiply(new BigDecimal("0.10"))
+                                .setScale(2, RoundingMode.HALF_UP);
+                        cashLimitWarning = availableCash.compareTo(threshold) < 0;
+                    }
                     return ActiveClientResponse.builder()
                             .clientId(c.getId())
                             .clientName(c.getName())
                             .turnoverToday(c.getTurnoverToday().setScale(2, RoundingMode.HALF_UP).toPlainString())
                             .availableCash(availableCash.toPlainString())
+                            .cashLimitWarning(cashLimitWarning)
                             .build();
                 })
                 .toList();
@@ -97,7 +107,8 @@ public class ClientService {
                             "clientId", r.getClientId().toString(),
                             "clientName", r.getClientName(),
                             "turnoverToday", r.getTurnoverToday(),
-                            "availableCash", r.getAvailableCash()))
+                            "availableCash", r.getAvailableCash(),
+                            "cashLimitWarning", String.valueOf(r.getCashLimitWarning())))
                     .toList();
             redisTemplate.opsForValue().set(cacheKey, cacheValue, 30, TimeUnit.SECONDS);
         } catch (Exception e) {

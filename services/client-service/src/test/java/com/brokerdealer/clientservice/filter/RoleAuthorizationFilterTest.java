@@ -3,6 +3,7 @@ package com.brokerdealer.clientservice.filter;
 import com.brokerdealer.clientservice.controller.ClientController;
 import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
+import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
 import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
@@ -80,6 +81,21 @@ class RoleAuthorizationFilterTest {
     }
 
     // ─── TRADER role ──────────────────────────────────────────────────────────
+
+    @Test
+    void shouldAllowTraderToGetActiveClients() throws Exception {
+        when(clientService.getActiveClients(10)).thenReturn(List.of(
+                ActiveClientResponse.builder()
+                        .clientId(UUID.fromString(CLIENT_ID))
+                        .clientName("Test Corp")
+                        .turnoverToday("10000.00")
+                        .availableCash("50000.00")
+                        .cashLimitWarning(false)
+                        .build()));
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isOk());
+    }
 
     @Test
     void shouldAllowTraderToGetClientById() throws Exception {
@@ -180,6 +196,16 @@ class RoleAuthorizationFilterTest {
                         .content("{\"defaultRoute\":\"NYSE\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    // ─── /active endpoint role restrictions ───────────────────────────────────
+
+    @Test
+    void shouldReturn403WhenViewerGetsActiveClients() throws Exception {
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .header("X-User-Role", "VIEWER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
     }
 
     // ─── Error envelope shape ─────────────────────────────────────────────────

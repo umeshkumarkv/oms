@@ -406,6 +406,7 @@ class ClientControllerTest {
                         .clientName("Alice Corp")
                         .turnoverToday("50000.00")
                         .availableCash("95000.00")
+                        .cashLimitWarning(false)
                         .build());
         when(clientService.getActiveClients(10)).thenReturn(response);
 
@@ -417,8 +418,29 @@ class ClientControllerTest {
                 .andExpect(jsonPath("$.data[0].clientName").value("Alice Corp"))
                 .andExpect(jsonPath("$.data[0].turnoverToday").value("50000.00"))
                 .andExpect(jsonPath("$.data[0].availableCash").value("95000.00"))
+                .andExpect(jsonPath("$.data[0].cashLimitWarning").value(false))
                 .andExpect(jsonPath("$.meta.timestamp").exists())
                 .andExpect(jsonPath("$.meta.requestId").exists());
+    }
+
+    @Test
+    void shouldReturn200WithActiveClientsForTraderRole() throws Exception {
+        List<ActiveClientResponse> response = List.of(
+                ActiveClientResponse.builder()
+                        .clientId(CLIENT_001)
+                        .clientName("Alice Corp")
+                        .turnoverToday("50000.00")
+                        .availableCash("95000.00")
+                        .cashLimitWarning(true)
+                        .build());
+        when(clientService.getActiveClients(10)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/clients/active")
+                        .header("X-User-Role", "TRADER")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].cashLimitWarning").value(true))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
     }
 
     @Test
@@ -429,6 +451,7 @@ class ClientControllerTest {
                         .clientName("Alice Corp")
                         .turnoverToday("50000.00")
                         .availableCash("95000.00")
+                        .cashLimitWarning(false)
                         .build()));
 
         mockMvc.perform(get("/api/v1/clients/active")

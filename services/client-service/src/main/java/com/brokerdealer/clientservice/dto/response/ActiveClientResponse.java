@@ -12,4 +12,5 @@ public class ActiveClientResponse {
     String clientName;
     String turnoverToday;
     String availableCash;
+    Boolean cashLimitWarning;
 }

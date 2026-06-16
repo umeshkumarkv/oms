@@ -80,9 +80,9 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
         if (!ALL_ROLES.contains(role)) {
             return false;
         }
-        // /active endpoint — OPERATIONS and ADMIN only
+        // /active endpoint — TRADER, OPERATIONS and ADMIN
         if ("GET".equalsIgnoreCase(method) && path.equals("/api/v1/clients/active")) {
-            return "OPERATIONS".equals(role) || "ADMIN".equals(role);
+            return "TRADER".equals(role) || "OPERATIONS".equals(role) || "ADMIN".equals(role);
         }
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/v1/clients")) {
             // ADMIN cannot access portfolio data per BRD Section 12.2
