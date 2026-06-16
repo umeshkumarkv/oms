@@ -2,11 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, ClipboardList, FilePlus, Radio, TrendingUp } from 'lucide-react'
 import { getOrders } from '../api/orderApi'
+import { getMarketMovers, getMarketIndices } from '../api/marketApi'
 import { OrderSummary } from '../types/order.types'
+import { MarketMovers, IndexEntry } from '../types/market.types'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const REFRESH_MS = 30_000
+const REFRESH_MS         = 30_000
+const MOVERS_REFRESH_MS  = 30_000
+const INDICES_REFRESH_MS = 60_000
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +38,14 @@ const formatDate = (iso: string): string => {
     })
   } catch { return iso }
 }
+
+const formatPct = (pct: string): string => {
+  const n = parseFloat(pct)
+  return (n >= 0 ? '+' : '') + pct + '%'
+}
+
+const pctColor = (pct: string): string =>
+  parseFloat(pct) >= 0 ? 'var(--color-success)' : 'var(--color-error)'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +108,14 @@ const s = {
   actionIcon:  { color: 'var(--color-primary)' } as React.CSSProperties,
   actionLabel: { fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' } as React.CSSProperties,
   rightCol:    { display: 'flex', flexDirection: 'column' as const, gap: '16px' },
+
+  // Market intelligence tiles
+  moverColHead: { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
+  moverRow:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
+  moverSymbol:  { fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' } as React.CSSProperties,
+  indexRow:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
+  indexName:    { fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' } as React.CSSProperties,
+  indexVal:     { fontSize: '12px', color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' as const } as React.CSSProperties,
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -125,7 +145,14 @@ const DashboardPage: React.FC = () => {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
   const [activityEvents] = useState<ActivityEvent[]>([])
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const intervalRef        = useRef<ReturnType<typeof setInterval> | null>(null)
+  const moversIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const indicesIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const [movers,       setMovers]       = useState<MarketMovers | null>(null)
+  const [moversError,  setMoversError]  = useState(false)
+  const [indices,      setIndices]      = useState<IndexEntry[] | null>(null)
+  const [indicesError, setIndicesError] = useState(false)
 
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -151,11 +178,45 @@ const DashboardPage: React.FC = () => {
     }
   }, [])
 
+  const loadMovers = useCallback(async () => {
+    try {
+      const data = await getMarketMovers()
+      setMovers(data)
+      setMoversError(false)
+    } catch {
+      setMoversError(true)
+      setMovers(null)
+    }
+  }, [])
+
+  const loadIndices = useCallback(async () => {
+    try {
+      const data = await getMarketIndices()
+      setIndices(data)
+      setIndicesError(false)
+    } catch {
+      setIndicesError(true)
+      setIndices([])
+    }
+  }, [])
+
   useEffect(() => {
     loadData(true)
     intervalRef.current = setInterval(() => loadData(false), REFRESH_MS)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [loadData])
+
+  useEffect(() => {
+    loadMovers()
+    moversIntervalRef.current = setInterval(loadMovers, MOVERS_REFRESH_MS)
+    return () => { if (moversIntervalRef.current) clearInterval(moversIntervalRef.current) }
+  }, [loadMovers])
+
+  useEffect(() => {
+    loadIndices()
+    indicesIntervalRef.current = setInterval(loadIndices, INDICES_REFRESH_MS)
+    return () => { if (indicesIntervalRef.current) clearInterval(indicesIntervalRef.current) }
+  }, [loadIndices])
 
   // Quick actions config with Lucide icons
   const quickActions = [
@@ -321,6 +382,96 @@ const DashboardPage: React.FC = () => {
           </div>
 
         </div>
+      </div>
+
+      {/* ── Market Intelligence Tiles ── */}
+      <div style={s.grid2}>
+
+        {/* Gainers & Losers */}
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <h2 style={s.sectionTitle}>Gainers &amp; Losers</h2>
+            <span style={s.refreshNote}>30s refresh</span>
+          </div>
+          <div style={s.sectionBody}>
+            {moversError ? (
+              <div style={s.emptyMsg}>--</div>
+            ) : movers === null ? (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton" style={{ height: '16px', width: '100%' }} />
+                <div className="skeleton" style={{ height: '16px', width: '75%' }} />
+                <div className="skeleton" style={{ height: '16px', width: '85%' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'flex' }}>
+                {/* Gainers column */}
+                <div style={{ flex: 1, borderRight: '1px solid var(--color-border-light)' }}>
+                  <div style={s.moverColHead}>Gainers</div>
+                  {movers.gainers.length === 0
+                    ? <div style={s.emptyMsg}>--</div>
+                    : movers.gainers.map((m) => (
+                      <div key={m.symbol} style={s.moverRow}>
+                        <span style={s.moverSymbol}>{m.symbol}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: pctColor(m.percentChange), fontVariantNumeric: 'tabular-nums' }}>
+                          {formatPct(m.percentChange)}
+                        </span>
+                      </div>
+                    ))
+                  }
+                </div>
+                {/* Losers column */}
+                <div style={{ flex: 1 }}>
+                  <div style={s.moverColHead}>Losers</div>
+                  {movers.losers.length === 0
+                    ? <div style={s.emptyMsg}>--</div>
+                    : movers.losers.map((m) => (
+                      <div key={m.symbol} style={s.moverRow}>
+                        <span style={s.moverSymbol}>{m.symbol}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: pctColor(m.percentChange), fontVariantNumeric: 'tabular-nums' }}>
+                          {formatPct(m.percentChange)}
+                        </span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Index Snapshot */}
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <h2 style={s.sectionTitle}>Index Snapshot</h2>
+            <span style={s.refreshNote}>60s refresh</span>
+          </div>
+          <div style={s.sectionBody}>
+            {indicesError ? (
+              <div style={s.emptyMsg}>--</div>
+            ) : indices === null ? (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton" style={{ height: '16px', width: '100%' }} />
+                <div className="skeleton" style={{ height: '16px', width: '80%' }} />
+                <div className="skeleton" style={{ height: '16px', width: '90%' }} />
+              </div>
+            ) : indices.length === 0 ? (
+              <div style={s.emptyMsg}>--</div>
+            ) : (
+              indices.map((idx) => (
+                <div key={idx.name} style={s.indexRow}>
+                  <span style={s.indexName}>{idx.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={s.indexVal}>{idx.currentValue}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: pctColor(idx.percentChange), fontVariantNumeric: 'tabular-nums' }}>
+                      {formatPct(idx.percentChange)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   )

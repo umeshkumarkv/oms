@@ -56,3 +56,19 @@ export interface TickHistoryResponse {
   to: string
   ticks: TickEntry[]
 }
+
+export interface MoverEntry {
+  symbol: string
+  percentChange: string
+}
+
+export interface MarketMovers {
+  gainers: MoverEntry[]
+  losers: MoverEntry[]
+}
+
+export interface IndexEntry {
+  name: string
+  currentValue: string
+  percentChange: string
+}

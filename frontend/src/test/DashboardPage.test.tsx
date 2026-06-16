@@ -12,13 +12,32 @@ vi.mock('../api/orderApi', () => ({
 }))
 
 vi.mock('../api/marketApi', () => ({
-  getMarketHours: vi.fn(),
+  getMarketHours:   vi.fn(),
+  getMarketMovers:  vi.fn(),
+  getMarketIndices: vi.fn(),
 }))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const emptyPage = { orders: [], page: 0, pageSize: 50, totalCount: 0, totalPages: 0 }
 const pageWithCount = (n: number) => ({ ...emptyPage, totalCount: n })
+
+const mockMovers = {
+  gainers: [
+    { symbol: 'NVDA', percentChange: '3.21' },
+    { symbol: 'AAPL', percentChange: '1.85' },
+  ],
+  losers: [
+    { symbol: 'TSLA', percentChange: '-2.10' },
+    { symbol: 'META', percentChange: '-0.95' },
+  ],
+}
+
+const mockIndices = [
+  { name: 'S&P 500',   currentValue: '5321.8400',  percentChange: '0.65'  },
+  { name: 'Nasdaq',    currentValue: '16748.2000', percentChange: '1.02'  },
+  { name: 'Dow Jones', currentValue: '38492.5000', percentChange: '-0.18' },
+]
 
 function renderDashboard() {
   return render(
@@ -33,6 +52,8 @@ function renderDashboard() {
 describe('DashboardPage — createdAfter date scoping', () => {
   beforeEach(() => {
     mockGetOrders.mockResolvedValue(emptyPage)
+    vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
+    vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
   })
 
   it('passes createdAfter=todayUTCMidnight to FILLED call', async () => {
@@ -114,5 +135,82 @@ describe('DashboardPage — createdAfter date scoping', () => {
     renderDashboard()
     await waitFor(() => expect(screen.getByText('Dashboard')).toBeInTheDocument())
     expect(vi.mocked(marketApi.getMarketHours)).not.toHaveBeenCalled()
+  })
+})
+
+describe('DashboardPage — Gainers & Losers tile', () => {
+  beforeEach(() => {
+    mockGetOrders.mockResolvedValue(emptyPage)
+    vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
+    vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
+  })
+
+  it('shouldRenderGainersSectionHeader', async () => {
+    renderDashboard()
+    await waitFor(() => {
+      expect(screen.getByText('Gainers & Losers')).toBeInTheDocument()
+      expect(screen.getByText('Gainers')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldRenderLosersSectionHeader', async () => {
+    renderDashboard()
+    await waitFor(() => expect(screen.getByText('Losers')).toBeInTheDocument())
+  })
+
+  it('shouldDisplayTopGainerSymbolAndPercent', async () => {
+    renderDashboard()
+    await waitFor(() => {
+      expect(screen.getByText('NVDA')).toBeInTheDocument()
+      expect(screen.getByText('+3.21%')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldDisplayTopLoserSymbolAndPercent', async () => {
+    renderDashboard()
+    await waitFor(() => {
+      expect(screen.getByText('TSLA')).toBeInTheDocument()
+      expect(screen.getByText('-2.10%')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldShowDashInGainersLosersWhenMoversFails', async () => {
+    vi.mocked(marketApi.getMarketMovers).mockRejectedValue(new Error('Network error'))
+    renderDashboard()
+    await waitFor(() => {
+      const dashes = screen.getAllByText('--')
+      expect(dashes.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+})
+
+describe('DashboardPage — Index Snapshot tile', () => {
+  beforeEach(() => {
+    mockGetOrders.mockResolvedValue(emptyPage)
+    vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
+    vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
+  })
+
+  it('shouldRenderIndexSnapshotSectionHeader', async () => {
+    renderDashboard()
+    await waitFor(() => expect(screen.getByText('Index Snapshot')).toBeInTheDocument())
+  })
+
+  it('shouldDisplayIndexNameValueAndPercent', async () => {
+    renderDashboard()
+    await waitFor(() => {
+      expect(screen.getByText('S&P 500')).toBeInTheDocument()
+      expect(screen.getByText('5321.8400')).toBeInTheDocument()
+      expect(screen.getByText('+0.65%')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldShowDashInIndexSnapshotWhenIndicesFails', async () => {
+    vi.mocked(marketApi.getMarketIndices).mockRejectedValue(new Error('Network error'))
+    renderDashboard()
+    await waitFor(() => {
+      const dashes = screen.getAllByText('--')
+      expect(dashes.length).toBeGreaterThanOrEqual(1)
+    })
   })
 })

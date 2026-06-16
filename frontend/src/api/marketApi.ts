@@ -1,5 +1,5 @@
 import http from './http'
-import { Holiday, Instrument, MarketConfig, MarketHours, TickHistoryResponse } from '../types/market.types'
+import { Holiday, Instrument, MarketConfig, MarketHours, MarketMovers, IndexEntry, TickHistoryResponse } from '../types/market.types'
 
 export const getMarketHours = async (): Promise<MarketHours> => {
   const res = await http.get('/market/hours')
@@ -28,5 +28,15 @@ export const getMarketConfig = async (): Promise<MarketConfig> => {
 
 export const getTickHistory = async (symbol: string): Promise<TickHistoryResponse> => {
   const res = await http.get(`/market/ticks/history`, { params: { symbol } })
+  return res.data.data
+}
+
+export const getMarketMovers = async (): Promise<MarketMovers> => {
+  const res = await http.get('/market/movers')
+  return res.data.data
+}
+
+export const getMarketIndices = async (): Promise<IndexEntry[]> => {
+  const res = await http.get('/market/indices')
   return res.data.data
 }
