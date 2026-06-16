@@ -165,6 +165,14 @@ class DashboardControllerTest {
     }
 
     @Test
+    void shouldReturn403ForViewerRoleOnSummary() throws Exception {
+        mockMvc.perform(get("/api/v1/dashboard/summary")
+                        .header("X-User-Role", "VIEWER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
     void shouldReturnSummaryStandardEnvelopeWithMetaFields() throws Exception {
         when(dashboardService.getTradingSummary()).thenReturn(buildSummaryResponse());
 
