@@ -53,6 +53,7 @@ class MarketDataControllerTest {
                 .volume(4521000L)
                 .dayHigh("176.10")
                 .dayLow("174.80")
+                .open("169.80")
                 .previousClose("173.75")
                 .marketStatus("OPEN")
                 .tradable(true)
@@ -64,7 +65,7 @@ class MarketDataControllerTest {
 
         when(marketDataService.getInstrument("AAPL")).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/market/AAPL"))
+        mockMvc.perform(get("/api/v1/market/instrument/AAPL"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.symbol").value("AAPL"))
                 .andExpect(jsonPath("$.data.bidPrice").value("174.95"))
@@ -75,6 +76,7 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.data.volume").value(4521000))
                 .andExpect(jsonPath("$.data.dayHigh").value("176.10"))
                 .andExpect(jsonPath("$.data.dayLow").value("174.80"))
+                .andExpect(jsonPath("$.data.open").value("169.80"))
                 .andExpect(jsonPath("$.data.previousClose").value("173.75"))
                 .andExpect(jsonPath("$.data.marketStatus").value("OPEN"))
                 .andExpect(jsonPath("$.data.tradable").value(true))
@@ -105,7 +107,7 @@ class MarketDataControllerTest {
 
         when(marketDataService.getInstrument("aapl")).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/market/aapl"))
+        mockMvc.perform(get("/api/v1/market/instrument/aapl"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.symbol").value("AAPL"));
     }
@@ -129,7 +131,7 @@ class MarketDataControllerTest {
 
         when(marketDataService.getInstrument("HALT")).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/market/HALT"))
+        mockMvc.perform(get("/api/v1/market/instrument/HALT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.symbol").value("HALT"))
                 .andExpect(jsonPath("$.data.tradable").value(true))
@@ -141,7 +143,7 @@ class MarketDataControllerTest {
         when(marketDataService.getInstrument("UNKNOWN"))
                 .thenThrow(new SymbolNotFoundException("SYMBOL_NOT_FOUND", "Symbol not found: UNKNOWN"));
 
-        mockMvc.perform(get("/api/v1/market/UNKNOWN"))
+        mockMvc.perform(get("/api/v1/market/instrument/UNKNOWN"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("SYMBOL_NOT_FOUND"))
                 .andExpect(jsonPath("$.error.message").value("Symbol not found: UNKNOWN"))

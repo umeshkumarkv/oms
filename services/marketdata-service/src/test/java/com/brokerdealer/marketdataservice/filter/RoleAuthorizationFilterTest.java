@@ -52,7 +52,7 @@ class RoleAuthorizationFilterTest {
 
     @Test
     void shouldReturn403WhenAdminGetsInstrument() throws Exception {
-        mockMvc.perform(get("/api/v1/market/AAPL")
+        mockMvc.perform(get("/api/v1/market/instrument/AAPL")
                         .header("X-User-Role", "ADMIN"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
@@ -106,7 +106,7 @@ class RoleAuthorizationFilterTest {
                         .tradable(true).halted(false).minQuantity(1).maxQuantity(10000)
                         .dataTimestamp("2026-04-27T06:00:00Z").build());
 
-        mockMvc.perform(get("/api/v1/market/AAPL")
+        mockMvc.perform(get("/api/v1/market/instrument/AAPL")
                         .header("X-User-Role", "VIEWER"))
                 .andExpect(status().isOk());
     }
@@ -135,7 +135,7 @@ class RoleAuthorizationFilterTest {
                         .tradable(true).halted(false).minQuantity(1).maxQuantity(10000)
                         .dataTimestamp("2026-04-27T06:00:00Z").build());
 
-        mockMvc.perform(get("/api/v1/market/AAPL")
+        mockMvc.perform(get("/api/v1/market/instrument/AAPL")
                         .header("X-User-Role", "OPERATIONS"))
                 .andExpect(status().isOk());
     }

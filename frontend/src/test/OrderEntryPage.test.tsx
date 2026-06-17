@@ -122,16 +122,16 @@ describe('OrderEntryPage — GTD date picker', () => {
 
   it('shouldShowDayOrderValidationLabelWhenDaySelected', async () => {
     renderPage()
-    await waitFor(() =>
-      expect(screen.getByText('DAY order — no expiry needed')).toBeInTheDocument()
-    )
+    // Validation card removed (SCRUM-187) — DAY TIF reflected in submit button state
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
   })
 
   it('shouldShowGtdDateValidationLabelWhenGtdSelected', async () => {
     renderPage()
     const gtdBtn = await screen.findByText('GTD')
     await act(async () => { fireEvent.click(gtdBtn) })
-    expect(screen.getByText('GTD date is a future trading day')).toBeInTheDocument()
+    // Validation card removed (SCRUM-187) — GTD picker still appears when GTD selected
+    expect(screen.getByPlaceholderText('Select GTD date')).toBeInTheDocument()
   })
 })
 
@@ -151,7 +151,7 @@ describe('OrderEntryPage — submit body', () => {
     renderPage()
 
     // Default is DAY — just verify no gtdDate in submit
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     // The submit button is disabled until all checks pass — this test
     // verifies the tif field is 'DAY' and gtdDate is undefined in a DAY order
     expect(vi.mocked(submitOrder)).not.toHaveBeenCalled()
@@ -161,13 +161,13 @@ describe('OrderEntryPage — submit body', () => {
 describe('OrderEntryPage — submit button spinner', () => {
   it('shouldNotShowSpinnerWhenNotSubmitting', async () => {
     const { container } = renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(container.querySelector('.btn-spinner')).toBeNull()
   })
 
   it('shouldShowSubmitOrderTextWhenNotSubmitting', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByText('Placing…')).toBeNull()
   })
 })
@@ -204,7 +204,7 @@ const renderAndWaitForPortfolio = async () => {
 
 // Helper: type a symbol into the symbol input (synchronous state update — holdings derived from this)
 const setSymbol = (value: string) => {
-  fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value } })
+  fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value } })
 }
 
 describe('OrderEntryPage — sell quantity vs holdings validation', () => {
@@ -268,7 +268,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     const qtyInput = screen.getByPlaceholderText('Number of shares')
     await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
 
-    expect(screen.getByText('PLACE ORDER')).toBeDisabled()
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
   })
 
   it('shouldShowSellHoldingsErrorImmediatelyWithoutBlur', async () => {
@@ -289,7 +289,8 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
   it('shouldShowValidationCheckRowHoldingsNaForBuy', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument())
+    // Validation card removed (SCRUM-187) — BUY side never shows a holdings error
+    await waitFor(() => expect(screen.queryByText(/cannot exceed available holding/)).toBeNull())
   })
 
   it('shouldShowSellHoldingsCheckRowWhenSideIsSell', async () => {
@@ -298,12 +299,10 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
     await renderAndWaitForPortfolio()
     setSymbol('AAPL')
-
     await act(async () => { fireEvent.click(screen.getByText('SELL')) })
 
-    await waitFor(() =>
-      expect(screen.getByText(/Sufficient holdings \(holding:/)).toBeInTheDocument()
-    )
+    // Validation card removed (SCRUM-187) — holdings enforcement surfaces via submit button
+    await waitFor(() => expect(screen.getByText('Order Preview')).toBeInTheDocument())
   })
 
   it('shouldShowSellHoldingsFailRowWhenQtyExceedsHolding', async () => {
@@ -312,14 +311,14 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
     await renderAndWaitForPortfolio()
     setSymbol('AAPL')
-
     await act(async () => { fireEvent.click(screen.getByText('SELL')) })
 
     const qtyInput = screen.getByPlaceholderText('Number of shares')
     await act(async () => { fireEvent.change(qtyInput, { target: { value: '200' } }) })
 
+    // Validation card removed (SCRUM-187) — sell failure shown as inline qty error
     await waitFor(() =>
-      expect(screen.getByText(/Sufficient holdings \(holding: 100/)).toBeInTheDocument()
+      expect(screen.getByText('Sell quantity cannot exceed available holding of 100 units')).toBeInTheDocument()
     )
   })
 
@@ -340,10 +339,9 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
 
   it('shouldPassBuyOrderUnaffectedAfterSellValidationAdded', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
-    // BUY is default — no sell validation check should interfere
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
+    // BUY is default — no sell validation error should appear
     expect(screen.queryByText(/cannot exceed available holding/)).toBeNull()
-    expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
   })
 })
 
@@ -384,12 +382,10 @@ describe('OrderEntryPage — SHORT_SELL', () => {
   it('shouldShowHoldingsNaForShortSell', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('SHORT SELL')).toBeInTheDocument())
-
     await act(async () => { fireEvent.click(screen.getByText('SHORT SELL')) })
 
-    await waitFor(() =>
-      expect(screen.getByText('Holdings check — N/A for BUY / SHORT_SELL')).toBeInTheDocument()
-    )
+    // Validation card removed (SCRUM-187) — SHORT_SELL never shows holdings error
+    await waitFor(() => expect(screen.queryByText(/cannot exceed available holding/)).toBeNull())
   })
 
   it('shouldNotDisableSubmitForShortSellQtyAboveHolding', async () => {
@@ -410,33 +406,26 @@ describe('OrderEntryPage — SHORT_SELL', () => {
 })
 
 // ── SOR dropdown ─────────────────────────────────────────────────────────────
-
-// Helper: expand the Advanced collapsible section (Route To and GTD Date live inside it)
-const expandAdvanced = async () => {
-  const toggle = await screen.findByTestId('advanced-toggle')
-  await act(async () => { fireEvent.click(toggle) })
-}
+// Route To is now in the top row of the left panel — no Advanced expansion needed.
 
 describe('OrderEntryPage — SOR dropdown', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
   it('shouldShowRouteTolabel', async () => {
     renderPage()
-    await expandAdvanced()
-    expect(screen.getByText('Route To')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
   })
 
   it('shouldHaveNysePreselectedByDefault', async () => {
     renderPage()
-    await expandAdvanced()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
     const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     expect(dropdown.value).toBe('NYSE')
   })
 
   it('shouldShowAllVenuesInDropdown', async () => {
     renderPage()
-    await expandAdvanced()
-    expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('option', { name: 'NYSE' })).toBeInTheDocument())
     expect(screen.getByRole('option', { name: 'NASDAQ' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'ARCA' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'BATS' })).toBeInTheDocument()
@@ -445,7 +434,7 @@ describe('OrderEntryPage — SOR dropdown', () => {
 
   it('shouldUpdateSelectedVenueWhenDropdownChanges', async () => {
     renderPage()
-    await expandAdvanced()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
     const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     await act(async () => { fireEvent.change(dropdown, { target: { value: 'NASDAQ' } }) })
     expect(dropdown.value).toBe('NASDAQ')
@@ -454,7 +443,7 @@ describe('OrderEntryPage — SOR dropdown', () => {
   it('shouldDisableDropdownWhenWindowIsExpired', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
-    await expandAdvanced()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
     const dropdown = screen.getByRole('combobox', { name: 'Route To' }) as HTMLSelectElement
     expect(dropdown).toBeDisabled()
   })
@@ -477,8 +466,7 @@ describe('OrderEntryPage — SOR dropdown — empty venues fallback', () => {
 
   it('shouldStillRenderRouteToLabelWhenVenuesEmpty', async () => {
     renderPage()
-    await expandAdvanced()
-    expect(screen.getByText('Route To')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Route To')).toBeInTheDocument())
   })
 })
 
@@ -492,7 +480,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldNotShowCountdownWarningWhenSecondsAbove15', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 
@@ -515,7 +503,7 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldShowCountdownWarningExactlyAt15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 15, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.getByText('⚠ Order window will expire in 15 seconds')).toBeInTheDocument()
   })
 
@@ -523,7 +511,7 @@ describe('OrderEntryPage — idle timer', () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText('PLACE ORDER')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Order Window Expired' })).toBeDisabled()
     )
   })
 
@@ -531,7 +519,7 @@ describe('OrderEntryPage — idle timer', () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText('Order Window Expired')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toBeInTheDocument()
     )
   })
 
@@ -547,15 +535,15 @@ describe('OrderEntryPage — idle timer', () => {
     const resetTimer = vi.fn()
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 60, isExpired: false, resetTimer })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
-    await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('e.g. AAPL'), { key: 'a' }) })
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
+    await act(async () => { fireEvent.keyDown(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { key: 'a' }) })
     expect(resetTimer).toHaveBeenCalled()
   })
 
   it('shouldNotShowWarningBannerWhenNotExpiredAndAbove15Seconds', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 16, isExpired: false, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() => expect(screen.getByText('PLACE ORDER')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
     expect(screen.queryByText(/Order window will expire in/)).toBeNull()
   })
 })
@@ -575,7 +563,7 @@ const renderAndLoadQuote = async () => {
   renderPage()
   await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
   await act(async () => {
-    fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+    fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'AAPL' } })
   })
   // Wait for debounce (400ms) and async quote resolution
   await waitFor(() => screen.getByText('$175.00'), { timeout: 1500 })
@@ -635,7 +623,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPL' } })
     })
     await waitFor(
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
@@ -652,13 +640,13 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPL' } })
     })
     await waitFor(
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
       { timeout: 1500 }
     )
-    expect(screen.getByText('PLACE ORDER')).toBeDisabled()
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
   })
 
   it('shouldClearSymbolNotFoundErrorImmediatelyOnInputChange', async () => {
@@ -670,7 +658,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPL' } })
     })
     await waitFor(
       () => expect(screen.getByText('Symbol not found. Please search and select a valid instrument.')).toBeInTheDocument(),
@@ -678,7 +666,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     )
 
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'APPLE' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'APPLE' } })
     })
     expect(screen.queryByText('Symbol not found. Please search and select a valid instrument.')).toBeNull()
   })
@@ -692,7 +680,7 @@ describe('OrderEntryPage — SYMBOL_NOT_FOUND handling', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'AAPL' } })
     })
     await waitFor(() => expect(vi.mocked(getInstrument)).toHaveBeenCalled(), { timeout: 1500 })
     await act(async () => {})
@@ -715,10 +703,11 @@ describe('OrderEntryPage — real-time LTP (SCRUM-127)', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText('e.g. AAPL'), { target: { value: 'AAPL' } })
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'AAPL' } })
     })
     // liveLtp='201.25' overrides REST quote.lastPrice='175.00'
     await waitFor(() => expect(screen.getByText('$201.25')).toBeInTheDocument(), { timeout: 1500 })
+
   })
 
   it('shouldFallBackToRestQuoteLtpWhenHookReturnsNullLtp', async () => {
@@ -726,5 +715,245 @@ describe('OrderEntryPage — real-time LTP (SCRUM-127)', () => {
     await renderAndLoadQuote()
     // liveLtp is null → falls back to quote.lastPrice='175.00'
     expect(screen.getByText('$175.00')).toBeInTheDocument()
+  })
+})
+
+// ── Redesign layout — SCRUM-185 ───────────────────────────────────────────────
+
+describe('OrderEntryPage — redesign layout (SCRUM-185)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldRenderClientAndRouteToInSameContainer', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Client' })).toBeInTheDocument())
+    const clientSelect  = screen.getByRole('combobox', { name: 'Client' })
+    const routeToSelect = screen.getByRole('combobox', { name: 'Route To' })
+    expect(clientSelect.closest('[data-testid="client-route-row"]')).not.toBeNull()
+    expect(routeToSelect.closest('[data-testid="client-route-row"]')).not.toBeNull()
+    expect(clientSelect.closest('[data-testid="client-route-row"]')).toBe(
+      routeToSelect.closest('[data-testid="client-route-row"]')
+    )
+  })
+
+  it('shouldShowRouteToDropdownWithoutExpandingAdvancedSection', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Route To' })).toBeInTheDocument())
+  })
+
+  it('shouldNotRenderAdvancedToggleButton', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
+    expect(screen.queryByTestId('advanced-toggle')).toBeNull()
+  })
+
+  it('shouldRenderSymbolInputWithSearchPlaceholder', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldRenderOrderTypeAndTifInSameGridRow', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('MARKET')).toBeInTheDocument())
+    const marketBtn = screen.getByText('MARKET')
+    const dayBtn    = screen.getByText('DAY')
+    expect(marketBtn.closest('[data-testid="ordertype-tif-row"]')).not.toBeNull()
+    expect(dayBtn.closest('[data-testid="ordertype-tif-row"]')).not.toBeNull()
+    expect(marketBtn.closest('[data-testid="ordertype-tif-row"]')).toBe(
+      dayBtn.closest('[data-testid="ordertype-tif-row"]')
+    )
+  })
+
+  it('shouldRenderQuantityAndLimitPriceInSameGridRowForLimitOrder', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput   = screen.getByPlaceholderText('Number of shares')
+    const limitInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    expect(qtyInput.closest('[data-testid="qty-limit-row"]')).not.toBeNull()
+    expect(limitInput.closest('[data-testid="qty-limit-row"]')).not.toBeNull()
+    expect(qtyInput.closest('[data-testid="qty-limit-row"]')).toBe(
+      limitInput.closest('[data-testid="qty-limit-row"]')
+    )
+  })
+
+  it('shouldHideLimitPriceInputWhenMarketOrderSelected', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('MARKET')).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByText('MARKET')) })
+    expect(screen.queryByRole('spinbutton', { name: 'Limit Price' })).toBeNull()
+  })
+
+  it('shouldShowGtdDatePickerInlineWithoutAdvancedSection', async () => {
+    renderPage()
+    const gtdBtn = await screen.findByText('GTD')
+    await act(async () => { fireEvent.click(gtdBtn) })
+    expect(screen.getByText('GTD Date')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Select GTD date')).toBeInTheDocument()
+    expect(screen.queryByTestId('advanced-toggle')).toBeNull()
+  })
+})
+
+// ── Order Summary + Submit label states — SCRUM-186 ───────────────────────────
+
+describe('OrderEntryPage — order summary and submit label states (SCRUM-186)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowOrderSummaryPlaceholderWhenFormIncomplete', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Complete the order details to preview your summary.')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowFormattedOrderSummaryWhenFormIsComplete', async () => {
+    await renderAndLoadQuote()
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Number of shares'), { target: { value: '100' } })
+    })
+    await waitFor(() => {
+      const box = screen.getByTestId('order-summary-box')
+      expect(box.textContent).not.toContain('Complete the order details')
+      expect(box.textContent).toContain('AAPL')
+      expect(box.textContent).toContain('100')
+      expect(box.textContent).toContain('Limit')
+      expect(box.textContent).toContain('DAY')
+      expect(box.textContent).toContain('Route')
+    })
+  })
+
+  it('shouldShowCompleteRequiredFieldsLabelOnSubmitButtonWhenIncomplete', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Complete required fields')).toBeInTheDocument())
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
+  })
+
+  it('shouldShowReviewAndSubmitLabelOnSubmitButtonWhenFormComplete', async () => {
+    await renderAndLoadQuote()
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Number of shares'), { target: { value: '100' } })
+    })
+    await waitFor(() => expect(screen.getByText('Review & Submit Order')).toBeInTheDocument())
+    expect(screen.getByText('Review & Submit Order')).not.toBeDisabled()
+  })
+})
+
+// ── SCRUM-187: Right panel redesign ──────────────────────────────────────────
+
+describe('OrderEntryPage — right panel redesign (SCRUM-187)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowOrderPreviewCardWithEstimatedValueLabel', async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Order Preview')).toBeInTheDocument()
+      expect(screen.getByText('Estimated Value')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldShowBuyingPowerProgressBarElement', async () => {
+    const { container } = renderPage()
+    await waitFor(() => expect(screen.getByText('Order Preview')).toBeInTheDocument())
+    expect(container.querySelector('.bp-progress-bar')).not.toBeNull()
+  })
+
+  it('shouldShowMarketQuoteCardHeading', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText(/market quote/i)).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowMarketQuotePlaceholderWhenNoSymbol', async () => {
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByText('Enter a symbol to see the current quote.')).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowLtpInMarketQuoteAfterSymbolEntered', async () => {
+    await renderAndLoadQuote()
+    expect(screen.getByText(/market quote/i)).toBeInTheDocument()
+    expect(screen.getByText('$175.00')).toBeInTheDocument()
+  })
+})
+
+// ── Fractional quantity validation — SCRUM-187 ────────────────────────────────
+
+describe('OrderEntryPage — fractional quantity validation', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowFractionalErrorMessageWhenDecimalQuantityEntered', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '1.5' } }) })
+    expect(screen.getByText('Quantity must be a whole number — fractional shares are not supported')).toBeInTheDocument()
+  })
+
+  it('shouldKeepSubmitButtonDisabledWhenFractionalQuantityEntered', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '2.25' } }) })
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
+  })
+
+  it('shouldClearFractionalErrorWhenWholeNumberEntered', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '1.5' } }) })
+    expect(screen.getByText('Quantity must be a whole number — fractional shares are not supported')).toBeInTheDocument()
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '10' } }) })
+    expect(screen.queryByText('Quantity must be a whole number — fractional shares are not supported')).toBeNull()
+  })
+})
+
+// ── Limit price decimal validation ────────────────────────────────────────────
+
+describe('OrderEntryPage — limit price decimal validation', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowErrorWhenLimitPriceHasMoreThanTwoDigitsAfterDecimal', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.123' } }) })
+    expect(screen.getByText('Limit price cannot have more than 2 digits after the decimal')).toBeInTheDocument()
+  })
+
+  it('shouldDisableSubmitButtonWhenLimitPriceExceedsTwoDigitsAfterDecimal', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '99.999' } }) })
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
+  })
+
+  it('shouldNotShowErrorForExactlyTwoDigitsAfterDecimal', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.25' } }) })
+    expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
+  })
+
+  it('shouldNotShowErrorForWholeNumberLimitPrice', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '150' } }) })
+    expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
+  })
+
+  it('shouldClearDecimalErrorWhenPriceCorrectedToTwoDigits', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.123' } }) })
+    expect(screen.getByText('Limit price cannot have more than 2 digits after the decimal')).toBeInTheDocument()
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.12' } }) })
+    expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
   })
 })
