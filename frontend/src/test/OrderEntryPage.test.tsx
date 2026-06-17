@@ -909,3 +909,51 @@ describe('OrderEntryPage — fractional quantity validation', () => {
     expect(screen.queryByText('Quantity must be a whole number — fractional shares are not supported')).toBeNull()
   })
 })
+
+// ── Limit price decimal validation ────────────────────────────────────────────
+
+describe('OrderEntryPage — limit price decimal validation', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowErrorWhenLimitPriceHasMoreThanTwoDigitsAfterDecimal', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.123' } }) })
+    expect(screen.getByText('Limit price cannot have more than 2 digits after the decimal')).toBeInTheDocument()
+  })
+
+  it('shouldDisableSubmitButtonWhenLimitPriceExceedsTwoDigitsAfterDecimal', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '99.999' } }) })
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
+  })
+
+  it('shouldNotShowErrorForExactlyTwoDigitsAfterDecimal', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.25' } }) })
+    expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
+  })
+
+  it('shouldNotShowErrorForWholeNumberLimitPrice', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '150' } }) })
+    expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
+  })
+
+  it('shouldClearDecimalErrorWhenPriceCorrectedToTwoDigits', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Limit Price' })).toBeInTheDocument())
+    const priceInput = screen.getByRole('spinbutton', { name: 'Limit Price' })
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.123' } }) })
+    expect(screen.getByText('Limit price cannot have more than 2 digits after the decimal')).toBeInTheDocument()
+    await act(async () => { fireEvent.change(priceInput, { target: { value: '10.12' } }) })
+    expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
+  })
+})

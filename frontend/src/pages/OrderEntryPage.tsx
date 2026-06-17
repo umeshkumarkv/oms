@@ -12,6 +12,7 @@ import { Holiday, Instrument } from '../types/market.types'
 import { Client, Portfolio } from '../types/client.types'
 import { OrderSide, OrderType, TimeInForce } from '../types/order.types'
 import { DEFAULT_VENUE, SOR_VENUES } from '../config/sorVenues'
+import { formatPriceToTwoDecimal } from '../utils/priceUtils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: string | number): string => {
@@ -253,7 +254,7 @@ const OrderEntryPage: React.FC = () => {
         const q = await getInstrument(symbol)
         setQuote(q)
         if (q && !limitPrice) {
-          setLimitPrice(side === 'BUY' ? q.askPrice : q.bidPrice)
+          setLimitPrice(formatPriceToTwoDecimal(side === 'BUY' ? q.askPrice : q.bidPrice))
         }
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { error?: { code?: string } } } }
@@ -268,7 +269,7 @@ const OrderEntryPage: React.FC = () => {
   }, [symbol]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (quote) setLimitPrice(side === 'BUY' ? quote.askPrice : quote.bidPrice)
+    if (quote) setLimitPrice(formatPriceToTwoDecimal(side === 'BUY' ? quote.askPrice : quote.bidPrice))
   }, [side, quote])
 
   const suggestions = symbolInput.length >= 1
@@ -290,6 +291,11 @@ const OrderEntryPage: React.FC = () => {
       ? 'Quantity must be a whole number — fractional shares are not supported'
       : null
 
+  const limitPriceDecimalError: string | null =
+    orderType === 'LIMIT' && limitPrice.includes('.') && limitPrice.split('.')[1].length > 2
+      ? 'Limit price cannot have more than 2 digits after the decimal'
+      : null
+
   const sellHoldingsError: string | null =
     side === 'SELL' && portfolio !== null && !isNaN(qty) && qty > 0 && qty > heldQty
       ? `Sell quantity cannot exceed available holding of ${heldQty} units`
@@ -307,7 +313,7 @@ const OrderEntryPage: React.FC = () => {
   const checks = {
     symbol:       symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
     quantity:     !isNaN(qty) && qty > 0 && fractionalQuantityError === null,
-    limitPrice:   orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0),
+    limitPrice:   orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0 && limitPriceDecimalError === null),
     gtdDate:      tif === 'DAY' || (gtdDate !== null && gtdDateStr >= tomorrowStr() && !isWeekendOrHoliday(gtdDateStr)),
     notHalted:    !quote || !quote.halted,
     sellHoldings: side !== 'SELL' || portfolio === null || isNaN(qty) || heldQty >= qty,
@@ -613,14 +619,16 @@ const OrderEntryPage: React.FC = () => {
                 <label style={s.label}>Limit Price ($)</label>
                 <input
                   aria-label="Limit Price"
-                  style={fieldErrors.limitPrice ? s.inputError : s.input}
+                  style={fieldErrors.limitPrice || limitPriceDecimalError ? s.inputError : s.input}
                   type="number" min="0.01" step="0.01"
                   placeholder="0.00"
                   value={limitPrice}
                   onChange={(e) => setLimitPrice(e.target.value)}
                   disabled={isExpired}
                 />
-                {fieldErrors.limitPrice && <div style={s.errorText}>{fieldErrors.limitPrice}</div>}
+                {(fieldErrors.limitPrice || limitPriceDecimalError) && (
+                  <div style={s.errorText}>{fieldErrors.limitPrice ?? limitPriceDecimalError}</div>
+                )}
               </div>
             )}
           </div>
