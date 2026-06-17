@@ -285,6 +285,11 @@ const OrderEntryPage: React.FC = () => {
   const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
   const heldQty    = holding ? holding.quantity : 0
 
+  const fractionalQuantityError: string | null =
+    quantity !== '' && !isNaN(parseFloat(quantity)) && parseFloat(quantity) % 1 !== 0
+      ? 'Quantity must be a whole number — fractional shares are not supported'
+      : null
+
   const sellHoldingsError: string | null =
     side === 'SELL' && portfolio !== null && !isNaN(qty) && qty > 0 && qty > heldQty
       ? `Sell quantity cannot exceed available holding of ${heldQty} units`
@@ -301,7 +306,7 @@ const OrderEntryPage: React.FC = () => {
 
   const checks = {
     symbol:       symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
-    quantity:     !isNaN(qty) && qty > 0,
+    quantity:     !isNaN(qty) && qty > 0 && fractionalQuantityError === null,
     limitPrice:   orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0),
     gtdDate:      tif === 'DAY' || (gtdDate !== null && gtdDateStr >= tomorrowStr() && !isWeekendOrHoliday(gtdDateStr)),
     notHalted:    !quote || !quote.halted,
@@ -592,15 +597,15 @@ const OrderEntryPage: React.FC = () => {
             <div>
               <label style={s.label}>Quantity (Shares)</label>
               <input
-                style={fieldErrors.quantity || sellHoldingsError ? s.inputError : s.input}
+                style={fieldErrors.quantity || sellHoldingsError || fractionalQuantityError ? s.inputError : s.input}
                 type="number" min="1" step="1"
                 placeholder="Number of shares"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 disabled={isExpired}
               />
-              {(fieldErrors.quantity || sellHoldingsError) && (
-                <div style={s.errorText}>{fieldErrors.quantity ?? sellHoldingsError}</div>
+              {(fieldErrors.quantity || fractionalQuantityError || sellHoldingsError) && (
+                <div style={s.errorText}>{fieldErrors.quantity ?? fractionalQuantityError ?? sellHoldingsError}</div>
               )}
             </div>
             {orderType === 'LIMIT' && (
