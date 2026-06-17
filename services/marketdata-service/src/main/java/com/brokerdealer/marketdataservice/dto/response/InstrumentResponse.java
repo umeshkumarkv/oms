@@ -17,6 +17,7 @@ public class InstrumentResponse {
     Long volume;
     String dayHigh;
     String dayLow;
+    String open;
     String previousClose;
     String marketStatus;
     Boolean tradable;

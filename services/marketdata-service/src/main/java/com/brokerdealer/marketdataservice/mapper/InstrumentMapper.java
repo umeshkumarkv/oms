@@ -19,6 +19,8 @@ public interface InstrumentMapper {
             expression = "java(instrument.getDayHigh() != null ? instrument.getDayHigh().toPlainString() : null)")
     @Mapping(target = "dayLow",
             expression = "java(instrument.getDayLow() != null ? instrument.getDayLow().toPlainString() : null)")
+    @Mapping(target = "open",
+            expression = "java(instrument.getOpenPrice() != null ? instrument.getOpenPrice().toPlainString() : null)")
     @Mapping(target = "previousClose",
             expression = "java(instrument.getPreviousClose() != null ? instrument.getPreviousClose().toPlainString() : null)")
     @Mapping(target = "dataTimestamp",
