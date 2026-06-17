@@ -877,3 +877,35 @@ describe('OrderEntryPage — right panel redesign (SCRUM-187)', () => {
     expect(screen.getByText('$175.00')).toBeInTheDocument()
   })
 })
+
+// ── Fractional quantity validation — SCRUM-187 ────────────────────────────────
+
+describe('OrderEntryPage — fractional quantity validation', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowFractionalErrorMessageWhenDecimalQuantityEntered', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '1.5' } }) })
+    expect(screen.getByText('Quantity must be a whole number — fractional shares are not supported')).toBeInTheDocument()
+  })
+
+  it('shouldKeepSubmitButtonDisabledWhenFractionalQuantityEntered', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '2.25' } }) })
+    expect(screen.getByText('Complete required fields')).toBeDisabled()
+  })
+
+  it('shouldClearFractionalErrorWhenWholeNumberEntered', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Number of shares')).toBeInTheDocument())
+    const qtyInput = screen.getByPlaceholderText('Number of shares')
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '1.5' } }) })
+    expect(screen.getByText('Quantity must be a whole number — fractional shares are not supported')).toBeInTheDocument()
+    await act(async () => { fireEvent.change(qtyInput, { target: { value: '10' } }) })
+    expect(screen.queryByText('Quantity must be a whole number — fractional shares are not supported')).toBeNull()
+  })
+})
