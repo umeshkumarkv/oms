@@ -97,4 +97,37 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
            "WHERE o.status = :status AND o.updatedAt < :cutoff")
     long countByStatusAndUpdatedAtBefore(@Param("status") OrderStatus status,
                                          @Param("cutoff") Instant cutoff);
+
+    // Dashboard summary — total order count within ET date range (no status filter)
+    @Query("SELECT COUNT(o) FROM Order o " +
+           "WHERE o.createdAt >= :startOfDay AND o.createdAt < :endOfDay")
+    long countAllOrdersForDateRange(@Param("startOfDay") Instant startOfDay,
+                                    @Param("endOfDay") Instant endOfDay);
+
+    // Dashboard summary — sum of pre-computed orderValue for given statuses within ET date range
+    // Used for turnoverToday (FILLED + PARTIALLY_FILLED) and filledCount derivation
+    @Query("SELECT COALESCE(SUM(o.orderValue), 0) FROM Order o " +
+           "WHERE o.status IN :statuses " +
+           "AND o.createdAt >= :startOfDay AND o.createdAt < :endOfDay")
+    BigDecimal sumOrderValueByStatusesForDateRange(@Param("statuses") List<OrderStatus> statuses,
+                                                   @Param("startOfDay") Instant startOfDay,
+                                                   @Param("endOfDay") Instant endOfDay);
+
+    // Dashboard summary — count of orders for given statuses within ET date range
+    // Used for filledCount numerator in fillRate calculation
+    @Query("SELECT COUNT(o) FROM Order o " +
+           "WHERE o.status IN :statuses " +
+           "AND o.createdAt >= :startOfDay AND o.createdAt < :endOfDay")
+    long countOrdersByStatusesForDateRange(@Param("statuses") List<OrderStatus> statuses,
+                                           @Param("startOfDay") Instant startOfDay,
+                                           @Param("endOfDay") Instant endOfDay);
+
+    // Dashboard summary — sum of pre-computed orderValue for given sides within ET date range
+    // Used for buySideNotional (BUY) and sellSideNotional (SELL + SHORT_SELL)
+    @Query("SELECT COALESCE(SUM(o.orderValue), 0) FROM Order o " +
+           "WHERE o.side IN :sides " +
+           "AND o.createdAt >= :startOfDay AND o.createdAt < :endOfDay")
+    BigDecimal sumOrderValueBySidesForDateRange(@Param("sides") List<OrderSide> sides,
+                                                @Param("startOfDay") Instant startOfDay,
+                                                @Param("endOfDay") Instant endOfDay);
 }

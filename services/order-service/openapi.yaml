@@ -192,6 +192,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/dashboard/summary:
+    get:
+      summary: Get today's trading summary aggregation (ET)
+      operationId: getTradingSummary
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Today's trading summary — turnover, fill rate, buy/sell split
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradingSummaryResponse'
+              example:
+                data:
+                  turnoverToday: "1284750.0000"
+                  ordersToday: 17
+                  fillRate: "76.47"
+                  buySideNotional: "892400.0000"
+                  sellSideNotional: "392350.0000"
+                meta:
+                  timestamp: "2026-06-16T14:30:00Z"
+                  requestId: "550e8400-e29b-41d4-a716-446655440000"
+        '401':
+          description: Unauthorized — missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — role not permitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/dashboard/risk-alerts:
     get:
       summary: Get risk alert counts for today (ET)
@@ -424,6 +460,35 @@ components:
               type: integer
               description: Orders in SENT_TO_EXECUTION state with no update for more than 30 seconds
               example: 1
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    TradingSummaryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            turnoverToday:
+              type: string
+              description: Sum of orderValue for FILLED and PARTIALLY_FILLED orders today (BigDecimal string)
+              example: "1284750.0000"
+            ordersToday:
+              type: integer
+              description: Total number of orders submitted today (ET)
+              example: 17
+            fillRate:
+              type: string
+              description: Percentage of orders filled or partially filled today, rounded to 2dp (BigDecimal string)
+              example: "76.47"
+            buySideNotional:
+              type: string
+              description: Sum of orderValue for BUY orders today (BigDecimal string)
+              example: "892400.0000"
+            sellSideNotional:
+              type: string
+              description: Sum of orderValue for SELL and SHORT_SELL orders today (BigDecimal string)
+              example: "392350.0000"
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 
