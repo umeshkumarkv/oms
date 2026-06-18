@@ -61,6 +61,17 @@ app:
       url: ${MARKETDATA_SERVICE_URL:http://marketdata-service:8084}
     execution-service:
       url: ${EXECUTION_SERVICE_URL:http://execution-service:8086}
+  health:
+    timeout-ms: 500
+    services:
+      auth-service: ${AUTH_SERVICE_URL:http://auth-service:8081}
+      order-service: ${ORDER_SERVICE_URL:http://localhost:8082}
+      client-service: ${CLIENT_SERVICE_URL:http://client-service:8083}
+      marketdata-service: ${MARKETDATA_SERVICE_URL:http://marketdata-service:8084}
+      risk-service: ${RISK_SERVICE_URL:http://risk-service:8085}
+      execution-service: ${EXECUTION_SERVICE_URL:http://execution-service:8086}
+      audit-service: ${AUDIT_SERVICE_URL:http://audit-service:8087}
+      notification-service: ${NOTIFICATION_SERVICE_URL:http://notification-service:8088}
 
 resilience4j:
   circuitbreaker:

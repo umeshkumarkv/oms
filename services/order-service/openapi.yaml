@@ -228,6 +228,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/dashboard/health:
+    get:
+      summary: Get aggregated health status for all internal microservices
+      operationId: getSystemHealth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Health status for all 8 internal services — always 200 regardless of individual service states
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                data:
+                  - service: "auth-service"
+                    status: "UP"
+                  - service: "order-service"
+                    status: "UP"
+                  - service: "client-service"
+                    status: "DEGRADED"
+                  - service: "marketdata-service"
+                    status: "UP"
+                  - service: "risk-service"
+                    status: "DOWN"
+                  - service: "execution-service"
+                    status: "UP"
+                  - service: "audit-service"
+                    status: "UP"
+                  - service: "notification-service"
+                    status: "UP"
+                meta:
+                  timestamp: "2026-06-18T05:00:00Z"
+                  requestId: "550e8400-e29b-41d4-a716-446655440000"
+        '401':
+          description: Unauthorized — missing X-User-Role header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — VIEWER role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/dashboard/risk-alerts:
     get:
       summary: Get risk alert counts for today (ET)
@@ -489,6 +536,30 @@ components:
               type: string
               description: Sum of orderValue for SELL and SHORT_SELL orders today (BigDecimal string)
               example: "392350.0000"
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ServiceHealthEntry:
+      type: object
+      properties:
+        service:
+          type: string
+          description: Internal service name
+          example: "auth-service"
+        status:
+          type: string
+          enum: [UP, DEGRADED, DOWN]
+          description: "UP=2xx Actuator response; DEGRADED=timeout >500ms; DOWN=connection refused or non-2xx"
+          example: "UP"
+
+    HealthResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceHealthEntry'
+          description: Health status for all 8 internal services — array always has exactly 8 entries
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 
