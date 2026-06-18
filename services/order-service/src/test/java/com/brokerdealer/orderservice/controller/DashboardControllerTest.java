@@ -1,13 +1,17 @@
 package com.brokerdealer.orderservice.controller;
 
+import com.brokerdealer.orderservice.domain.ServiceHealthStatus;
+import com.brokerdealer.orderservice.dto.response.HealthResponse;
 import com.brokerdealer.orderservice.dto.response.ResponseMeta;
 import com.brokerdealer.orderservice.dto.response.RiskAlertsData;
 import com.brokerdealer.orderservice.dto.response.RiskAlertsResponse;
+import com.brokerdealer.orderservice.dto.response.ServiceHealthEntry;
 import com.brokerdealer.orderservice.dto.response.TradingSummaryData;
 import com.brokerdealer.orderservice.dto.response.TradingSummaryResponse;
 import com.brokerdealer.orderservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.orderservice.filter.RoleAuthorizationFilter;
 import com.brokerdealer.orderservice.service.DashboardService;
+import com.brokerdealer.orderservice.service.HealthAggregatorService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -16,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.when;
@@ -32,6 +37,9 @@ class DashboardControllerTest {
 
     @MockBean
     private DashboardService dashboardService;
+
+    @MockBean
+    private HealthAggregatorService healthAggregatorService;
 
     @Test
     void shouldReturn200WithRiskAlertsForTraderRole() throws Exception {
@@ -192,6 +200,118 @@ class DashboardControllerTest {
                         .buySideNotional("892400.0000")
                         .sellSideNotional("392350.0000")
                         .build())
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+    }
+
+    // ── GET /api/v1/dashboard/health ─────────────────────────────────────────
+
+    @Test
+    void shouldReturn200WithHealthDataForTraderRole() throws Exception {
+        when(healthAggregatorService.getSystemHealth()).thenReturn(buildAllUpHealthResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/health")
+                        .header("X-User-Role", "TRADER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(8))
+                .andExpect(jsonPath("$.data[0].service").value("auth-service"))
+                .andExpect(jsonPath("$.data[0].status").value("UP"));
+    }
+
+    @Test
+    void shouldReturn200WithHealthDataForOperationsRole() throws Exception {
+        when(healthAggregatorService.getSystemHealth()).thenReturn(buildAllUpHealthResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/health")
+                        .header("X-User-Role", "OPERATIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(8));
+    }
+
+    @Test
+    void shouldReturn200WithHealthDataForAdminRole() throws Exception {
+        when(healthAggregatorService.getSystemHealth()).thenReturn(buildAllUpHealthResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/health")
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(8));
+    }
+
+    @Test
+    void shouldReturn401WhenNoRoleHeaderOnHealthEndpoint() throws Exception {
+        mockMvc.perform(get("/api/v1/dashboard/health"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void shouldReturn403ForViewerRoleOnHealthEndpoint() throws Exception {
+        mockMvc.perform(get("/api/v1/dashboard/health")
+                        .header("X-User-Role", "VIEWER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void shouldReturnStandardEnvelopeWithMetaFieldsForHealthEndpoint() throws Exception {
+        when(healthAggregatorService.getSystemHealth()).thenReturn(buildAllUpHealthResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/health")
+                        .header("X-User-Role", "OPERATIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturn200EvenWhenAllServicesAreDown() throws Exception {
+        when(healthAggregatorService.getSystemHealth()).thenReturn(buildAllDownHealthResponse());
+
+        mockMvc.perform(get("/api/v1/dashboard/health")
+                        .header("X-User-Role", "OPERATIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(8))
+                .andExpect(jsonPath("$.data[0].status").value("DOWN"));
+    }
+
+    private HealthResponse buildAllUpHealthResponse() {
+        List<ServiceHealthEntry> entries = List.of(
+                ServiceHealthEntry.builder().service("auth-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("order-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("client-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("marketdata-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("risk-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("execution-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("audit-service").status(ServiceHealthStatus.UP).build(),
+                ServiceHealthEntry.builder().service("notification-service").status(ServiceHealthStatus.UP).build()
+        );
+        return HealthResponse.builder()
+                .data(entries)
+                .meta(ResponseMeta.builder()
+                        .timestamp(Instant.now().toString())
+                        .requestId(UUID.randomUUID().toString())
+                        .build())
+                .build();
+    }
+
+    private HealthResponse buildAllDownHealthResponse() {
+        List<ServiceHealthEntry> entries = List.of(
+                ServiceHealthEntry.builder().service("auth-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("order-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("client-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("marketdata-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("risk-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("execution-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("audit-service").status(ServiceHealthStatus.DOWN).build(),
+                ServiceHealthEntry.builder().service("notification-service").status(ServiceHealthStatus.DOWN).build()
+        );
+        return HealthResponse.builder()
+                .data(entries)
                 .meta(ResponseMeta.builder()
                         .timestamp(Instant.now().toString())
                         .requestId(UUID.randomUUID().toString())
