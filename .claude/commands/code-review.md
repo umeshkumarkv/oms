@@ -8,6 +8,28 @@ Audit a PR diff against CLAUDE.md coding standards and post a structured GitHub 
 /code-review pr:{n}
 ```
 
+## GitHub Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- `gh pr review --approve` — approving a pull request
+- `gh pr review --request-changes` — requesting changes on a pull request
+- `gh pr review --comment` — posting a review comment block (individual line comments are fine without approval)
+
+Approval format:
+```
+GITHUB ACTION — AWAITING YOUR APPROVAL
+  PR      : #{pr-number} — {pr-title}
+  Action  : {approve | request-changes | post review comment}
+  Verdict : {APPROVED — all 12 categories pass | REQUEST CHANGES — {n} violation(s)}
+  Summary : {one-line summary of findings}
+
+Proceed? (yes / no)
+```
+Do NOT execute the gh pr review command until the user types "yes".
+If the user types "no", show the full findings report but do not post to GitHub.
+
+---
+
 ## Phase 0 — Setup
 
 1. Read `CLAUDE.md` fully — all 19 sections. Do not skip any.
@@ -131,7 +153,7 @@ Fix: {what should be done instead}
 Reference: CLAUDE.md Section {n}"
 ```
 
-After all line comments, post the overall review:
+After all line comments, apply the **GitHub Write Guard**, then post the overall review:
 
 ```bash
 gh pr review {pr-number} \

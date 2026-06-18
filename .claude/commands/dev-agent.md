@@ -27,6 +27,26 @@ If the user types "no", skip the action and note it in the final report.
 
 ---
 
+## GitHub Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- `git push` to any remote branch
+- `gh pr create` to raise a pull request
+
+Approval format:
+```
+GITHUB ACTION — AWAITING YOUR APPROVAL
+  Action  : {push branch "ai/SCRUM-{n}-{slug}" to origin | create PR "{title}" → develop}
+  Branch  : ai/SCRUM-{n}-{slug}
+  Reason  : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the git push or gh pr create until the user types "yes".
+If the user types "no", stop at that step and tell the user what remains.
+
+---
+
 ## Phase 0 — Pre-flight (BMAD Gates — all must pass before any code)
 
 1. Fetch the JIRA story using `getJiraIssue(SCRUM-{n})`
@@ -123,10 +143,16 @@ feat({service}): {short description} — SCRUM-{n}
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF
 )"
+```
+
+Apply the **GitHub Write Guard**, then:
+```bash
 git push -u origin ai/SCRUM-{n}-{slug}
 ```
 
 ## Phase 5 — Pull Request
+
+Apply the **GitHub Write Guard**, then:
 
 ```bash
 gh pr create \

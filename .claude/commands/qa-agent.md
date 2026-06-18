@@ -11,6 +11,26 @@ At sprint close, run `/qa-agent sprint` to produce the full sprint-level Test Pl
 
 ---
 
+## JIRA Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- Adding or removing a label on any ticket
+- Transitioning a ticket status
+
+Approval format:
+```
+JIRA ACTION — AWAITING YOUR APPROVAL
+  Ticket : SCRUM-{n}
+  Action : {transition to "In Progress" | etc.}
+  Reason : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the JIRA write operation until the user types "yes".
+If the user types "no", skip the action and note it in the final report.
+
+---
+
 ## Per-Story Mode — /qa-agent SCRUM-{n}
 
 ## Phase 0 — Setup (BMAD Gate — Code Review must pass before QA runs)
@@ -110,26 +130,6 @@ Response: {full JSON response}
 Expected: {what was expected}
 Actual: {what was returned}
 ```
-
-## JIRA Write Guard — Human Approval Required
-
-Before performing ANY of the following operations, STOP and request explicit user approval:
-- Adding or removing a label on any ticket
-- Transitioning a ticket status
-
-Approval format:
-```
-JIRA ACTION — AWAITING YOUR APPROVAL
-  Ticket : SCRUM-{n}
-  Action : {transition to "In Progress" | etc.}
-  Reason : {one-line reason}
-
-Proceed? (yes / no)
-```
-Do NOT execute the JIRA write operation until the user types "yes".
-If the user types "no", skip the action and note it in the final report.
-
----
 
 ## Phase 4 — JIRA Action
 
