@@ -8,45 +8,69 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private SseEmitterRegistry sseEmitterRegistry;
 
     @InjectMocks
     private NotificationService notificationService;
 
     @Test
-    void shouldPushToClientDestination() {
+    void shouldPushToUserViaRegistry() {
         UUID clientId = UUID.randomUUID();
         NotificationResponse notification = buildNotification(clientId);
 
         notificationService.pushToClient(clientId, notification);
 
-        ArgumentCaptor<String> destCaptor = ArgumentCaptor.forClass(String.class);
-        verify(messagingTemplate).convertAndSend(destCaptor.capture(), (Object) org.mockito.ArgumentMatchers.eq(notification));
-        assertThat(destCaptor.getValue()).isEqualTo("/topic/notifications/" + clientId);
+        verify(sseEmitterRegistry).pushToUser(eq(clientId), any(SseEmitter.SseEventBuilder.class));
     }
 
     @Test
-    void shouldBroadcastToBroadcastDestination() {
+    void shouldBroadcastViaRegistry() {
         UUID clientId = UUID.randomUUID();
         NotificationResponse notification = buildNotification(clientId);
 
         notificationService.broadcast(notification);
 
-        ArgumentCaptor<String> destCaptor = ArgumentCaptor.forClass(String.class);
-        verify(messagingTemplate).convertAndSend(destCaptor.capture(), (Object) org.mockito.ArgumentMatchers.eq(notification));
-        assertThat(destCaptor.getValue()).isEqualTo("/topic/notifications/broadcast");
+        verify(sseEmitterRegistry).broadcast(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    void shouldBuildEventWithCorrectNameForPush() {
+        UUID clientId = UUID.randomUUID();
+        NotificationResponse notification = buildNotification(clientId);
+
+        notificationService.pushToClient(clientId, notification);
+
+        ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(sseEmitterRegistry).pushToUser(eq(clientId), captor.capture());
+        assertThat(captor.getValue()).isNotNull();
+    }
+
+    @Test
+    void shouldBuildEventWithCorrectNameForBroadcast() {
+        UUID clientId = UUID.randomUUID();
+        NotificationResponse notification = buildNotification(clientId);
+
+        notificationService.broadcast(notification);
+
+        ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(sseEmitterRegistry).broadcast(captor.capture());
+        assertThat(captor.getValue()).isNotNull();
     }
 
     private NotificationResponse buildNotification(UUID clientId) {
