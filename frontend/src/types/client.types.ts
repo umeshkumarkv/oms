@@ -26,6 +26,14 @@ export interface Portfolio {
   holdings: Holding[]
 }
 
+export interface ActiveClient {
+  clientId:         string
+  clientName:       string
+  turnoverToday:    string
+  availableCash:    string
+  cashLimitWarning: boolean
+}
+
 // Parsed from AuditRecord.metadata for entityType=EXECUTION
 export interface FillActivity {
   auditId: string

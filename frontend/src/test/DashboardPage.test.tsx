@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import DashboardPage from '../pages/DashboardPage'
 import * as marketApi from '../api/marketApi'
+import * as clientApi from '../api/clientApi'
 
 // ── Mock API modules ──────────────────────────────────────────────────────────
 
@@ -15,6 +16,10 @@ vi.mock('../api/marketApi', () => ({
   getMarketHours:   vi.fn(),
   getMarketMovers:  vi.fn(),
   getMarketIndices: vi.fn(),
+}))
+
+vi.mock('../api/clientApi', () => ({
+  getActiveClients: vi.fn(),
 }))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -54,6 +59,7 @@ describe('DashboardPage — createdAfter date scoping', () => {
     mockGetOrders.mockResolvedValue(emptyPage)
     vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
     vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
+    vi.mocked(clientApi.getActiveClients).mockResolvedValue([])
   })
 
   it('passes createdAfter=todayUTCMidnight to FILLED call', async () => {
@@ -143,6 +149,7 @@ describe('DashboardPage — Gainers & Losers tile', () => {
     mockGetOrders.mockResolvedValue(emptyPage)
     vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
     vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
+    vi.mocked(clientApi.getActiveClients).mockResolvedValue([])
   })
 
   it('shouldRenderGainersSectionHeader', async () => {
@@ -189,6 +196,7 @@ describe('DashboardPage — Index Snapshot tile', () => {
     mockGetOrders.mockResolvedValue(emptyPage)
     vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
     vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
+    vi.mocked(clientApi.getActiveClients).mockResolvedValue([])
   })
 
   it('shouldRenderIndexSnapshotSectionHeader', async () => {
@@ -211,6 +219,29 @@ describe('DashboardPage — Index Snapshot tile', () => {
     await waitFor(() => {
       const dashes = screen.getAllByText('--')
       expect(dashes.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+})
+
+describe('DashboardPage — Most Active Clients panel', () => {
+  beforeEach(() => {
+    mockGetOrders.mockResolvedValue(emptyPage)
+    vi.mocked(marketApi.getMarketMovers).mockResolvedValue(mockMovers)
+    vi.mocked(marketApi.getMarketIndices).mockResolvedValue(mockIndices)
+    vi.mocked(clientApi.getActiveClients).mockResolvedValue([])
+  })
+
+  it('shouldCallGetActiveClientsOnMount', async () => {
+    renderDashboard()
+    await waitFor(() => {
+      expect(vi.mocked(clientApi.getActiveClients)).toHaveBeenCalledWith(10)
+    })
+  })
+
+  it('shouldRenderMostActiveClientsSectionHeader', async () => {
+    renderDashboard()
+    await waitFor(() => {
+      expect(screen.getByText('Most Active Clients')).toBeInTheDocument()
     })
   })
 })

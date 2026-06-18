@@ -1,5 +1,5 @@
 import http from './http'
-import { Client, Portfolio } from '../types/client.types'
+import { Client, Portfolio, ActiveClient } from '../types/client.types'
 
 export const getClient = async (clientId: string): Promise<Client> => {
   const res = await http.get(`/clients/${clientId}`)
@@ -13,5 +13,10 @@ export const getPortfolio = async (clientId: string): Promise<Portfolio> => {
 
 export const getClients = async (): Promise<Client[]> => {
   const res = await http.get('/clients')
+  return res.data.data
+}
+
+export const getActiveClients = async (limit = 10): Promise<ActiveClient[]> => {
+  const res = await http.get(`/clients/active?limit=${limit}`)
   return res.data.data
 }

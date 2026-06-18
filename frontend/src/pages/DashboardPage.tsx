@@ -3,14 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { Briefcase, ClipboardList, FilePlus, Radio, TrendingUp } from 'lucide-react'
 import { getOrders } from '../api/orderApi'
 import { getMarketMovers, getMarketIndices } from '../api/marketApi'
+import { getActiveClients } from '../api/clientApi'
 import { OrderSummary } from '../types/order.types'
 import { MarketMovers, IndexEntry } from '../types/market.types'
+import { ActiveClient } from '../types/client.types'
+import ActiveClientsPanel from '../components/ActiveClientsPanel'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const REFRESH_MS         = 30_000
-const MOVERS_REFRESH_MS  = 30_000
-const INDICES_REFRESH_MS = 60_000
+const REFRESH_MS          = 30_000
+const MOVERS_REFRESH_MS   = 30_000
+const INDICES_REFRESH_MS  = 60_000
+const CLIENTS_REFRESH_MS  = 30_000
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -145,14 +149,17 @@ const DashboardPage: React.FC = () => {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
   const [activityEvents] = useState<ActivityEvent[]>([])
 
-  const intervalRef        = useRef<ReturnType<typeof setInterval> | null>(null)
-  const moversIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
-  const indicesIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const intervalRef         = useRef<ReturnType<typeof setInterval> | null>(null)
+  const moversIntervalRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const indicesIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const clientsIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const [movers,       setMovers]       = useState<MarketMovers | null>(null)
-  const [moversError,  setMoversError]  = useState(false)
-  const [indices,      setIndices]      = useState<IndexEntry[] | null>(null)
-  const [indicesError, setIndicesError] = useState(false)
+  const [movers,         setMovers]         = useState<MarketMovers | null>(null)
+  const [moversError,    setMoversError]    = useState(false)
+  const [indices,        setIndices]        = useState<IndexEntry[] | null>(null)
+  const [indicesError,   setIndicesError]   = useState(false)
+  const [activeClients,  setActiveClients]  = useState<ActiveClient[] | null>(null)
+  const [activeClientsError, setActiveClientsError] = useState(false)
 
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -200,6 +207,17 @@ const DashboardPage: React.FC = () => {
     }
   }, [])
 
+  const loadActiveClients = useCallback(async () => {
+    try {
+      const data = await getActiveClients(10)
+      setActiveClients(data)
+      setActiveClientsError(false)
+    } catch {
+      setActiveClientsError(true)
+      setActiveClients([])
+    }
+  }, [])
+
   useEffect(() => {
     loadData(true)
     intervalRef.current = setInterval(() => loadData(false), REFRESH_MS)
@@ -217,6 +235,12 @@ const DashboardPage: React.FC = () => {
     indicesIntervalRef.current = setInterval(loadIndices, INDICES_REFRESH_MS)
     return () => { if (indicesIntervalRef.current) clearInterval(indicesIntervalRef.current) }
   }, [loadIndices])
+
+  useEffect(() => {
+    loadActiveClients()
+    clientsIntervalRef.current = setInterval(loadActiveClients, CLIENTS_REFRESH_MS)
+    return () => { if (clientsIntervalRef.current) clearInterval(clientsIntervalRef.current) }
+  }, [loadActiveClients])
 
   // Quick actions config with Lucide icons
   const quickActions = [
@@ -473,6 +497,18 @@ const DashboardPage: React.FC = () => {
         </div>
 
       </div>
+
+      {/* ── Most Active Clients ── */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <h2 style={s.sectionTitle}>Most Active Clients</h2>
+            <span style={s.refreshNote}>Top 10 by today's turnover · 30s refresh</span>
+          </div>
+          <ActiveClientsPanel clients={activeClients} error={activeClientsError} />
+        </div>
+      </div>
+
     </div>
   )
 }
