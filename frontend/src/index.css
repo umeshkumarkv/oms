@@ -317,3 +317,11 @@ body {
 .toast-fade-out {
   animation: toast-fade-out-anim 0.3s ease forwards;
 }
+
+/* ── Order Entry — keyboard accessibility (SCRUM-141) ────────────────────────── */
+.order-form-card input:focus-visible,
+.order-form-card select:focus-visible,
+.order-form-card button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

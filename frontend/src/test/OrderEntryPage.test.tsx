@@ -510,9 +510,11 @@ describe('OrderEntryPage — idle timer', () => {
   it('shouldDisableSubmitButtonWhenWindowExpired', async () => {
     vi.mocked(useIdleTimer).mockReturnValue({ secondsRemaining: 0, isExpired: true, resetTimer: vi.fn() })
     renderPage()
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Order Window Expired' })).toBeDisabled()
-    )
+    await waitFor(() => {
+      const btn = screen.getByRole('button', { name: 'Submit Order' })
+      expect(btn).toBeDisabled()
+      expect(btn).toHaveTextContent('Order Window Expired')
+    })
   })
 
   it('shouldShowExpiredBannerWhenWindowExpired', async () => {
@@ -955,5 +957,100 @@ describe('OrderEntryPage — limit price decimal validation', () => {
     expect(screen.getByText('Limit price cannot have more than 2 digits after the decimal')).toBeInTheDocument()
     await act(async () => { fireEvent.change(priceInput, { target: { value: '10.12' } }) })
     expect(screen.queryByText('Limit price cannot have more than 2 digits after the decimal')).toBeNull()
+  })
+})
+
+// ── Tab navigation and ARIA labels (SCRUM-141) ────────────────────────────────
+
+describe('OrderEntryPage — tab navigation and aria labels (SCRUM-141)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldFocusClientDropdownAfterClientsLoad', async () => {
+    renderPage()
+    // waitFor the select to be populated — focus fires inside getClients.then()
+    const clientSelect = await waitFor(() => {
+      const el = screen.getByRole('combobox', { name: 'Client' })
+      expect(el).toHaveValue('a1000000-0000-0000-0000-000000000001')
+      return el
+    })
+    expect(clientSelect).toHaveFocus()
+  })
+
+  it('shouldRenderSymbolInputWithAriaLabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Symbol' })).toBeInTheDocument())
+  })
+
+  it('shouldRenderQuantityInputWithAriaLabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'Quantity (Shares)' })).toBeInTheDocument())
+  })
+
+  it('shouldRenderSideGroupWithAriaLabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Side' })).toBeInTheDocument())
+  })
+
+  it('shouldRenderOrderTypeGroupWithAriaLabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Order Type' })).toBeInTheDocument())
+  })
+
+  it('shouldRenderTifGroupWithAriaLabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Time in Force' })).toBeInTheDocument())
+  })
+
+  it('shouldRenderSubmitButtonWithAriaLabel', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit Order' })).toBeInTheDocument())
+  })
+
+  it('shouldHaveAriaPressedTrueOnBuyByDefault', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'BUY' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'BUY' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'SELL' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'SHORT SELL' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('shouldUpdateAriaPressedWhenSideChangedToSell', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'SELL' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'SELL' })) })
+    expect(screen.getByRole('button', { name: 'SELL' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'BUY' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'SHORT SELL' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('shouldUpdateAriaPressedWhenSideChangedToShortSell', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'SHORT SELL' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'SHORT SELL' })) })
+    expect(screen.getByRole('button', { name: 'SHORT SELL' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'BUY' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'SELL' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('shouldKeepSymbolValueOnEscapeKey', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Symbol' })).toBeInTheDocument())
+    const symbolInput = screen.getByRole('textbox', { name: 'Symbol' })
+    await act(async () => { fireEvent.change(symbolInput, { target: { value: 'AAPL' } }) })
+    await act(async () => { fireEvent.keyDown(symbolInput, { key: 'Escape', code: 'Escape' }) })
+    expect(symbolInput).toHaveValue('AAPL')
+  })
+
+  it('shouldApplyOrderFormCardClassToLeftCard', async () => {
+    const { container } = renderPage()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Client' })).toBeInTheDocument())
+    expect(container.querySelector('.order-form-card')).not.toBeNull()
+  })
+
+  it('shouldRenderGtdDateInputWithLabelAssociationWhenGtdSelected', async () => {
+    renderPage()
+    const gtdBtn = await screen.findByRole('button', { name: 'GTD' })
+    await act(async () => { fireEvent.click(gtdBtn) })
+    await waitFor(() => expect(screen.getByLabelText('GTD Date')).toBeInTheDocument())
   })
 })

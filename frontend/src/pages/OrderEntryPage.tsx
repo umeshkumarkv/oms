@@ -182,7 +182,8 @@ const OrderEntryPage: React.FC = () => {
   const [showModal,    setShowModal]    = useState(false)
   const [symbolNotFound, setSymbolNotFound] = useState(false)
 
-  const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const symbolDebounce  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clientSelectRef = useRef<HTMLSelectElement>(null)
 
   // ── Real-time Bid/Ask (SCRUM-108) ────────────────────────────────────────────
   const { bid: liveBid, ask: liveAsk, ltp: liveLtp, isStale } = useOrderEntryBidAsk(symbol)
@@ -235,7 +236,10 @@ const OrderEntryPage: React.FC = () => {
     getHolidays().then(setHolidays).catch(() => {})
     getClients().then((list) => {
       setClients(list)
-      if (list.length > 0) setClientId(list[0].clientId)
+      if (list.length > 0) {
+        setClientId(list[0].clientId)
+        clientSelectRef.current?.focus()
+      }
     }).catch(() => {})
   }, [])
 
@@ -433,6 +437,7 @@ const OrderEntryPage: React.FC = () => {
 
         {/* ── Left: Order Entry Form ── */}
         <div
+          className="order-form-card"
           style={s.card}
           onKeyDown={handleInteraction}
           onClick={handleInteraction}
@@ -472,6 +477,7 @@ const OrderEntryPage: React.FC = () => {
               <label htmlFor="client-select" style={s.label}>Client</label>
               <select
                 id="client-select"
+                ref={clientSelectRef}
                 style={s.select}
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
@@ -515,6 +521,7 @@ const OrderEntryPage: React.FC = () => {
                 <Search size={15} />
               </span>
               <input
+                aria-label="Symbol"
                 style={fieldErrors.symbol || symbolNotFound
                   ? { ...s.inputError, paddingLeft: '36px' }
                   : { ...s.input,      paddingLeft: '36px' }}
@@ -526,6 +533,7 @@ const OrderEntryPage: React.FC = () => {
                   setSymbol(v)
                   setSymbolNotFound(false)
                 }}
+                onKeyDown={(e) => { if (e.key === 'Escape') setSymbolInput(symbol) }}
                 autoComplete="off"
                 disabled={isExpired}
               />
@@ -560,9 +568,9 @@ const OrderEntryPage: React.FC = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>Side</label>
             <div style={s.toggleGroup} role="group" aria-label="Side">
-              <button style={s.sideToggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
-              <button style={s.sideToggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
-              <button style={s.sideToggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
+              <button style={s.sideToggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired} aria-pressed={side === 'BUY'}>BUY</button>
+              <button style={s.sideToggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired} aria-pressed={side === 'SELL'}>SELL</button>
+              <button style={s.sideToggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired} aria-pressed={side === 'SHORT_SELL'}>SHORT SELL</button>
             </div>
           </div>
 
@@ -573,14 +581,14 @@ const OrderEntryPage: React.FC = () => {
           >
             <div>
               <label style={s.label}>Order Type</label>
-              <div style={s.toggleGroup}>
+              <div style={s.toggleGroup} role="group" aria-label="Order Type">
                 <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired}>MARKET</button>
                 <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired}>LIMIT</button>
               </div>
             </div>
             <div>
               <label style={s.label}>Time in Force</label>
-              <div style={s.toggleGroup}>
+              <div style={s.toggleGroup} role="group" aria-label="Time in Force">
                 <button
                   style={s.toggleBtn(tif === 'DAY')}
                   onClick={() => { setTif('DAY'); setGtdDate(null) }}
@@ -603,6 +611,7 @@ const OrderEntryPage: React.FC = () => {
             <div>
               <label style={s.label}>Quantity (Shares)</label>
               <input
+                aria-label="Quantity (Shares)"
                 style={fieldErrors.quantity || sellHoldingsError || fractionalQuantityError ? s.inputError : s.input}
                 type="number" min="1" step="1"
                 placeholder="Number of shares"
@@ -636,9 +645,10 @@ const OrderEntryPage: React.FC = () => {
           {/* Row 6 — GTD Date Picker (inline, conditional on tif === 'GTD') */}
           {tif === 'GTD' && (
             <div style={s.fieldGroup}>
-              <label style={s.label}>GTD Date</label>
+              <label htmlFor="gtd-date-input" style={s.label}>GTD Date</label>
               <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
                 <DatePicker
+                  id="gtd-date-input"
                   selected={gtdDate}
                   onChange={(date: Date | null) => {
                     setGtdDate(date)
@@ -676,6 +686,7 @@ const OrderEntryPage: React.FC = () => {
 
           {/* Submit button */}
           <button
+            aria-label="Submit Order"
             style={{
               width: '100%', padding: '13px',
               borderRadius: 'var(--radius-md)', border: 'none',
