@@ -1053,4 +1053,32 @@ describe('OrderEntryPage — tab navigation and aria labels (SCRUM-141)', () => 
     await act(async () => { fireEvent.click(gtdBtn) })
     await waitFor(() => expect(screen.getByLabelText('GTD Date')).toBeInTheDocument())
   })
+
+  it('shouldFocusClientDropdownAfterStartNewOrder', async () => {
+    vi.mocked(useIdleTimer).mockReturnValue({
+      secondsRemaining: 0,
+      isExpired: true,
+      resetTimer: vi.fn(),
+    })
+    const { rerender } = renderPage()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start New Order' })).toBeInTheDocument())
+
+    // Click sets focusOnRestartRef = true (resetTimer mock does not change isExpired)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Start New Order' }))
+    })
+
+    // Simulate the hook transitioning isExpired → false (as resetTimer would in real code)
+    vi.mocked(useIdleTimer).mockReturnValue({
+      secondsRemaining: 60,
+      isExpired: false,
+      resetTimer: vi.fn(),
+    })
+    await act(async () => {
+      rerender(<MemoryRouter><OrderEntryPage /></MemoryRouter>)
+    })
+
+    expect(screen.getByRole('combobox', { name: 'Client' })).toHaveFocus()
+  })
 })

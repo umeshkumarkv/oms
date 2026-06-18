@@ -182,8 +182,9 @@ const OrderEntryPage: React.FC = () => {
   const [showModal,    setShowModal]    = useState(false)
   const [symbolNotFound, setSymbolNotFound] = useState(false)
 
-  const symbolDebounce  = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const clientSelectRef = useRef<HTMLSelectElement>(null)
+  const symbolDebounce    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clientSelectRef   = useRef<HTMLSelectElement>(null)
+  const focusOnRestartRef = useRef(false)
 
   // ── Real-time Bid/Ask (SCRUM-108) ────────────────────────────────────────────
   const { bid: liveBid, ask: liveAsk, ltp: liveLtp, isStale } = useOrderEntryBidAsk(symbol)
@@ -211,6 +212,14 @@ const OrderEntryPage: React.FC = () => {
     setSide('BUY')
     setOrderType('LIMIT')
     setRoutingDestination(DEFAULT_VENUE)
+  }, [isExpired])
+
+  // Focus client dropdown when the user restarts after an expiry
+  useEffect(() => {
+    if (!isExpired && focusOnRestartRef.current) {
+      focusOnRestartRef.current = false
+      clientSelectRef.current?.focus()
+    }
   }, [isExpired])
 
   // Computed values for the GTD date picker
@@ -457,7 +466,7 @@ const OrderEntryPage: React.FC = () => {
             <div style={s.expiredBanner} role="alert">
               <p style={s.expiredTitle}>Order Window Expired</p>
               <p style={s.expiredMsg}>This order window has expired. Unsaved data has been cleared.</p>
-              <button style={s.restartBtn} onClick={() => resetTimer()}>Start New Order</button>
+              <button style={s.restartBtn} onClick={() => { focusOnRestartRef.current = true; resetTimer() }}>Start New Order</button>
             </div>
           )}
 
