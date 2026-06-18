@@ -6,6 +6,7 @@ Decompose a business requirement into JIRA Epics and Stories with full acceptanc
 ```
 /ba-agent "plain English requirement"
 /ba-agent confluence:{pageId}
+/ba-agent epic:{epicKey}
 ```
 
 ## Phase 0 — Understand the Requirement
@@ -86,6 +87,27 @@ Explicit list of what is NOT in this ticket, including:
 ### Story Points
 Estimate: 1 (trivial) | 2 (simple DB read) | 3 (service call) | 5 (complex logic) | 8 (multi-layer)
 
+## JIRA Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- Creating a JIRA issue (Epic or Story)
+- Adding or removing a label on any ticket
+- Transitioning a ticket status
+
+Approval format:
+```
+JIRA ACTION — AWAITING YOUR APPROVAL
+  Ticket : {SCRUM-key or "new Story/Epic"}
+  Action : {create Story | add label "bmad-dor-ready" | etc.}
+  Reason : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the JIRA write operation until the user types "yes".
+If the user types "no", skip the action and note it in the final report.
+
+---
+
 ## Phase 3 — Create in JIRA
 
 1. Create Epic if needed: `createJiraIssue(issueTypeName: "Epic", ...)`
@@ -114,7 +136,7 @@ DEFINITION OF READY — SCRUM-{n}
 The last item (architect approval) is always unchecked at BA stage — it must be completed by the
 Architect Agent before development begins.
 
-Add label `bmad-dor-ready` to each story after all other checks pass.
+Apply the JIRA Write Guard, then add label `bmad-dor-ready` to each story after all other checks pass.
 
 ## Phase 5 — Report to User
 

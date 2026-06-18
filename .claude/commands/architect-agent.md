@@ -197,6 +197,26 @@ If any item is unchecked: STOP. Comment on JIRA with what is missing. Do NOT app
 
 ---
 
+## JIRA Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- Adding or removing a label on any ticket
+- Transitioning a ticket status
+
+Approval format:
+```
+JIRA ACTION — AWAITING YOUR APPROVAL
+  Ticket : SCRUM-{n}
+  Action : {add label "bmad-arch-approved" | add label "bmad-arch-blocked" | etc.}
+  Reason : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the JIRA write operation until the user types "yes".
+If the user types "no", skip the action and note it in the final report.
+
+---
+
 ## Phase 4 — JIRA Update
 
 1. Post the full technical design as a JIRA comment on SCRUM-{n}:
@@ -212,9 +232,9 @@ If any item is unchecked: STOP. Comment on JIRA with what is missing. Do NOT app
    Story is ready for development. Run: /dev-agent SCRUM-{n}
    ```
 
-2. Add label `bmad-arch-approved` to the ticket.
+2. Apply the JIRA Write Guard, then add label `bmad-arch-approved` to the ticket.
 
-3. If any DoR item failed: add label `bmad-arch-blocked` instead and describe what is missing.
+3. If any DoR item failed: apply the JIRA Write Guard, then add label `bmad-arch-blocked` instead and describe what is missing.
 
 ---
 

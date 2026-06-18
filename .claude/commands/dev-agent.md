@@ -7,6 +7,26 @@ Implement a JIRA story end-to-end: branch → code → test → commit → PR �
 /dev-agent SCRUM-{n}
 ```
 
+## JIRA Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- Adding or removing a label on any ticket
+- Transitioning a ticket status (To Do → In Progress, In Progress → In Review, In Review → Done)
+
+Approval format:
+```
+JIRA ACTION — AWAITING YOUR APPROVAL
+  Ticket : SCRUM-{n}
+  Action : {transition to "In Progress" | transition to "In Review" | transition to "Done" | etc.}
+  Reason : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the JIRA write operation until the user types "yes".
+If the user types "no", skip the action and note it in the final report.
+
+---
+
 ## Phase 0 — Pre-flight (BMAD Gates — all must pass before any code)
 
 1. Fetch the JIRA story using `getJiraIssue(SCRUM-{n})`
@@ -22,7 +42,7 @@ Check the ticket labels:
 3. Check every blocked-by ticket status — if any is not Done, STOP and tell the user which blockers are open.
 
 ### Gate 3 — JIRA Transition
-4. Transition JIRA: To Do → **In Progress**
+4. Apply the JIRA Write Guard, then transition JIRA: To Do → **In Progress**
 5. Add JIRA comment: "Developer Agent starting work on SCRUM-{n}. DoR and architect design verified. Reading CLAUDE.md and planning implementation."
 6. Read `/Users/umeshkumarkotaladinnevaradaraj/code/broker-dealer/CLAUDE.md` fully (all 19 sections)
 7. Identify the service from the ticket (client-service, order-service, etc.)
@@ -147,7 +167,7 @@ EOF
 
 ## Phase 6 — JIRA Close-out
 
-1. Transition JIRA: In Progress → **In Review**
+1. Apply the JIRA Write Guard, then transition JIRA: In Progress → **In Review**
 2. Add JIRA comment: "PR raised: {pr_url} — awaiting review and merge."
 3. Add JIRA worklog entry for time spent
 
@@ -165,7 +185,7 @@ Coverage   : >= 80%
 
 ## On PR Merge (when user tells you it was merged)
 
-1. Transition JIRA: In Review → **Done**
+1. Apply the JIRA Write Guard, then transition JIRA: In Review → **Done**
 2. Confirm: "SCRUM-{n} closed as Done."
 
 ## Hard Stops — always pause and ask the user

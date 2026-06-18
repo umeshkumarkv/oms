@@ -70,13 +70,34 @@ DEPENDENCIES
 
 ---
 
+## JIRA Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- Creating a JIRA issue (Epic or Story)
+- Adding or removing a label on any ticket
+- Transitioning a ticket status
+
+Approval format:
+```
+JIRA ACTION — AWAITING YOUR APPROVAL
+  Ticket : {SCRUM-key or "new Epic"}
+  Action : {create Epic | add label "bmad-prd-approved" | etc.}
+  Reason : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the JIRA write operation until the user types "yes".
+If the user types "no", skip the action and note it in the final report.
+
+---
+
 ## Phase 2 — Epic Creation
 
 1. Search for an existing Epic that covers this theme:
    ```
    searchJiraIssuesUsingJql("project = SCRUM AND issueType = Epic AND summary ~ '{keyword}'")
    ```
-2. If no matching Epic exists, create one:
+2. If no matching Epic exists, apply the JIRA Write Guard, then create one:
    ```
    createJiraIssue(
      issueTypeName: "Epic",
@@ -119,7 +140,7 @@ Next step: Run /ba-agent epic:{epic-key} to decompose into stories.
 Prioritization: {P1/P2/P3 summary}
 ```
 
-Add label `bmad-prd-approved` to the Epic.
+Apply the JIRA Write Guard, then add label `bmad-prd-approved` to the Epic.
 
 ---
 

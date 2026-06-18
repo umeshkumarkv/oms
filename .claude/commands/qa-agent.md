@@ -111,6 +111,26 @@ Expected: {what was expected}
 Actual: {what was returned}
 ```
 
+## JIRA Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- Adding or removing a label on any ticket
+- Transitioning a ticket status
+
+Approval format:
+```
+JIRA ACTION — AWAITING YOUR APPROVAL
+  Ticket : SCRUM-{n}
+  Action : {transition to "In Progress" | etc.}
+  Reason : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the JIRA write operation until the user types "yes".
+If the user types "no", skip the action and note it in the final report.
+
+---
+
 ## Phase 4 — JIRA Action
 
 **If all tests PASS:**
@@ -119,7 +139,7 @@ Actual: {what was returned}
 
 **If any test FAILS:**
 1. Add JIRA comment with the full report
-2. Transition ticket: In Review → **In Progress**
+2. Apply the JIRA Write Guard, then transition ticket: In Review → **In Progress**
 3. Add comment: "QA FAILED — {n} checks failed. Ticket moved back to In Progress. See report above."
 4. Tell the user which ACs failed and what the actual vs expected values were
 
