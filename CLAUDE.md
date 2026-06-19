@@ -28,13 +28,6 @@ Methodology: BMAD — Breakthrough Method of Agile AI-driven Development
 Every feature follows this pipeline in order. No step may be skipped.
 Gate labels on JIRA tickets enforce the pipeline.
 
-Each stage has two variants:
-- Single-shot — runs once, stops on failure, requires human re-trigger
-- Eval loop  — retries automatically with findings fed back, escalates on exhaustion
-
-Prefer eval loop variants for all new stories.
-Single-shot variants remain available for targeted reruns or debugging.
-
 ```
 1. PM Agent        /pm-agent "requirement"
    → Writes PRD, creates Epic, prioritizes backlog
@@ -45,38 +38,24 @@ Single-shot variants remain available for targeted reruns or debugging.
    → Runs DoR checklist (8 items), tags story bmad-dor-ready
    → Gate: all 8 DoR items checked except architect sign-off
 
-3. Architect       /arch-eval-loop SCRUM-{n}       ← PREFERRED (eval loop)
-                   /architect-agent SCRUM-{n}       ← single-shot fallback
+3. Architect Agent /architect-agent SCRUM-{n}
    → Writes per-story technical design doc (endpoint, DB, Kafka, tests)
-   → Eval loop: validates all 11 DoR items after every design attempt
-   → Retries up to 2× with gaps fed back as mandatory constraints
-   → Escalates to BA Agent with gap evidence if exhausted after 2 attempts
-   → Gate label: bmad-arch-approved (or bmad-arch-blocked if escalated)
+   → Verifies full DoR checklist
+   → Gate label: bmad-arch-approved (or bmad-arch-blocked if gaps found)
 
-4. Dev             /dev-eval-loop SCRUM-{n}         ← PREFERRED (eval loop)
-                   /dev-agent SCRUM-{n}             ← single-shot fallback
+4. Dev Agent       /dev-agent SCRUM-{n}
    → Requires: bmad-dor-ready + bmad-arch-approved labels
-   → Implements all 8 layers: domain, migration, DTO, mapper,
-     repository, service, controller, tests
-   → Eval loop: after every attempt runs 12-category inline code review
-     + mvn test (0 failures) + JaCoCo >= 80%
-   → Retries up to 3× with prior findings prepended as mandatory fixes
-   → Never pushes code that fails evaluation
-   → Escalates to human with full violation list if exhausted after 3 attempts
-   → Gate: push + PR raised on first passing attempt
+   → Implements, tests, commits, raises PR
+   → Gate: mvn test passes, JaCoCo >= 80%, PR raised
 
 5. Code Review     /code-review SCRUM-{n}
    → 12-category audit against CLAUDE.md standards
    → Approves or requests changes on GitHub PR
    → Gate: PR reviewDecision = APPROVED
 
-6. QA              /qa-eval-loop SCRUM-{n}          ← PREFERRED (eval loop)
-                   /qa-agent SCRUM-{n}              ← single-shot fallback
+6. QA Agent        /qa-agent SCRUM-{n}
    → Requires: PR reviewDecision = APPROVED
-   → Executes every AC + 4 mandatory edge cases against running Docker system
-   → Eval loop: retries up to 3× on any AC failure
-   → On each retry, prior failure evidence is available as context
-   → Escalates to human with full curl evidence posted to JIRA if exhausted
+   → Validates all ACs against running system
    → Gate: all ACs pass, JIRA → In Review
 
 7. SM Agent        /sm-agent  (daily)
@@ -93,30 +72,15 @@ Single-shot variants remain available for targeted reruns or debugging.
    → Raises a docs PR — never commits directly
 ```
 
-### Eval Loop Behaviour — All Three Loops
-
-| Property              | /arch-eval-loop | /dev-eval-loop  | /qa-eval-loop   |
-|-----------------------|-----------------|-----------------|-----------------|
-| Max attempts          | 2               | 3               | 3               |
-| Evaluator             | DoR (11 items)  | 12-cat review + mvn + JaCoCo | ACs + 4 edge cases |
-| Findings fed back     | Yes — gap list  | Yes — file:line violations | Yes — curl evidence |
-| Write guard on retry  | No (local only) | No (local only) | No (local only) |
-| Write guard on exit   | JIRA label      | git push + gh pr | JIRA transition |
-| Escalation target     | BA Agent        | Human + JIRA    | Human + JIRA    |
-
-The inner retry cycle runs entirely on local files or curl calls.
-JIRA and GitHub write guards fire only at loop exit — human approval
-is required exactly once per story, not once per attempt.
-
 ### BMAD JIRA Labels
 
-| Label                     | Set by            | Meaning                                      |
-|---------------------------|-------------------|----------------------------------------------|
-| bmad-prd-approved         | PM Agent          | Epic has an approved PRD                     |
-| bmad-dor-ready            | BA Agent          | Story passes 8/9 DoR checks (arch pending)   |
-| bmad-arch-approved        | Architect Agent   | Technical design complete, full DoR passed   |
-| bmad-arch-blocked         | Architect Agent   | Design blocked — ACs or story incomplete     |
-| bmad-code-review-approved | Code Review Agent | PR approved by code-review agent             |
+| Label                  | Set by           | Meaning                                      |
+|------------------------|------------------|----------------------------------------------|
+| bmad-prd-approved      | PM Agent         | Epic has an approved PRD                     |
+| bmad-dor-ready         | BA Agent         | Story passes 8/9 DoR checks (arch pending)   |
+| bmad-arch-approved     | Architect Agent  | Technical design complete, full DoR passed   |
+| bmad-arch-blocked      | Architect Agent  | Design blocked — ACs or story incomplete     |
+| bmad-code-review-approved | Code Review   | PR approved by code-review agent             |
 
 ---
 
