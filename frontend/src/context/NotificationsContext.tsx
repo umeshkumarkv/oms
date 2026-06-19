@@ -5,7 +5,7 @@ import { NotificationMessage } from '../types/notification.types'
 
 interface NotificationsContextValue {
   notifications: NotificationMessage[]
-  wsConnected: boolean
+  sseConnected: boolean
   dismiss: (id: string) => void
 }
 
@@ -13,14 +13,14 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth()
-  const { notifications, wsConnected, dismiss } = useNotifications(
+  const { notifications, sseConnected, dismiss } = useNotifications(
     user?.token ?? '',
     user?.userId ?? '',
     user?.role ?? ''
   )
 
   return (
-    <NotificationsContext.Provider value={{ notifications, wsConnected, dismiss }}>
+    <NotificationsContext.Provider value={{ notifications, sseConnected, dismiss }}>
       {children}
     </NotificationsContext.Provider>
   )

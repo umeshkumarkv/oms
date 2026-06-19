@@ -286,7 +286,7 @@ const OrderBlotterPage: React.FC = () => {
   const [drawerAudit,   setDrawerAudit]   = useState<AuditRecord[]>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
 
-  const { notifications, wsConnected } = useNotificationsContext()
+  const { notifications, sseConnected } = useNotificationsContext()
 
   const flashRow = useCallback((orderId: string) => {
     setFlashingIds(prev => new Set([...prev, orderId]))
@@ -312,14 +312,14 @@ const OrderBlotterPage: React.FC = () => {
 
   useEffect(() => { loadOrders() }, [loadOrders])
 
-  // Polling fallback — only runs when WebSocket is not connected
+  // Polling fallback — only runs when SSE is not connected
   useEffect(() => {
-    if (wsConnected) return
+    if (sseConnected) return
     const id = setInterval(loadOrders, 15_000)
     return () => clearInterval(id)
-  }, [wsConnected, loadOrders])
+  }, [sseConnected, loadOrders])
 
-  // WebSocket-driven updates — upsert a single order on state-change events
+  // SSE-driven updates — upsert a single order on state-change events
   const processedIds = useRef(new Set<string>())
   useEffect(() => {
     const last = notifications[notifications.length - 1]
@@ -424,12 +424,12 @@ const OrderBlotterPage: React.FC = () => {
           <h1 style={s.title}>Order Blotter</h1>
           <div style={s.subtitle}>
             {loading ? 'Loading…' : `${totalFiltered} order${totalFiltered !== 1 ? 's' : ''} today`}
-            {' · '}{wsConnected ? 'live via WebSocket' : 'polling every 15s'}
+            {' · '}{sseConnected ? 'live via SSE' : 'polling every 15s'}
           </div>
         </div>
-        <span style={s.wsPill(wsConnected)}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsConnected ? '#10b981' : '#9ca3af', display: 'inline-block' }} />
-          {wsConnected ? 'Live' : 'Polling'}
+        <span style={s.wsPill(sseConnected)}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sseConnected ? '#10b981' : '#9ca3af', display: 'inline-block' }} />
+          {sseConnected ? 'Live' : 'Polling'}
         </span>
       </div>
 

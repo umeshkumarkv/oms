@@ -1,14 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { NotificationMessage } from '../types/notification.types'
 
-const WS_URL = 'http://localhost:8088/ws'
+const SSE_URL = '/api/v1/notifications/stream'
 const MAX_TOASTS = 5
 
-export function useNotifications(token: string, userId: string, role: string) {
+export function useNotifications(token: string, userId: string, _role: string) {
   const [notifications, setNotifications] = useState<NotificationMessage[]>([])
-  const [wsConnected, setWsConnected] = useState(false)
+  const [sseConnected, setSseConnected] = useState(false)
 
   const dismiss = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
@@ -17,48 +16,46 @@ export function useNotifications(token: string, userId: string, role: string) {
   useEffect(() => {
     if (!token || !userId) return
 
-    const destination =
-      role === 'TRADER'
-        ? `/topic/notifications/${userId}`
-        : '/topic/notifications/broadcast'
+    const controller = new AbortController()
 
-    const client = new Client({
-      webSocketFactory: () => new SockJS(WS_URL),
-      connectHeaders: { Authorization: `Bearer ${token}` },
-      reconnectDelay: 5000,
-      onConnect: () => {
-        setWsConnected(true)
-        client.subscribe(destination, frame => {
-          try {
-            const payload = JSON.parse(frame.body)
-            const msg: NotificationMessage = {
-              id: crypto.randomUUID(),
-              type: payload.type,
-              orderId: payload.orderId ?? null,
-              clientId: payload.clientId ?? null,
-              title: payload.title,
-              message: payload.message,
-              timestamp: payload.timestamp,
-            }
-            setNotifications(prev => {
-              const updated = [...prev, msg]
-              return updated.length > MAX_TOASTS ? updated.slice(updated.length - MAX_TOASTS) : updated
-            })
-          } catch {
-            // ignore malformed frames
-          }
-        })
+    fetchEventSource(SSE_URL, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+      onopen: async (response) => {
+        if (response.ok) setSseConnected(true)
       },
-      onDisconnect: () => { setWsConnected(false) },
-      onStompError: () => { setWsConnected(false) },
+      onmessage: (event) => {
+        if (!event.data || event.data === ':keepalive') return
+        try {
+          const payload = JSON.parse(event.data)
+          const msg: NotificationMessage = {
+            id: crypto.randomUUID(),
+            type: payload.type,
+            orderId: payload.orderId ?? null,
+            clientId: payload.clientId ?? null,
+            title: payload.title,
+            message: payload.message,
+            timestamp: payload.timestamp,
+          }
+          setNotifications(prev => {
+            const updated = [...prev, msg]
+            return updated.length > MAX_TOASTS
+              ? updated.slice(updated.length - MAX_TOASTS)
+              : updated
+          })
+        } catch {
+          // ignore malformed frames
+        }
+      },
+      onclose: () => { setSseConnected(false) },
+      onerror: () => { setSseConnected(false) },
     })
 
-    client.activate()
     return () => {
-      client.deactivate()
-      setWsConnected(false)
+      controller.abort()
+      setSseConnected(false)
     }
-  }, [token, userId, role])
+  }, [token, userId])
 
-  return { notifications, wsConnected, dismiss }
+  return { notifications, sseConnected, dismiss }
 }

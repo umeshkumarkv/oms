@@ -24,8 +24,7 @@ this file first.
 | Icons      | lucide-react                 | 1.x      |
 | Font       | @fontsource/inter            | 5.x      |
 | Date Picker | react-datepicker             | 4.x      |
-| WebSocket  | @stomp/stompjs               | 7.x      |
-| WebSocket  | sockjs-client                | 1.x      |
+| SSE        | @microsoft/fetch-event-source | 2.x     |
 | Testing    | Vitest + React Testing Library | 1.x    |
 
 ---
