@@ -1,6 +1,6 @@
 # CLAUDE.md — Broker Dealer OMS POC
 # Principal Architect: Umesh Kumar KV
-# Version: 1.0 | April 2026
+# Version: 1.2 | June 2026
 # Status: Active — Sprint 1
 
 ---
@@ -780,9 +780,9 @@ Both apply. Neither overrides the other.
 
 | Field          | Value                                               |
 |----------------|-----------------------------------------------------|
-| Version        | 1.1                                                 |
+| Version        | 1.2                                                 |
 | Owner          | Umesh Kumar KV — Principal Architect                |
-| Last Updated   | May 2026 — SHORT_SELL added to scope (SCRUM-105)    |
+| Last Updated   | June 2026 — eval loop skills added (arch, dev, qa)  |
 | GitHub         | github.com/umeshkumarkv/broker-dealer               |
 | Confluence     | BD-POC > AI SDLC Standards > CLAUDE.md              |
 | Update Rule    | Update this file before introducing any new pattern |
