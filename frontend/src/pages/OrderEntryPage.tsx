@@ -143,7 +143,7 @@ const s = {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface FieldErrors { quantity?: string; limitPrice?: string; gtdDate?: string; symbol?: string }
+interface FieldErrors { client?: string; route?: string; quantity?: string; limitPrice?: string; gtdDate?: string; symbol?: string }
 interface ErrorDetail { field: string; code: string; message: string }
 interface SubmitError {
   type: 'MARKET_CLOSED' | 'RISK_REJECTED' | 'INVALID_GTD_DATE' | 'VALIDATION_ERROR' | 'GENERIC'
@@ -166,7 +166,7 @@ const OrderEntryPage: React.FC = () => {
   const [limitPrice,  setLimitPrice]  = useState('')
   const [tif,                setTif]                = useState<TimeInForce>('DAY')
   const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
-  const [routingDestination, setRoutingDestination] = useState(DEFAULT_VENUE)
+  const [routingDestination, setRoutingDestination] = useState('')
 
   const [instruments,  setInstruments]  = useState<Instrument[]>([])
   const [quote,        setQuote]        = useState<Instrument | null>(null)
@@ -182,7 +182,19 @@ const OrderEntryPage: React.FC = () => {
   const [showModal,    setShowModal]    = useState(false)
   const [symbolNotFound, setSymbolNotFound] = useState(false)
 
-  const symbolDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const symbolDebounce    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clientSelectRef   = useRef<HTMLSelectElement>(null)
+  const routeSelectRef    = useRef<HTMLSelectElement>(null)
+  const focusOnRestartRef = useRef(false)
+
+  // Toggle button refs for roving tabIndex
+  const buyRef        = useRef<HTMLButtonElement>(null)
+  const sellRef       = useRef<HTMLButtonElement>(null)
+  const shortSellRef  = useRef<HTMLButtonElement>(null)
+  const marketRef     = useRef<HTMLButtonElement>(null)
+  const limitRef      = useRef<HTMLButtonElement>(null)
+  const dayRef        = useRef<HTMLButtonElement>(null)
+  const gtdRef        = useRef<HTMLButtonElement>(null)
 
   // ── Real-time Bid/Ask (SCRUM-108) ────────────────────────────────────────────
   const { bid: liveBid, ask: liveAsk, ltp: liveLtp, isStale } = useOrderEntryBidAsk(symbol)
@@ -193,6 +205,20 @@ const OrderEntryPage: React.FC = () => {
   const handleInteraction = useCallback(() => {
     resetTimer()
   }, [resetTimer])
+
+  const rove = useCallback((
+    e: React.KeyboardEvent,
+    refs: React.RefObject<HTMLButtonElement>[],
+    currentIdx: number,
+    onSelect: (idx: number) => void,
+  ) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const n = refs.length
+    const next = e.key === 'ArrowRight' ? (currentIdx + 1) % n : (currentIdx - 1 + n) % n
+    onSelect(next)
+    refs[next].current?.focus()
+  }, [])
 
   // Reset form fields when window expires
   useEffect(() => {
@@ -209,7 +235,15 @@ const OrderEntryPage: React.FC = () => {
     setSymbolNotFound(false)
     setSide('BUY')
     setOrderType('LIMIT')
-    setRoutingDestination(DEFAULT_VENUE)
+    setRoutingDestination('')
+  }, [isExpired])
+
+  // Focus client dropdown when the user restarts after an expiry
+  useEffect(() => {
+    if (!isExpired && focusOnRestartRef.current) {
+      focusOnRestartRef.current = false
+      clientSelectRef.current?.focus()
+    }
   }, [isExpired])
 
   // Computed values for the GTD date picker
@@ -235,7 +269,7 @@ const OrderEntryPage: React.FC = () => {
     getHolidays().then(setHolidays).catch(() => {})
     getClients().then((list) => {
       setClients(list)
-      if (list.length > 0) setClientId(list[0].clientId)
+      if (list.length > 0) clientSelectRef.current?.focus()
     }).catch(() => {})
   }, [])
 
@@ -311,6 +345,8 @@ const OrderEntryPage: React.FC = () => {
   }
 
   const checks = {
+    client:       clientId.length > 0,
+    route:        SOR_VENUES.length === 0 || routingDestination.length > 0,
     symbol:       symbol.length > 0 && symbol.length <= 20 && /^[A-Z0-9]+$/.test(symbol),
     quantity:     !isNaN(qty) && qty > 0 && fractionalQuantityError === null,
     limitPrice:   orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0 && limitPriceDecimalError === null),
@@ -327,7 +363,8 @@ const OrderEntryPage: React.FC = () => {
       ? 'Market'
       : `Limit $${parseFloat(limitPrice).toFixed(2)}`
     const qtyStr = qty.toLocaleString('en-US')
-    return `${qtyStr} ${symbol} @ ${priceStr} · ${tif} · Route ${routingDestination}`
+    const effectiveRoute = SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination
+    return `${qtyStr} ${symbol} @ ${priceStr} · ${tif} · Route ${effectiveRoute}`
   }, [allChecksPass, symbol, clientId, qty, orderType, limitPrice, tif, routingDestination])
 
   const orderSummaryValue = useMemo<string | null>(() => {
@@ -433,6 +470,7 @@ const OrderEntryPage: React.FC = () => {
 
         {/* ── Left: Order Entry Form ── */}
         <div
+          className="order-form-card"
           style={s.card}
           onKeyDown={handleInteraction}
           onClick={handleInteraction}
@@ -452,7 +490,7 @@ const OrderEntryPage: React.FC = () => {
             <div style={s.expiredBanner} role="alert">
               <p style={s.expiredTitle}>Order Window Expired</p>
               <p style={s.expiredMsg}>This order window has expired. Unsaved data has been cleared.</p>
-              <button style={s.restartBtn} onClick={() => resetTimer()}>Start New Order</button>
+              <button style={s.restartBtn} onClick={() => { focusOnRestartRef.current = true; resetTimer() }}>Start New Order</button>
             </div>
           )}
 
@@ -468,27 +506,33 @@ const OrderEntryPage: React.FC = () => {
             data-testid="client-route-row"
             style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
           >
-            <div>
+            <div className="field-group">
               <label htmlFor="client-select" style={s.label}>Client</label>
               <select
                 id="client-select"
-                style={s.select}
+                ref={clientSelectRef}
+                style={fieldErrors.client ? { ...s.select, border: '1.5px solid var(--color-error)' } : s.select}
                 value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
+                onChange={(e) => { setClientId(e.target.value); if (e.target.value) setFieldErrors((f) => ({ ...f, client: undefined })) }}
+                onBlur={() => { if (!clientSelectRef.current?.value) setFieldErrors((f) => ({ ...f, client: 'required' })) }}
+                onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); clientSelectRef.current?.showPicker() } }}
                 disabled={isExpired}
               >
                 {clients.length === 0
                   ? <option value="">Loading clients…</option>
-                  : clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)
+                  : <><option value="">Select client…</option>{clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)}</>
                 }
               </select>
             </div>
-            <div>
+            <div className="field-group">
               <label style={s.label}>Route To</label>
               <select
-                style={s.select}
+                style={fieldErrors.route ? { ...s.select, border: '1.5px solid var(--color-error)' } : s.select}
                 value={SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination}
-                onChange={(e) => setRoutingDestination(e.target.value)}
+                onChange={(e) => { setRoutingDestination(e.target.value); if (e.target.value) setFieldErrors((f) => ({ ...f, route: undefined })) }}
+                onBlur={() => { if (SOR_VENUES.length > 0 && !routeSelectRef.current?.value) setFieldErrors((f) => ({ ...f, route: 'required' })) }}
+                ref={routeSelectRef}
+                onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); routeSelectRef.current?.showPicker() } }}
                 disabled={isExpired || SOR_VENUES.length === 0}
                 title={SOR_VENUES.length === 0 ? 'No venues configured' : undefined}
                 aria-label="Route To"
@@ -496,16 +540,14 @@ const OrderEntryPage: React.FC = () => {
                 {SOR_VENUES.length === 0 ? (
                   <option value={DEFAULT_VENUE}>{DEFAULT_VENUE}</option>
                 ) : (
-                  SOR_VENUES.map((venue) => (
-                    <option key={venue} value={venue}>{venue}</option>
-                  ))
+                  <><option value="">Select route…</option>{SOR_VENUES.map((venue) => <option key={venue} value={venue}>{venue}</option>)}</>
                 )}
               </select>
             </div>
           </div>
 
           {/* Row 2 — Symbol typeahead (full-width, search icon) */}
-          <div style={{ ...s.fieldGroup, position: 'relative' }}>
+          <div className="field-group" style={{ ...s.fieldGroup, position: 'relative' }}>
             <label style={s.label}>Symbol</label>
             <div style={{ position: 'relative' }}>
               <span style={{
@@ -515,6 +557,7 @@ const OrderEntryPage: React.FC = () => {
                 <Search size={15} />
               </span>
               <input
+                aria-label="Symbol"
                 style={fieldErrors.symbol || symbolNotFound
                   ? { ...s.inputError, paddingLeft: '36px' }
                   : { ...s.input,      paddingLeft: '36px' }}
@@ -526,6 +569,7 @@ const OrderEntryPage: React.FC = () => {
                   setSymbol(v)
                   setSymbolNotFound(false)
                 }}
+                onKeyDown={(e) => { if (e.key === 'Escape') setSymbolInput(symbol) }}
                 autoComplete="off"
                 disabled={isExpired}
               />
@@ -557,12 +601,17 @@ const OrderEntryPage: React.FC = () => {
           </div>
 
           {/* Row 3 — Side selector (full-width, prominent 11px padding) */}
-          <div style={s.fieldGroup}>
+          <div className="field-group" style={s.fieldGroup}>
             <label style={s.label}>Side</label>
-            <div style={s.toggleGroup} role="group" aria-label="Side">
-              <button style={s.sideToggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired}>BUY</button>
-              <button style={s.sideToggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired}>SELL</button>
-              <button style={s.sideToggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired}>SHORT SELL</button>
+            <div
+              style={s.toggleGroup}
+              role="group"
+              aria-label="Side"
+              onKeyDown={(e) => rove(e, [buyRef, sellRef, shortSellRef], ['BUY', 'SELL', 'SHORT_SELL'].indexOf(side), (i) => setSide((['BUY', 'SELL', 'SHORT_SELL'] as OrderSide[])[i]))}
+            >
+              <button ref={buyRef}       tabIndex={side === 'BUY'        ? 0 : -1} style={s.sideToggleBtn(side === 'BUY',        'var(--color-buy)')}     onClick={() => setSide('BUY')}        disabled={isExpired} aria-pressed={side === 'BUY'}>BUY</button>
+              <button ref={sellRef}      tabIndex={side === 'SELL'       ? 0 : -1} style={s.sideToggleBtn(side === 'SELL',       'var(--color-sell)')}    onClick={() => setSide('SELL')}       disabled={isExpired} aria-pressed={side === 'SELL'}>SELL</button>
+              <button ref={shortSellRef} tabIndex={side === 'SHORT_SELL' ? 0 : -1} style={s.sideToggleBtn(side === 'SHORT_SELL', 'var(--color-warning)')} onClick={() => setSide('SHORT_SELL')} disabled={isExpired} aria-pressed={side === 'SHORT_SELL'}>SHORT SELL</button>
             </div>
           </div>
 
@@ -571,25 +620,45 @@ const OrderEntryPage: React.FC = () => {
             data-testid="ordertype-tif-row"
             style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
           >
-            <div>
+            <div className="field-group">
               <label style={s.label}>Order Type</label>
-              <div style={s.toggleGroup}>
-                <button style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired}>MARKET</button>
-                <button style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired}>LIMIT</button>
+              <div
+                style={s.toggleGroup}
+                role="group"
+                aria-label="Order Type"
+                onKeyDown={(e) => rove(e, [marketRef, limitRef], ['MARKET', 'LIMIT'].indexOf(orderType), (i) => setOrderType((['MARKET', 'LIMIT'] as OrderType[])[i]))}
+              >
+                <button ref={marketRef} tabIndex={orderType === 'MARKET' ? 0 : -1} style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired} aria-pressed={orderType === 'MARKET'}>MARKET</button>
+                <button ref={limitRef}  tabIndex={orderType === 'LIMIT'  ? 0 : -1} style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired} aria-pressed={orderType === 'LIMIT'}>LIMIT</button>
               </div>
             </div>
-            <div>
+            <div className="field-group">
               <label style={s.label}>Time in Force</label>
-              <div style={s.toggleGroup}>
+              <div
+                style={s.toggleGroup}
+                role="group"
+                aria-label="Time in Force"
+                onKeyDown={(e) => rove(e, [dayRef, gtdRef], ['DAY', 'GTD'].indexOf(tif), (i) => {
+                  const next = (['DAY', 'GTD'] as TimeInForce[])[i]
+                  setTif(next)
+                  if (next === 'DAY') setGtdDate(null)
+                })}
+              >
                 <button
+                  ref={dayRef}
+                  tabIndex={tif === 'DAY' ? 0 : -1}
                   style={s.toggleBtn(tif === 'DAY')}
                   onClick={() => { setTif('DAY'); setGtdDate(null) }}
                   disabled={isExpired}
+                  aria-pressed={tif === 'DAY'}
                 >DAY</button>
                 <button
+                  ref={gtdRef}
+                  tabIndex={tif === 'GTD' ? 0 : -1}
                   style={s.toggleBtn(tif === 'GTD')}
                   onClick={() => setTif('GTD')}
                   disabled={isExpired}
+                  aria-pressed={tif === 'GTD'}
                 >GTD</button>
               </div>
             </div>
@@ -600,9 +669,10 @@ const OrderEntryPage: React.FC = () => {
             data-testid="qty-limit-row"
             style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
           >
-            <div>
+            <div className="field-group">
               <label style={s.label}>Quantity (Shares)</label>
               <input
+                aria-label="Quantity (Shares)"
                 style={fieldErrors.quantity || sellHoldingsError || fractionalQuantityError ? s.inputError : s.input}
                 type="number" min="1" step="1"
                 placeholder="Number of shares"
@@ -615,7 +685,7 @@ const OrderEntryPage: React.FC = () => {
               )}
             </div>
             {orderType === 'LIMIT' && (
-              <div>
+              <div className="field-group">
                 <label style={s.label}>Limit Price ($)</label>
                 <input
                   aria-label="Limit Price"
@@ -635,10 +705,11 @@ const OrderEntryPage: React.FC = () => {
 
           {/* Row 6 — GTD Date Picker (inline, conditional on tif === 'GTD') */}
           {tif === 'GTD' && (
-            <div style={s.fieldGroup}>
-              <label style={s.label}>GTD Date</label>
+            <div className="field-group" style={s.fieldGroup}>
+              <label htmlFor="gtd-date-input" style={s.label}>GTD Date</label>
               <div style={fieldErrors.gtdDate ? s.datepickerWrapperError : s.datepickerWrapper}>
                 <DatePicker
+                  id="gtd-date-input"
                   selected={gtdDate}
                   onChange={(date: Date | null) => {
                     setGtdDate(date)
@@ -676,6 +747,7 @@ const OrderEntryPage: React.FC = () => {
 
           {/* Submit button */}
           <button
+            aria-label="Submit Order"
             style={{
               width: '100%', padding: '13px',
               borderRadius: 'var(--radius-md)', border: 'none',

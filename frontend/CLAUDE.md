@@ -103,7 +103,7 @@ Holdings validation (sell qty > holdings) is skipped for SHORT_SELL — only app
 - Body: 14px / Inter / color-text-primary
 - Page titles: 20px / weight 700 / letter-spacing -0.01em
 - Section titles: 14px / weight 600
-- Labels / overlines: 10–11px / weight 700 / uppercase / letter-spacing 0.04–0.08em
+- Labels / overlines: 10–11px resting / 12px when field focused (`:focus-within` on `.field-group`) / weight 700 / uppercase / letter-spacing 0.04–0.08em
 - Table headers: 11px / weight 700 / uppercase / color-text-secondary
 - Code / IDs: monospace / 12px
 
@@ -233,6 +233,8 @@ Global utility classes defined in `src/index.css`:
 | `.btn-spinner`          | Rotating circle spinner inside buttons (submit loading state) |
 | `.toast-slide-in`       | Slide-in animation for notification toasts (translateX 110%→0, opacity 0→1, 0.25s) |
 | `.toast-fade-out`       | Fade-out animation for dismissed toasts (opacity 1→0, 0.3s)  |
+| `.order-form-card`      | Scoping anchor on the Order Entry left card — namespaces focus-visible and `.field-group` CSS rules (SCRUM-141) |
+| `.field-group`          | Label + field wrapper on the Order Entry form — triggers `:focus-within` label enlargement (SCRUM-141) |
 
 Do not add global classes without documenting them here.
 
