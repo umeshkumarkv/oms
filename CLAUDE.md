@@ -237,7 +237,7 @@ levels pass. This is non-negotiable.
 - quantity — must be Integer greater than 0
 - limitPrice — required and greater than 0 if orderType is LIMIT
 - limitPrice — must be null if orderType is MARKET
-- symbol — non-empty, max 20 chars, alphanumeric only
+- symbol — 1–6 uppercase letters (A–Z) only
 Fail → 400 Bad Request
 
 ### Level 2 — Semantic (synchronous REST calls — use Resilience4j circuit breaker)

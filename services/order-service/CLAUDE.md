@@ -87,7 +87,7 @@ Order:
 - id: UUID (PK, auto-generated)
 - clientOrderId: String (client-supplied, stored not used internally)
 - clientId: UUID (non-null)
-- symbol: String (max 20 chars, alphanumeric only)
+- symbol: String (1–6 uppercase letters A–Z)
 - side: OrderSide enum (BUY / SELL / SHORT_SELL)
 - orderType: OrderType enum (MARKET / LIMIT)
 - timeInForce: TimeInForce enum (DAY / GTC)

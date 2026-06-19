@@ -229,6 +229,125 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
     }
 
+    // --- Symbol Level 1 validation — SCRUM-195 ---
+
+    @Test
+    void shouldReturn400WhenSymbolContainsDigit() throws Exception {
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("AAPL1");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void shouldReturn400WhenSymbolExceedsSixChars() throws Exception {
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("TOOLONG7");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void shouldReturn400WhenSymbolIsBlank() throws Exception {
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void shouldReturn400WhenSymbolIsLowercase() throws Exception {
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("aapl");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void shouldReturn400WhenSymbolIsSevenLetters() throws Exception {
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("TOOLONG");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void shouldPassLevel1WhenSymbolIsFourLetters() throws Exception {
+        when(orderService.submitOrder(any(), any())).thenReturn(buildSuccessResponse());
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("AAPL");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void shouldPassLevel1WhenSymbolIsFiveLetters() throws Exception {
+        when(orderService.submitOrder(any(), any())).thenReturn(buildSuccessResponse());
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("GOOGL");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void shouldPassLevel1WhenSymbolIsSixLetters() throws Exception {
+        when(orderService.submitOrder(any(), any())).thenReturn(buildSuccessResponse());
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("SIXLTR");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void shouldPassLevel1WhenSymbolIsOneLetter() throws Exception {
+        when(orderService.submitOrder(any(), any())).thenReturn(buildSuccessResponse());
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setSymbol("A");
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isAccepted());
+    }
+
     // --- GET /orders/{id} ---
 
     @Test

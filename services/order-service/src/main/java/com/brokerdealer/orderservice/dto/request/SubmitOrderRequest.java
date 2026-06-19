@@ -22,8 +22,8 @@ public class SubmitOrderRequest {
     private UUID clientId;
 
     @NotBlank(message = "symbol is required")
-    @Size(max = 20, message = "symbol must not exceed 20 characters")
-    @Pattern(regexp = "^[A-Z0-9]+$", message = "symbol must contain only uppercase letters and digits")
+    @Size(min = 1, max = 6, message = "symbol must be 1–6 characters")
+    @Pattern(regexp = "^[A-Z]{1,6}$", message = "symbol must contain only uppercase letters A–Z (1–6 characters)")
     private String symbol;
 
     @NotBlank(message = "side is required")
