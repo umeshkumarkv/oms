@@ -325,3 +325,11 @@ body {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
+
+.order-form-card .field-group > label {
+  transition: font-size 0.12s ease;
+}
+
+.order-form-card .field-group:focus-within > label {
+  font-size: 12px;
+}
