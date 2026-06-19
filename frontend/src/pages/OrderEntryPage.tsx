@@ -13,6 +13,8 @@ import { Client, Portfolio } from '../types/client.types'
 import { OrderSide, OrderType, TimeInForce } from '../types/order.types'
 import { DEFAULT_VENUE, SOR_VENUES } from '../config/sorVenues'
 import { formatPriceToTwoDecimal } from '../utils/priceUtils'
+import { IDLE_TIMER_SECONDS, SYMBOL_DEBOUNCE_MS, TOAST_DISMISS_MS, TOAST_SUCCESS_NAV_MS } from '../utils/constants'
+import Toast from '../components/Toast'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: string | number): string => {
@@ -119,8 +121,6 @@ const s = {
       : 'var(--color-error-border)'}`,
   } as React.CSSProperties),
 
-  // Toast
-  toast: { position: 'fixed' as const, top: '20px', right: '20px', background: 'var(--color-nav)', color: '#fff', padding: '14px 20px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 9999, fontSize: '14px', fontWeight: 500 },
 
   // Error banner / modal
   errorBanner:  { padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-error-border)', borderRadius: 'var(--radius-md)', color: '#b91c1c', fontSize: '13px', marginBottom: '14px' } as React.CSSProperties,
@@ -178,9 +178,12 @@ const OrderEntryPage: React.FC = () => {
   const [submitError,  setSubmitError]  = useState<SubmitError | null>(null)
   const [showToast,    setShowToast]    = useState(false)
   const [toastMsg,     setToastMsg]     = useState('')
+  const [toastType,    setToastType]    = useState<'success' | 'warning' | 'error'>('success')
   const [fieldErrors,  setFieldErrors]  = useState<FieldErrors>({})
   const [showModal,    setShowModal]    = useState(false)
   const [symbolNotFound, setSymbolNotFound] = useState(false)
+  const [portfolioError, setPortfolioError] = useState(false)
+  const [clientsError,   setClientsError]   = useState(false)
 
   const symbolDebounce    = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clientSelectRef   = useRef<HTMLSelectElement>(null)
@@ -200,7 +203,7 @@ const OrderEntryPage: React.FC = () => {
   const { bid: liveBid, ask: liveAsk, ltp: liveLtp, isStale } = useOrderEntryBidAsk(symbol)
 
   // ── Idle timer ────────────────────────────────────────────────────────────────
-  const { secondsRemaining, isExpired, resetTimer } = useIdleTimer(60)
+  const { secondsRemaining, isExpired, resetTimer } = useIdleTimer(IDLE_TIMER_SECONDS)
 
   const handleInteraction = useCallback(() => {
     resetTimer()
@@ -266,16 +269,29 @@ const OrderEntryPage: React.FC = () => {
 
   useEffect(() => {
     getInstruments().then(setInstruments)
-    getHolidays().then(setHolidays).catch(() => {})
+    getHolidays().then(setHolidays).catch(() => {
+      setToastMsg('Failed to load market holidays — holiday dates may not be excluded from the date picker')
+      setToastType('warning')
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), TOAST_DISMISS_MS)
+    })
     getClients().then((list) => {
       setClients(list)
+      setClientsError(false)
       if (list.length > 0) clientSelectRef.current?.focus()
-    }).catch(() => {})
+    }).catch(() => {
+      setClientsError(true)
+      setToastMsg('Failed to load client list — please refresh and try again')
+      setToastType('error')
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), TOAST_DISMISS_MS)
+    })
   }, [])
 
   useEffect(() => {
     setPortfolio(null)
-    if (clientId) getPortfolio(clientId).then(setPortfolio).catch(() => setPortfolio(null))
+    setPortfolioError(false)
+    if (clientId) getPortfolio(clientId).then(setPortfolio).catch(() => { setPortfolio(null); setPortfolioError(true) })
   }, [clientId])
 
   useEffect(() => {
@@ -299,7 +315,7 @@ const OrderEntryPage: React.FC = () => {
         }
       }
       setQuoteLoading(false)
-    }, 400)
+    }, SYMBOL_DEBOUNCE_MS)
   }, [symbol]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -392,8 +408,9 @@ const OrderEntryPage: React.FC = () => {
         routingDestination: SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination,
       })
       setToastMsg(`Order ${res.orderId} submitted successfully`)
+      setToastType('success')
       setShowToast(true)
-      setTimeout(() => { setShowToast(false); navigate('/orders') }, 2500)
+      setTimeout(() => { setShowToast(false); navigate('/orders') }, TOAST_SUCCESS_NAV_MS)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string; details?: ErrorDetail[] } } } }
       const errBody  = axiosErr?.response?.data?.error
@@ -445,7 +462,7 @@ const OrderEntryPage: React.FC = () => {
     <div style={s.page}>
 
       {/* Toast */}
-      {showToast && <div style={s.toast}>{toastMsg}</div>}
+      {showToast && <Toast message={toastMsg} type={toastType} />}
 
       {/* Risk Rejected Modal */}
       {showModal && submitError && (
@@ -518,9 +535,11 @@ const OrderEntryPage: React.FC = () => {
                 onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); clientSelectRef.current?.showPicker() } }}
                 disabled={isExpired}
               >
-                {clients.length === 0
-                  ? <option value="">Loading clients…</option>
-                  : <><option value="">Select client…</option>{clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)}</>
+                {clientsError
+                  ? <option value="API_ERROR">Failed to load clients</option>
+                  : clients.length === 0
+                    ? <option value="">Loading clients…</option>
+                    : <><option value="">Select client…</option>{clients.map((c) => <option key={c.clientId} value={c.clientId}>{c.name}</option>)}</>
                 }
               </select>
             </div>
@@ -818,7 +837,12 @@ const OrderEntryPage: React.FC = () => {
                 }}
               />
             </div>
-            {side === 'SELL' && !portfolio && clientId && (
+            {portfolioError && !portfolio && clientId && (
+              <div style={{ ...s.errorText, marginTop: '4px' }}>
+                Unable to load portfolio data — please refresh
+              </div>
+            )}
+            {side === 'SELL' && !portfolio && !portfolioError && clientId && (
               <div style={{ ...s.errorText, marginTop: '4px' }}>
                 Portfolio data unavailable — holding check skipped
               </div>
