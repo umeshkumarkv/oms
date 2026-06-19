@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ChevronDown, ChevronUp, ClipboardList, Clock, Layers, User } from 'lucide-react'
 import { getRiskRuleAudit, getRiskRules, patchRiskRule } from '../api/riskApi'
-import { getCurrentUser } from '../api/authApi'
+import { getCurrentUser } from '../api/apiClient'
 import { RiskRule, RiskRuleAuditRecord } from '../types/risk.types'
 import PendingApprovalsPanel from '../components/PendingApprovalsPanel'
 

@@ -2,13 +2,13 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import AdminPanelPage from '../pages/AdminPanelPage'
-import * as authApi from '../api/authApi'
+import * as apiClient from '../api/apiClient'
 import * as riskApi from '../api/riskApi'
 import { RiskRule } from '../types/risk.types'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
-vi.mock('../api/authApi')
+vi.mock('../api/apiClient')
 vi.mock('../api/riskApi')
 
 const mockUser = { username: 'admin01', role: 'ADMIN' as const, sub: 'u1' }
@@ -65,7 +65,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  vi.mocked(authApi.getCurrentUser).mockReturnValue(mockUser as never)
+  vi.mocked(apiClient.getCurrentUser).mockReturnValue(mockUser as never)
   vi.mocked(riskApi.getRiskRules).mockResolvedValue(MOCK_RULES)
   vi.mocked(riskApi.getRiskRuleAudit).mockResolvedValue([])
   vi.mocked(riskApi.getPendingChanges).mockResolvedValue([])
