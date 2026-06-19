@@ -1,6 +1,6 @@
 # CLAUDE.md — Broker Dealer OMS POC
 # Principal Architect: Umesh Kumar KV
-# Version: 1.2 | June 2026
+# Version: 1.3 | June 2026
 # Status: Active — Sprint 1
 
 ---
@@ -28,13 +28,6 @@ Methodology: BMAD — Breakthrough Method of Agile AI-driven Development
 Every feature follows this pipeline in order. No step may be skipped.
 Gate labels on JIRA tickets enforce the pipeline.
 
-Each stage has two variants:
-- Single-shot — runs once, stops on failure, requires human re-trigger
-- Eval loop  — retries automatically with findings fed back, escalates on exhaustion
-
-Prefer eval loop variants for all new stories.
-Single-shot variants remain available for targeted reruns or debugging.
-
 ```
 1. PM Agent        /pm-agent "requirement"
    → Writes PRD, creates Epic, prioritizes backlog
@@ -45,20 +38,18 @@ Single-shot variants remain available for targeted reruns or debugging.
    → Runs DoR checklist (8 items), tags story bmad-dor-ready
    → Gate: all 8 DoR items checked except architect sign-off
 
-3. Architect       /arch-eval-loop SCRUM-{n}       ← PREFERRED (eval loop)
-                   /architect-agent SCRUM-{n}       ← single-shot fallback
+3. Architect       /arch-eval-loop SCRUM-{n}
    → Writes per-story technical design doc (endpoint, DB, Kafka, tests)
-   → Eval loop: validates all 11 DoR items after every design attempt
+   → Validates all 11 DoR items after every design attempt
    → Retries up to 2× with gaps fed back as mandatory constraints
    → Escalates to BA Agent with gap evidence if exhausted after 2 attempts
    → Gate label: bmad-arch-approved (or bmad-arch-blocked if escalated)
 
-4. Dev             /dev-eval-loop SCRUM-{n}         ← PREFERRED (eval loop)
-                   /dev-agent SCRUM-{n}             ← single-shot fallback
+4. Dev             /dev-eval-loop SCRUM-{n}
    → Requires: bmad-dor-ready + bmad-arch-approved labels
    → Implements all 8 layers: domain, migration, DTO, mapper,
      repository, service, controller, tests
-   → Eval loop: after every attempt runs 12-category inline code review
+   → After every attempt: 12-category inline code review
      + mvn test (0 failures) + JaCoCo >= 80%
    → Retries up to 3× with prior findings prepended as mandatory fixes
    → Never pushes code that fails evaluation
@@ -70,12 +61,10 @@ Single-shot variants remain available for targeted reruns or debugging.
    → Approves or requests changes on GitHub PR
    → Gate: PR reviewDecision = APPROVED
 
-6. QA              /qa-eval-loop SCRUM-{n}          ← PREFERRED (eval loop)
-                   /qa-agent SCRUM-{n}              ← single-shot fallback
+6. QA              /qa-eval-loop SCRUM-{n}
    → Requires: PR reviewDecision = APPROVED
    → Executes every AC + 4 mandatory edge cases against running Docker system
-   → Eval loop: retries up to 3× on any AC failure
-   → On each retry, prior failure evidence is available as context
+   → Retries up to 3× on any AC failure with prior curl evidence as context
    → Escalates to human with full curl evidence posted to JIRA if exhausted
    → Gate: all ACs pass, JIRA → In Review
 
@@ -780,9 +769,9 @@ Both apply. Neither overrides the other.
 
 | Field          | Value                                               |
 |----------------|-----------------------------------------------------|
-| Version        | 1.2                                                 |
+| Version        | 1.3                                                 |
 | Owner          | Umesh Kumar KV — Principal Architect                |
-| Last Updated   | June 2026 — eval loop skills added (arch, dev, qa)  |
+| Last Updated   | June 2026 — removed single-shot agent fallbacks (architect-agent, dev-agent, qa-agent); eval loops are the only pipeline variants |
 | GitHub         | github.com/umeshkumarkv/broker-dealer               |
 | Confluence     | BD-POC > AI SDLC Standards > CLAUDE.md              |
 | Update Rule    | Update this file before introducing any new pattern |
