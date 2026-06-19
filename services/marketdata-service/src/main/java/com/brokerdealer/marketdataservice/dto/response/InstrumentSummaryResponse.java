@@ -20,4 +20,6 @@ public class InstrumentSummaryResponse {
     String dataTimestamp;
     Boolean tradable;
     Boolean halted;
+    String cusip;
+    String secNumber;
 }

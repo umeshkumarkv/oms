@@ -28,5 +28,7 @@ public interface InstrumentMapper {
     @Mapping(target = "change", ignore = true)
     @Mapping(target = "changePct", ignore = true)
     @Mapping(target = "marketStatus", ignore = true)
+    @Mapping(target = "cusip",     source = "cusip")
+    @Mapping(target = "secNumber", source = "secNumber")
     InstrumentResponse toResponse(Instrument instrument);
 }
