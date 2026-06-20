@@ -413,7 +413,10 @@ QA PASSED — {total}/{total} checks verified. Ready to merge.
 ```
 
 Add JIRA comment with the full report.
-Apply JIRA Write Guard, then transition ticket: In Progress → **In Review**
+
+The ticket is already **In Review** (set by Dev Eval Loop when the PR was raised).
+Do NOT transition the status — it is correct as-is.
+The SM Agent will transition In Review → Done after the PR is merged and DoD is verified.
 
 ---
 

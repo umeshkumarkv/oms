@@ -90,11 +90,30 @@ DEFINITION OF DONE — SCRUM-{n}
   [x] No open follow-up bugs created by QA Agent
 ```
 
-If a ticket in In Review is missing any DoD item:
+Verify each item:
+```bash
+# Check PR is merged
+gh pr list --search "SCRUM-{n}" --state merged --json number,mergedAt | jq .
+
+# Check QA report exists (search JIRA comments for "QA Eval Loop Report")
+# Check label bmad-code-review-approved present on ticket
+# Check no open bugs: searchJiraIssuesUsingJql("project = SCRUM AND issueType = Bug AND text ~ 'SCRUM-{n}' AND status != Done")
+```
+
+**If ALL DoD items pass:**
+- Add JIRA comment:
+  ```
+  SM Agent ({date}): DoD PASSED — all 7 gates verified.
+  QA report: PASSED ✓  |  Code review: APPROVED ✓  |  PR merged ✓  |  CI green ✓  |  No open bugs ✓
+  Closing ticket as Done.
+  ```
+- Apply the **JIRA Write Guard**, then transition ticket: In Review → **Done**
+
+**If ANY DoD item fails:**
 - Flag it as NEEDS ATTENTION
 - Add JIRA comment:
   ```
-  SM Agent ({date}): DoD check failed. Missing: {list items}.
+  SM Agent ({date}): DoD check FAILED. Missing: {list items}.
   Ticket cannot be closed as Done until all DoD items are met.
   ```
 - Do NOT transition the ticket to Done

@@ -183,6 +183,37 @@ gh pr review {pr-number} \
 "
 ```
 
+## Phase 3 — JIRA Update
+
+After posting the GitHub review, update JIRA to reflect the code review outcome.
+
+**If APPROVED:**
+
+Add JIRA comment:
+```
+Code Review Agent ({date}): PR #{pr-number} APPROVED — all 12 categories passed.
+Ready for QA. Run: /qa-eval-loop SCRUM-{n}
+```
+
+Add label `bmad-code-review-approved` to the ticket (apply JIRA Write Guard first).
+
+**If REQUEST CHANGES:**
+
+Add JIRA comment:
+```
+Code Review Agent ({date}): PR #{pr-number} — REQUEST CHANGES
+{n} violation(s) found across {categories} categories.
+See GitHub PR #{pr-number} for line-level comments.
+
+Violations summary:
+{numbered list of violations with file:line}
+
+Action required: fix violations on branch {branch-name} and re-run /code-review SCRUM-{n}.
+```
+
+Apply the **JIRA Write Guard**, then transition ticket: In Review → **In Progress**
+(Rationale: code is not reviewable until violations are fixed; returning to In Progress signals active rework.)
+
 ## Hard Stops — always pause and ask the user
 
 - A violation is ambiguous — unclear if it is intentional or an error
