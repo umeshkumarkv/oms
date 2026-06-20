@@ -1,6 +1,6 @@
 # CLAUDE.md — Broker Dealer OMS POC
 # Principal Architect: Umesh Kumar KV
-# Version: 1.3 | June 2026
+# Version: 1.4 | June 2026
 # Status: Active — Sprint 4
 
 ---
@@ -91,11 +91,72 @@ Gate labels on JIRA tickets enforce the pipeline.
 | Findings fed back     | Yes — gap list  | Yes — file:line violations | Yes — curl evidence |
 | Write guard on retry  | No (local only) | No (local only) | No (local only) |
 | Write guard on exit   | JIRA label      | git push + gh pr | JIRA transition |
-| Escalation target     | BA Agent        | Human + JIRA    | Human + JIRA    |
+| Escalation target     | BA Agent        | Arch Agent (design gap) or Human (3× fail) | Human + JIRA    |
 
 The inner retry cycle runs entirely on local files or curl calls.
 JIRA and GitHub write guards fire only at loop exit — human approval
 is required exactly once per story, not once per attempt.
+
+### Agent Scope Boundaries — Absolute. No Exceptions.
+
+Every agent owns exactly one lane. Crossing into another agent's lane is a hard stop.
+These rules override any agent's instinct to "just fix it."
+
+#### PM Agent — scope: product strategy only
+- OWNS: PRDs, Epic creation, backlog prioritization
+- NEVER: writes user stories, acceptance criteria, technical design, or code
+- ESCALATE to human if: requirement is entirely out of scope for POC
+
+#### BA Agent — scope: story decomposition only
+- OWNS: user stories, acceptance criteria, DoR checklist, story point estimation
+- NEVER: writes technical design, chooses implementation patterns, or touches code
+- ESCALATE to PM Agent if: requirement scope is ambiguous or contradicts PRD
+
+#### Arch Agent — scope: technical design only
+- OWNS: endpoint design, DB schema, service layer logic, Kafka/Redis plan, test strategy
+- NEVER: writes production code, modifies source files, or runs tests
+- ESCALATE to BA Agent if: ACs are ambiguous or missing information the architect cannot invent
+- The arch design posted to JIRA is the sole contract for the Dev Agent — it must be complete
+
+#### Dev Agent — scope: implementation of the approved arch design only
+- OWNS: writing and testing code per the arch design doc on the JIRA ticket
+- NEVER: makes architecture decisions, chooses a different design approach, or changes the data model independently
+- DESIGN GAP RULE — HARD STOP: if implementation reveals a gap in the arch design
+  (e.g. a field does not exist, a comparison is between incompatible types, a security
+  assumption is wrong), the Dev Agent MUST STOP immediately and escalate to the Arch Agent.
+  It must NOT self-solve the gap. It must NOT implement a workaround. It must post the gap
+  to JIRA and wait for an updated arch design before retrying.
+- ESCALATE to Arch Agent if: arch design is incomplete, contradictory, or technically infeasible
+
+#### Code Review Agent — scope: standards audit only
+- OWNS: 12-category audit of the PR diff against CLAUDE.md
+- NEVER: fixes code, suggests refactors beyond CLAUDE.md standards, or makes design decisions
+- ESCALATE to human if: a violation is ambiguous or a new pattern appears not in CLAUDE.md
+
+#### QA Agent — scope: acceptance testing only
+- OWNS: executing curl and Playwright tests against the running Docker system
+- NEVER: modifies source code, configuration files, Dockerfiles, or any project file
+- NEVER: makes architecture decisions or diagnoses root causes beyond "this AC fails"
+- DESIGN GAP RULE — HARD STOP: if an AC fails because of a design issue (e.g. wrong field
+  used for comparison, missing header, RBAC misconfiguration), the QA Agent MUST STOP
+  and post the failure evidence to JIRA. It must NOT implement a fix. It must NOT suggest
+  code changes. Escalate to human → Arch Agent to update the design.
+- ESCALATE to human if: any AC fails after 3 attempts — post full curl/Playwright evidence
+
+#### SM Agent — scope: sprint health monitoring only
+- OWNS: velocity tracking, blocker detection, DoD gate enforcement before closing tickets
+- NEVER: modifies code, design docs, or JIRA stories
+- ESCALATE to human if: a ticket cannot be closed because DoD criteria are unmet
+
+#### DevOps Agent — scope: CI/CD pipeline health only
+- OWNS: monitoring pipeline failures, auto-fixing compilation/test failures in CI config
+- NEVER: changes business logic, modifies service source code, or bypasses test gates
+- ESCALATE to human if: pipeline failure is caused by a code bug (not CI config)
+
+#### Doc Agent — scope: documentation only
+- OWNS: updating openapi.yaml and service CLAUDE.md after a story merges
+- NEVER: raises PRs for code changes, modifies Java source, or changes migrations
+- Always raises a docs PR — never commits directly to develop or main
 
 ### BMAD JIRA Labels
 
@@ -771,7 +832,7 @@ Both apply. Neither overrides the other.
 |----------------|-----------------------------------------------------|
 | Version        | 1.3                                                 |
 | Owner          | Umesh Kumar KV — Principal Architect                |
-| Last Updated   | June 2026 — removed single-shot agent fallbacks (architect-agent, dev-agent, qa-agent); eval loops are the only pipeline variants |
+| Last Updated   | June 2026 — v1.4: added strict Agent Scope Boundaries section; each agent owns exactly one lane, design gaps escalate to Arch Agent, QA Agent never touches code |
 | GitHub         | github.com/umeshkumarkv/broker-dealer               |
 | Confluence     | BD-POC > AI SDLC Standards > CLAUDE.md              |
 | Update Rule    | Update this file before introducing any new pattern |
