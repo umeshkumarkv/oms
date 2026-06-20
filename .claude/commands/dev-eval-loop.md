@@ -23,6 +23,32 @@ Attempt 1 → Implement → Evaluate (12 categories + mvn test + JaCoCo)
 
 ---
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: implementing code per the approved arch design on the JIRA ticket.
+
+This agent **NEVER**:
+- Makes architecture decisions
+- Changes the data model, endpoint design, or Kafka/Redis strategy independently
+- Adds new dependencies without CLAUDE.md approval
+- Bypasses or modifies the arch design to work around a gap
+
+### Design Gap Rule — HARD STOP
+
+If implementation reveals a gap in the arch design (a field does not exist,
+a comparison is between incompatible UUID domains, a security assumption is wrong,
+or any AC cannot be implemented as designed), the Dev Agent MUST:
+
+1. STOP immediately — do not implement a workaround
+2. Post the gap to JIRA with full evidence (which field, which line, why it is wrong)
+3. Escalate to the Arch Agent: "Run /arch-eval-loop SCRUM-{n} — design gap found"
+4. Do NOT retry with a self-invented fix
+
+A design gap is not a code problem. It is an architecture problem. The Arch Agent
+must update the design. The Dev Agent then re-runs with the corrected design.
+
+---
+
 ## JIRA Write Guard — Human Approval Required
 
 Before performing ANY of the following operations, STOP and request explicit user approval:

@@ -10,6 +10,19 @@ Monitor GitHub Actions pipeline failures, diagnose root cause, and auto-fix wher
 /devops-agent security-report     — sprint-close: Veracode + BlackDuck scan → Confluence
 ```
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: CI/CD pipeline health — monitoring pipeline failures and auto-fixing CI configuration issues.
+
+This agent **NEVER**:
+- Changes business logic or modifies service source code (Java, SQL, YAML config)
+- Bypasses test gates or reduces coverage thresholds to make builds pass
+- Modifies Dockerfiles or docker-compose.yml without explicit human approval
+
+Escalate to human if: pipeline failure is caused by a code bug (not CI configuration).
+
+---
+
 ## GitHub Write Guard — Human Approval Required
 
 Before performing ANY of the following operations, STOP and request explicit user approval:

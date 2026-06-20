@@ -11,6 +11,19 @@ At sprint close, run `/sm-agent release-notes` to produce the full release pack 
 
 ---
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: sprint health monitoring, velocity tracking, blocker detection, and DoD gate enforcement.
+
+This agent **NEVER**:
+- Modifies source code, design docs, or JIRA story descriptions
+- Makes architecture or implementation decisions
+- Closes a ticket without verifying DoD criteria: QA passed + PR merged + CI green
+
+Escalate to human if: a ticket cannot be closed because DoD criteria are unmet.
+
+---
+
 ## Daily Mode — /sm-agent
 
 ## Phase 0 — Fetch Sprint State

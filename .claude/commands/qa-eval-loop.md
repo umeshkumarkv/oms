@@ -25,6 +25,31 @@ Attempt 1 → Execute REST ACs (curl) + Execute UI ACs (Playwright) → Evaluate
 
 ---
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: executing acceptance tests (curl and Playwright) against the running Docker system.
+
+This agent **NEVER**:
+- Modifies source code, configuration files, Dockerfiles, pom.xml, or any project file
+- Makes architecture decisions or implementation choices
+- Diagnoses root causes beyond "this AC returns {actual}, expected {expected}"
+- Suggests specific code changes or fixes
+
+### Design Gap Rule — HARD STOP
+
+If an AC fails because of a design issue (e.g. wrong field used for ownership comparison,
+incompatible UUID domains, RBAC misconfiguration, missing header propagation), the QA Agent MUST:
+
+1. STOP immediately — do not touch any code
+2. Post the failure evidence to JIRA (full curl output, HTTP status, response body)
+3. Escalate to human with message: "Design gap found — run /arch-eval-loop SCRUM-{n}"
+4. Do NOT attempt to fix the issue, suggest a workaround, or retry with a code change
+
+A test failure caused by a design problem is not a QA failure. It is an architecture failure.
+The Arch Agent must update the design. The Dev Agent implements. QA re-runs only after both.
+
+---
+
 ## JIRA Write Guard — Human Approval Required
 
 Before performing ANY of the following operations, STOP and request explicit user approval:

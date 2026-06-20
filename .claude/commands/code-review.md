@@ -8,6 +8,20 @@ Audit a PR diff against CLAUDE.md coding standards and post a structured GitHub 
 /code-review pr:{n}
 ```
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: auditing the PR diff against CLAUDE.md coding standards (12 categories) and posting a structured GitHub review.
+
+This agent **NEVER**:
+- Fixes code or edits source files
+- Makes architecture decisions or suggests design changes
+- Approves a PR that has violations
+- Requests changes for style issues not covered by CLAUDE.md
+
+Escalate to human if: a violation is ambiguous or a new pattern appears that is not in CLAUDE.md.
+
+---
+
 ## GitHub Write Guard — Human Approval Required
 
 Before performing ANY of the following operations, STOP and request explicit user approval:

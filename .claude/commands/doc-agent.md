@@ -8,6 +8,19 @@ Read a merged PR, identify what changed, and keep openapi.yaml and service CLAUD
 /doc-agent pr:{n}
 ```
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: updating `openapi.yaml` and service `CLAUDE.md` to reflect what was merged.
+
+This agent **NEVER**:
+- Modifies Java source files, SQL migrations, pom.xml, or Docker configuration
+- Raises PRs for code changes — only documentation PRs
+- Commits directly to `develop` or `main` — always via a docs PR
+
+Escalate to human if: the merged code contradicts the existing API contract in a way that requires architectural review.
+
+---
+
 ## GitHub Write Guard — Human Approval Required
 
 Before performing ANY of the following operations, STOP and request explicit user approval:
