@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ChevronDown, ChevronUp, ClipboardList, Clock, Layers, User } from 'lucide-react'
 import { getRiskRuleAudit, getRiskRules, patchRiskRule } from '../api/riskApi'
-import { getCurrentUser } from '../api/apiClient'
+import { useAuth } from '../context/AuthContext'
 import { RiskRule, RiskRuleAuditRecord } from '../types/risk.types'
 import PendingApprovalsPanel from '../components/PendingApprovalsPanel'
 
@@ -237,7 +237,7 @@ const ThresholdModal: React.FC<ThresholdModalProps> = ({ rule, onConfirm, onCanc
 // ── Main Component ─────────────────────────────────────────────────────────────
 const AdminPanelPage: React.FC = () => {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
 
   // Role guard — only enforce when a JWT is present (auth-service stub issues no token yet)
   useEffect(() => {

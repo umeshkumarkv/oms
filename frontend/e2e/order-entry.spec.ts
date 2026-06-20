@@ -20,8 +20,9 @@ test.describe('Order Entry', () => {
     await expect(page.getByPlaceholder('Number of shares')).toBeVisible()
   })
 
-  test('PLACE ORDER button is disabled when form is incomplete', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeDisabled()
+  test('submit button is disabled when form is incomplete', async ({ page }) => {
+    // Button uses aria-label="Submit Order"; text shows "Complete required fields" when checks fail
+    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeDisabled()
   })
 
   test('Limit Price field is visible for LIMIT orders', async ({ page }) => {
@@ -50,15 +51,18 @@ test.describe('Order Entry', () => {
   })
 
   test('submit button enables when BUY MARKET DAY form is complete', async ({ page }) => {
-    // Market is CLOSED in test environment so we only verify the button enables —
-    // not that the submission succeeds (server-side L2 rejects MARKET_CLOSED)
+    // SCRUM-141 added mandatory client dropdown — must be selected for allChecksPass to be true
+    await page.locator('select#client-select').selectOption({ index: 1 })
+    // Route To dropdown is also mandatory (SOR_VENUES has 5 venues configured)
+    await page.locator('select[aria-label="Route To"]').selectOption({ index: 1 })
+
     await page.getByRole('button', { name: 'MARKET' }).click()
     await page.getByRole('button', { name: 'BUY' }).click()
-
     await page.getByPlaceholder('e.g. AAPL').fill('AAPL')
     await page.getByPlaceholder('Number of shares').fill('1')
 
-    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeEnabled({ timeout: 5000 })
+    // Button shows "Review & Submit Order" when all checks pass
+    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeEnabled({ timeout: 8000 })
   })
 
   test('shows a validation error for LIMIT order with no price', async ({ page }) => {
@@ -71,7 +75,45 @@ test.describe('Order Entry', () => {
     // Limit price placeholder is "0.00"; default value is empty → check fails → button disabled
     const limitPrice = page.getByPlaceholder('0.00')
     await limitPrice.clear()
-    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeDisabled()
+  })
+
+  test('SELL side toggle is aria-pressed and uses sell color', async ({ page }) => {
+    const sellBtn = page.getByRole('button', { name: 'SELL', exact: true })
+    await sellBtn.click()
+    await expect(sellBtn).toHaveAttribute('aria-pressed', 'true')
+    // Active SELL button uses --color-sell (#be185d) → white text on pink background
+    await expect(sellBtn).toHaveCSS('color', 'rgb(255, 255, 255)')
+  })
+
+  test('SHORT SELL side toggle is aria-pressed and uses warning color', async ({ page }) => {
+    const shortSellBtn = page.getByRole('button', { name: 'SHORT SELL' })
+    await shortSellBtn.click()
+    await expect(shortSellBtn).toHaveAttribute('aria-pressed', 'true')
+    await expect(shortSellBtn).toHaveCSS('color', 'rgb(255, 255, 255)')
+  })
+
+  test('GTD time-in-force toggle shows the date picker', async ({ page }) => {
+    const gtdBtn = page.getByRole('button', { name: 'GTD' })
+    await expect(gtdBtn).toBeVisible()
+    await gtdBtn.click()
+    await expect(gtdBtn).toHaveAttribute('aria-pressed', 'true')
+    // DatePicker renders when GTD is selected
+    await expect(page.locator('.react-datepicker__input-container, input[type="text"][class*="datepicker"]').first()).toBeVisible()
+  })
+
+  test('DAY toggle clears the GTD date picker', async ({ page }) => {
+    await page.getByRole('button', { name: 'GTD' }).click()
+    await page.getByRole('button', { name: 'DAY' }).click()
+    await expect(page.getByRole('button', { name: 'DAY' })).toHaveAttribute('aria-pressed', 'true')
+    // DatePicker should no longer be in the DOM when DAY is active
+    const datepickerCount = await page.locator('.react-datepicker__input-container').count()
+    expect(datepickerCount).toBe(0)
+  })
+
+  test('Order Preview card is visible on the right panel', async ({ page }) => {
+    // Right panel heading changed to "Order Preview" in SCRUM-187
+    await expect(page.getByRole('heading', { name: 'Order Preview' })).toBeVisible()
   })
 
   test('BUY LIMIT order form renders correctly', async ({ page }) => {
@@ -87,11 +129,9 @@ test.describe('Order Entry', () => {
     await expect(page.getByRole('button', { name: 'LIMIT' })).toHaveCSS('color', 'rgb(255, 255, 255)')
     // Limit Price field visible
     await expect(page.getByPlaceholder('0.00')).toBeVisible()
-    // PLACE ORDER button is visible
-    await expect(page.getByRole('button', { name: 'PLACE ORDER' })).toBeVisible()
-    // Two-column layout — Order Details card present
-    await expect(page.getByText('Order Details')).toBeVisible()
-    // Validation panel present
-    await expect(page.getByText('Validation')).toBeVisible()
+    // Submit button is visible (aria-label="Submit Order")
+    await expect(page.getByRole('button', { name: 'Submit Order' })).toBeVisible()
+    // Two-column layout — Order Preview card present
+    await expect(page.getByRole('heading', { name: 'Order Preview' })).toBeVisible()
   })
 })
