@@ -25,6 +25,7 @@ import com.brokerdealer.orderservice.dto.response.ResponseMeta;
 import com.brokerdealer.orderservice.dto.response.StatusCountsResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderData;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
+import com.brokerdealer.orderservice.exception.OrderAccessDeniedException;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
 import com.brokerdealer.orderservice.exception.InsufficientBuyingPowerException;
@@ -386,7 +387,7 @@ public class OrderService {
         }
     }
 
-    public OrderDetailResponse getOrderById(UUID id) {
+    public OrderDetailResponse getOrderById(UUID id, UUID callerUserId, String callerRole) {
         String cacheKey = ORDER_CACHE_KEY_PREFIX + id;
         Order order = null;
 
@@ -401,6 +402,14 @@ public class OrderService {
                     .orElseThrow(() -> new OrderNotFoundException(id));
             redisTemplate.opsForValue().set(cacheKey, order);
             log.debug("Cache miss — populated: orderId={}", id);
+        }
+
+        if ("TRADER".equals(callerRole)) {
+            if (callerUserId == null || !callerUserId.equals(order.getClientId())) {
+                log.warn("Access denied: orderId={} callerRole={}", id, callerRole);
+                throw new OrderAccessDeniedException("ACCESS_DENIED",
+                        "TRADER may only access their own client's orders");
+            }
         }
 
         List<ExecutionItem> fills = executionServiceClient.getFills(id);
