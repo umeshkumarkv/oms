@@ -133,19 +133,17 @@ class RoleAuthorizationFilterTest {
     }
 
     @Test
-    void shouldReturn403WhenAdminGetsOrders() throws Exception {
+    void shouldAllowAdminToGetOrders() throws Exception {
         mockMvc.perform(get("/api/v1/orders")
                         .header("X-User-Role", "ADMIN"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+                .andExpect(status().isOk());
     }
 
     @Test
-    void shouldReturn403WhenAdminGetsOrderById() throws Exception {
+    void shouldAllowAdminToGetOrderById() throws Exception {
         mockMvc.perform(get("/api/v1/orders/550e8400-e29b-41d4-a716-446655440000")
                         .header("X-User-Role", "ADMIN"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+                .andExpect(status().isOk());
     }
 
     // ─── Unknown role ─────────────────────────────────────────────────────────
