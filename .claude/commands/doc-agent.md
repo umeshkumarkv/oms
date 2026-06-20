@@ -1,4 +1,4 @@
-# Documentation Agent — SCRUM-64
+# Documentation Agent — Broker Dealer OMS
 
 Read a merged PR, identify what changed, and keep openapi.yaml and service CLAUDE.md accurate. Always raises a docs PR — never commits directly to develop.
 
@@ -7,6 +7,26 @@ Read a merged PR, identify what changed, and keep openapi.yaml and service CLAUD
 /doc-agent SCRUM-{n}
 /doc-agent pr:{n}
 ```
+
+## GitHub Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- `git push` — pushing the docs branch to origin
+- `gh pr create` — raising the documentation PR
+
+Approval format:
+```
+GITHUB ACTION — AWAITING YOUR APPROVAL
+  Action  : {push branch "docs/SCRUM-{n}-update-docs" to origin | create PR "docs({service}): sync openapi.yaml and CLAUDE.md for SCRUM-{n}" → develop}
+  Branch  : docs/SCRUM-{n}-update-docs
+  Reason  : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the git push or gh pr create until the user types "yes".
+If the user types "no", stop at that step and tell the user what remains.
+
+---
 
 ## Phase 0 — Read the PR
 
@@ -147,9 +167,15 @@ docs({service}): update openapi.yaml and CLAUDE.md for SCRUM-{n}
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF
 )"
+```
 
+Apply the **GitHub Write Guard**, then:
+```bash
 git push -u origin docs/SCRUM-{n}-update-docs
+```
 
+Apply the **GitHub Write Guard**, then:
+```bash
 gh pr create \
   --title "docs({service}): sync openapi.yaml and CLAUDE.md for SCRUM-{n}" \
   --base develop \

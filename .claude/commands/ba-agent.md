@@ -1,4 +1,4 @@
-# BA Agent — SCRUM-59
+# BA Agent — Broker Dealer OMS
 
 Decompose a business requirement into JIRA Epics and Stories with full acceptance criteria.
 

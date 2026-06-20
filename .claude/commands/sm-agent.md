@@ -1,4 +1,4 @@
-# Scrum Master Agent — SCRUM-63
+# Scrum Master Agent — Broker Dealer OMS
 
 Run a daily sprint health check, detect blockers, and produce a standup summary with JIRA comments on flagged tickets.
 At sprint close, run `/sm-agent release-notes` to produce the full release pack for the Go/No-Go meeting.

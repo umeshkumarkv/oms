@@ -1,4 +1,4 @@
-# DevOps Agent — SCRUM-62
+# DevOps Agent — Broker Dealer OMS
 
 Monitor GitHub Actions pipeline failures, diagnose root cause, and auto-fix where possible.
 
@@ -9,6 +9,27 @@ Monitor GitHub Actions pipeline failures, diagnose root cause, and auto-fix wher
 /devops-agent branch:{branch-name} — check a specific branch
 /devops-agent security-report     — sprint-close: Veracode + BlackDuck scan → Confluence
 ```
+
+## GitHub Write Guard — Human Approval Required
+
+Before performing ANY of the following operations, STOP and request explicit user approval:
+- `git push` — pushing any commit to a remote branch
+- Docker file changes (`Dockerfile`, `docker-compose.yml`)
+- GitHub Actions workflow changes (`.github/workflows/`)
+
+Approval format:
+```
+GITHUB ACTION — AWAITING YOUR APPROVAL
+  Action  : {push fix commit to "{branch}" | modify Dockerfile for {service} | update workflow {file}}
+  Branch  : {branch}
+  Reason  : {one-line reason}
+
+Proceed? (yes / no)
+```
+Do NOT execute the push or file modification until the user types "yes".
+If the user types "no", stop at that step and show the recommended fix for the user to apply manually.
+
+---
 
 ## Phase 0 — Fetch Pipeline State
 
@@ -56,7 +77,7 @@ Read the log output and classify into exactly one category:
    ```bash
    mvn test -q
    ```
-5. If tests pass, commit and push:
+5. If tests pass, apply the **GitHub Write Guard**, then commit and push:
    ```bash
    git add services/{service}/src/...
    git commit -m "fix(ci): resolve compilation error in {file} — {description}
@@ -74,7 +95,7 @@ Read the log output and classify into exactly one category:
    - **Test code** (wrong mock/assertion) → fix the test
 3. Run `mvn test` to verify the fix
 4. Never comment out or delete failing tests — fix the underlying issue
-5. Commit and push the fix (same format as above)
+5. Apply the **GitHub Write Guard**, then commit and push the fix (same format as above)
 
 ## Phase 2C — Auto-fix: JaCoCo Coverage
 
@@ -84,11 +105,11 @@ Read the log output and classify into exactly one category:
    ```
 2. Add unit tests for the uncovered lines
 3. Run `mvn verify` to confirm coverage gate passes
-4. Commit and push the new tests
+4. Apply the **GitHub Write Guard**, then commit and push the new tests
 
 ## Phase 2D — Suggest Fix: Docker Build
 
-Provide this structured diagnosis and do NOT auto-fix (Docker changes need human review):
+Provide this structured diagnosis and do NOT auto-fix (apply GitHub Write Guard before any Docker file change):
 
 ```
 DevOps Agent — Docker Build Failure
@@ -165,8 +186,8 @@ Next Step    : {CI will re-run | human must apply fix}
 
 - Auto-fix changes production logic (not just compilation or tests)
 - Flyway migration has already been applied to a shared environment
-- Docker changes are needed (always requires human review)
-- The failure is in `.github/workflows/` YAML (CI config changes need human approval)
+- Docker changes are needed (always requires human review via GitHub Write Guard)
+- The failure is in `.github/workflows/` YAML (CI config changes need human approval via GitHub Write Guard)
 - Multiple failure categories present simultaneously (diagnose all, fix none without approval)
 - `mvn test` fails after the auto-fix attempt
 

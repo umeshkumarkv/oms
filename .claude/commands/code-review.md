@@ -1,4 +1,4 @@
-# Code Review Agent — SCRUM-61
+# Code Review Agent — Broker Dealer OMS
 
 Audit a PR diff against CLAUDE.md coding standards and post a structured GitHub review.
 
