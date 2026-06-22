@@ -253,6 +253,14 @@ components:
         dataTimestamp:
           type: string
           format: date-time
+        cusip:
+          type: string
+          description: 9-character CUSIP identifier, nullable
+          example: "037833100"
+        secNumber:
+          type: string
+          description: SEC CIK identifier, nullable
+          example: "320193"
 
     InstrumentResponse:
       type: object
@@ -271,6 +279,14 @@ components:
           type: boolean
         halted:
           type: boolean
+        cusip:
+          type: string
+          description: 9-character CUSIP identifier, nullable
+          example: "037833100"
+        secNumber:
+          type: string
+          description: SEC CIK identifier, nullable
+          example: "320193"
 
     InstrumentListResponse:
       type: object

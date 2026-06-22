@@ -1,7 +1,7 @@
 # CLAUDE.md — Broker Dealer OMS POC
 # Principal Architect: Umesh Kumar KV
 # Version: 1.3 | June 2026
-# Status: Active — Sprint 1
+# Status: Active — Sprint 4
 
 ---
 

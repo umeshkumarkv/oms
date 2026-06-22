@@ -15,6 +15,7 @@ import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
 import com.brokerdealer.orderservice.exception.GlobalExceptionHandler;
 import com.brokerdealer.orderservice.exception.MarketClosedException;
+import com.brokerdealer.orderservice.exception.OrderAccessDeniedException;
 import com.brokerdealer.orderservice.exception.OrderNotFoundException;
 import com.brokerdealer.orderservice.exception.ServiceUnavailableException;
 import com.brokerdealer.orderservice.exception.SymbolHaltedException;
@@ -40,6 +41,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -352,7 +354,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithOrderDetailForKnownId() throws Exception {
-        when(orderService.getOrderById(orderId)).thenReturn(buildDetailResponse());
+        when(orderService.getOrderById(eq(orderId), any(), any())).thenReturn(buildDetailResponse());
 
         mockMvc.perform(get("/api/v1/orders/" + orderId)
                         .header("X-User-Role", "TRADER"))
@@ -365,13 +367,67 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn404ForUnknownOrderId() throws Exception {
-        when(orderService.getOrderById(orderId))
+        when(orderService.getOrderById(eq(orderId), any(), any()))
                 .thenThrow(new OrderNotFoundException(orderId));
 
         mockMvc.perform(get("/api/v1/orders/" + orderId)
                         .header("X-User-Role", "TRADER"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("ORDER_NOT_FOUND"));
+    }
+
+    // --- GET /orders/{id} — SCRUM-198 ownership guard ---
+
+    @Test
+    void shouldReturn200WhenTraderOwnsOrder() throws Exception {
+        when(orderService.getOrderById(eq(orderId), eq(clientId), eq("TRADER")))
+                .thenReturn(buildDetailResponse());
+
+        mockMvc.perform(get("/api/v1/orders/" + orderId)
+                        .header("X-User-Role", "TRADER")
+                        .header("X-User-Id", clientId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(orderId.toString()));
+    }
+
+    @Test
+    void shouldReturn403WhenTraderDoesNotOwnOrder() throws Exception {
+        UUID differentClientId = UUID.randomUUID();
+        when(orderService.getOrderById(eq(orderId), eq(differentClientId), eq("TRADER")))
+                .thenThrow(new OrderAccessDeniedException("ACCESS_DENIED",
+                        "TRADER may only access their own client's orders"));
+
+        mockMvc.perform(get("/api/v1/orders/" + orderId)
+                        .header("X-User-Role", "TRADER")
+                        .header("X-User-Id", differentClientId.toString()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void shouldReturn200ForOperationsRegardlessOfOwnership() throws Exception {
+        UUID differentClientId = UUID.randomUUID();
+        when(orderService.getOrderById(eq(orderId), eq(differentClientId), eq("OPERATIONS")))
+                .thenReturn(buildDetailResponse());
+
+        mockMvc.perform(get("/api/v1/orders/" + orderId)
+                        .header("X-User-Role", "OPERATIONS")
+                        .header("X-User-Id", differentClientId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(orderId.toString()));
+    }
+
+    @Test
+    void shouldReturn200ForAdminRegardlessOfOwnership() throws Exception {
+        UUID differentClientId = UUID.randomUUID();
+        when(orderService.getOrderById(eq(orderId), eq(differentClientId), eq("ADMIN")))
+                .thenReturn(buildDetailResponse());
+
+        mockMvc.perform(get("/api/v1/orders/" + orderId)
+                        .header("X-User-Role", "ADMIN")
+                        .header("X-User-Id", differentClientId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(orderId.toString()));
     }
 
     // --- GET /orders ---
@@ -485,7 +541,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturnRoutingDestinationInOrderDetailResponse() throws Exception {
-        when(orderService.getOrderById(orderId)).thenReturn(buildDetailResponseWithVenue("NASDAQ"));
+        when(orderService.getOrderById(eq(orderId), any(), any())).thenReturn(buildDetailResponseWithVenue("NASDAQ"));
 
         mockMvc.perform(get("/api/v1/orders/" + orderId)
                         .header("X-User-Role", "TRADER"))

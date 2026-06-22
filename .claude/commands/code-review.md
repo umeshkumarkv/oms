@@ -1,4 +1,4 @@
-# Code Review Agent — SCRUM-61
+# Code Review Agent — Broker Dealer OMS
 
 Audit a PR diff against CLAUDE.md coding standards and post a structured GitHub review.
 
@@ -7,6 +7,20 @@ Audit a PR diff against CLAUDE.md coding standards and post a structured GitHub 
 /code-review SCRUM-{n}
 /code-review pr:{n}
 ```
+
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: auditing the PR diff against CLAUDE.md coding standards (12 categories) and posting a structured GitHub review.
+
+This agent **NEVER**:
+- Fixes code or edits source files
+- Makes architecture decisions or suggests design changes
+- Approves a PR that has violations
+- Requests changes for style issues not covered by CLAUDE.md
+
+Escalate to human if: a violation is ambiguous or a new pattern appears that is not in CLAUDE.md.
+
+---
 
 ## GitHub Write Guard — Human Approval Required
 
@@ -182,6 +196,37 @@ gh pr review {pr-number} \
 {REQUEST CHANGES — {n} violation(s) found, see line comments above}
 "
 ```
+
+## Phase 3 — JIRA Update
+
+After posting the GitHub review, update JIRA to reflect the code review outcome.
+
+**If APPROVED:**
+
+Add JIRA comment:
+```
+Code Review Agent ({date}): PR #{pr-number} APPROVED — all 12 categories passed.
+Ready for QA. Run: /qa-eval-loop SCRUM-{n}
+```
+
+Add label `bmad-code-review-approved` to the ticket (apply JIRA Write Guard first).
+
+**If REQUEST CHANGES:**
+
+Add JIRA comment:
+```
+Code Review Agent ({date}): PR #{pr-number} — REQUEST CHANGES
+{n} violation(s) found across {categories} categories.
+See GitHub PR #{pr-number} for line-level comments.
+
+Violations summary:
+{numbered list of violations with file:line}
+
+Action required: fix violations on branch {branch-name} and re-run /code-review SCRUM-{n}.
+```
+
+Apply the **JIRA Write Guard**, then transition ticket: In Review → **In Progress**
+(Rationale: code is not reviewable until violations are fixed; returning to In Progress signals active rework.)
 
 ## Hard Stops — always pause and ask the user
 

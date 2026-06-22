@@ -31,7 +31,7 @@ public class RoleAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String ROLE_HEADER = "X-User-Role";
     private static final Set<String> ALL_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS", "ADMIN");
-    private static final Set<String> ORDER_READ_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS");
+    private static final Set<String> ORDER_READ_ROLES = Set.of("VIEWER", "TRADER", "OPERATIONS", "ADMIN");
     private static final Set<String> DASHBOARD_ROLES = Set.of("TRADER", "OPERATIONS", "ADMIN");
 
     private final ObjectMapper objectMapper = new ObjectMapper();

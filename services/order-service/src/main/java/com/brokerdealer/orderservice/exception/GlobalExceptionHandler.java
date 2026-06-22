@@ -53,6 +53,12 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(OrderAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleOrderAccessDenied(OrderAccessDeniedException ex) {
+        log.warn("Order access denied: code={} message={}", ex.getErrorCode(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getErrorCode(), ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(ServiceUnavailableException.class)
     public ResponseEntity<Map<String, Object>> handleServiceUnavailable(ServiceUnavailableException ex) {
         log.warn("Downstream service unavailable: {}", ex.getMessage());

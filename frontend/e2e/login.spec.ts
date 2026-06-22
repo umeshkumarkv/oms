@@ -64,4 +64,20 @@ test.describe('Login page', () => {
     await page.goto('/')
     await expect(page).toHaveURL(/\/dashboard/)
   })
+
+  test('shows inline error for invalid credentials', async ({ page }) => {
+    await page.getByLabel('Username').fill('trader.john')
+    await page.getByLabel('Password').fill('WrongPassword!')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    // Auth service returns 401 for bad password → inline error rendered
+    await expect(page.getByText('Invalid username or password')).toBeVisible({ timeout: 8000 })
+  })
+
+  test('successful login navigates to /dashboard', async ({ page }) => {
+    // Fills the form and submits — depends on auth service being up
+    await page.getByRole('button', { name: 'trader.john' }).click()
+    await page.getByLabel('Password').fill('Demo@1234')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 10000 })
+  })
 })

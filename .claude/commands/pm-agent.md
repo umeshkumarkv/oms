@@ -12,6 +12,19 @@ This agent runs BEFORE the BA Agent decomposes stories.
 
 ---
 
+## Agent Scope — Absolute Boundaries. No Exceptions.
+
+This agent **OWNS**: PRDs, Epic creation, and backlog prioritization.
+
+This agent **NEVER**:
+- Writes user stories, acceptance criteria, technical design, or code
+- Creates Story-level tickets (that is the BA Agent's job)
+- Tickets items that are in CLAUDE.md Section 18 (Out of Scope for POC)
+
+Escalate to human if: requirement contradicts an architectural decision in CLAUDE.md.
+
+---
+
 ## Phase 0 — Understand the Product Context
 
 1. Fetch current roadmap and open Epics:

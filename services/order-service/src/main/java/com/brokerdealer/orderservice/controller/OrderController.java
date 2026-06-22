@@ -62,8 +62,18 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrderDetailResponse> getOrderById(@PathVariable UUID id) {
-        OrderDetailResponse response = orderService.getOrderById(id);
+    public ResponseEntity<OrderDetailResponse> getOrderById(
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        UUID callerUserId = null;
+        if (userId != null && !userId.isBlank()) {
+            try {
+                callerUserId = UUID.fromString(userId);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        OrderDetailResponse response = orderService.getOrderById(id, callerUserId, role);
         return ResponseEntity.ok(response);
     }
 }

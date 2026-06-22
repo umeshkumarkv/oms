@@ -20,6 +20,7 @@ import com.brokerdealer.orderservice.dto.response.OrderDetailResponse;
 import com.brokerdealer.orderservice.dto.response.OrderListResponse;
 import com.brokerdealer.orderservice.dto.response.StatusCountsResponse;
 import com.brokerdealer.orderservice.dto.response.SubmitOrderResponse;
+import com.brokerdealer.orderservice.exception.OrderAccessDeniedException;
 import com.brokerdealer.orderservice.exception.ClientInactiveException;
 import com.brokerdealer.orderservice.exception.ClientNotEligibleException;
 import com.brokerdealer.orderservice.exception.ClientNotFoundException;
@@ -646,7 +647,7 @@ class OrderServiceTest {
         Order order = buildOrder(orderId, OrderStatus.NEW);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-        OrderDetailResponse response = orderService.getOrderById(orderId);
+        OrderDetailResponse response = orderService.getOrderById(orderId, null, "OPERATIONS");
 
         assertThat(response.getData().getId()).isEqualTo(orderId);
         assertThat(response.getData().getStatus()).isEqualTo("NEW");
@@ -662,7 +663,7 @@ class OrderServiceTest {
         Order order = buildOrder(orderId, OrderStatus.RISK_CHECK_PASSED);
         when(valueOperations.get("order:state:" + orderId)).thenReturn(order);
 
-        OrderDetailResponse response = orderService.getOrderById(orderId);
+        OrderDetailResponse response = orderService.getOrderById(orderId, null, "OPERATIONS");
 
         assertThat(response.getData().getStatus()).isEqualTo("RISK_CHECK_PASSED");
         verify(orderRepository, never()).findById(any());
@@ -690,7 +691,7 @@ class OrderServiceTest {
 
         when(executionServiceClient.getFills(orderId)).thenReturn(List.of(fill1, fill2));
 
-        OrderDetailResponse response = orderService.getOrderById(orderId);
+        OrderDetailResponse response = orderService.getOrderById(orderId, null, "OPERATIONS");
 
         assertThat(response.getData().getFilledQuantity()).isEqualTo(10);
         assertThat(response.getData().getAvgFillPrice()).isEqualTo("151.0000");
@@ -702,7 +703,7 @@ class OrderServiceTest {
         UUID orderId = UUID.randomUUID();
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> orderService.getOrderById(orderId))
+        assertThatThrownBy(() -> orderService.getOrderById(orderId, null, "OPERATIONS"))
                 .isInstanceOf(OrderNotFoundException.class);
     }
 
@@ -713,11 +714,71 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(executionServiceClient.getFills(orderId)).thenReturn(Collections.emptyList());
 
-        OrderDetailResponse response = orderService.getOrderById(orderId);
+        OrderDetailResponse response = orderService.getOrderById(orderId, null, "OPERATIONS");
 
         assertThat(response.getData().getFills()).isEmpty();
         assertThat(response.getData().getFilledQuantity()).isEqualTo(0);
         assertThat(response.getData().getAvgFillPrice()).isNull();
+    }
+
+    // --- SCRUM-198: TRADER ownership guard ---
+
+    @Test
+    void shouldReturnOrderDetailWhenTraderAccessesOwnOrder() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.NEW);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        OrderDetailResponse response = orderService.getOrderById(orderId, clientId, "TRADER");
+
+        assertThat(response.getData().getId()).isEqualTo(orderId);
+        assertThat(response.getData().getClientId()).isEqualTo(clientId);
+    }
+
+    @Test
+    void shouldThrowAccessDeniedWhenTraderAccessesOtherClientsOrder() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.NEW);
+        UUID otherClientId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.getOrderById(orderId, otherClientId, "TRADER"))
+                .isInstanceOf(OrderAccessDeniedException.class)
+                .hasMessageContaining("TRADER may only access their own client's orders");
+    }
+
+    @Test
+    void shouldThrowAccessDeniedWhenTraderCallerUserIdIsNull() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.NEW);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.getOrderById(orderId, null, "TRADER"))
+                .isInstanceOf(OrderAccessDeniedException.class);
+    }
+
+    @Test
+    void shouldReturnOrderDetailWhenOperationsAccessesAnyOrder() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.FILLED);
+        UUID differentClientId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        OrderDetailResponse response = orderService.getOrderById(orderId, differentClientId, "OPERATIONS");
+
+        assertThat(response.getData().getId()).isEqualTo(orderId);
+    }
+
+    @Test
+    void shouldReturnOrderDetailWhenAdminAccessesAnyOrder() {
+        UUID orderId = UUID.randomUUID();
+        Order order = buildOrder(orderId, OrderStatus.FILLED);
+        UUID differentClientId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        OrderDetailResponse response = orderService.getOrderById(orderId, differentClientId, "ADMIN");
+
+        assertThat(response.getData().getId()).isEqualTo(orderId);
     }
 
     // --- SCRUM-119: Portfolio snapshot enrichment fields ---
