@@ -6,6 +6,7 @@ At sprint close, run `/sm-agent release-notes` to produce the full release pack 
 ## Usage
 ```
 /sm-agent                — daily standup health check
+/sm-agent SCRUM-{n}      — single-ticket health check + DoD gate for one story
 /sm-agent release-notes  — sprint-close: Release Notes → Confluence + Go/No-Go meeting pack
 ```
 
@@ -193,6 +194,76 @@ Highlight the most urgent item needing human action today.
 
 - JIRA API returns an error fetching sprint data
 - Cannot determine which sprint is active (multiple open sprints)
+- A blocker chain creates a circular dependency (A blocks B blocks A)
+
+---
+
+## Single-Ticket Mode — /sm-agent SCRUM-{n}
+
+Runs all applicable health checks against one specific ticket and applies JIRA comments or transitions only to that ticket.
+
+### Phase 0 — Fetch Ticket
+
+```
+getJiraIssue(
+  issueIdOrKey: "SCRUM-{n}",
+  fields: ["summary", "status", "assignee", "created", "updated", "labels",
+           "description", "comment", "issuelinks", "priority"]
+)
+```
+
+Hard stop if the ticket key does not exist or the API returns an error.
+
+### Phase 1 — Run Applicable Checks
+
+Run checks 1–6 against the single ticket. Skip check 7 (velocity requires sprint-wide data — report as N/A).
+
+| Check | Applies when |
+|-------|-------------|
+| 1. Stuck In Progress (> 2 days) | status = In Progress |
+| 2. Stuck In Review (> 1 day)    | status = In Review |
+| 3. Blocked                      | ticket has issuelinks of type "is blocked by" |
+| 4. Unassigned                   | status = To Do and no assignee |
+| 5. Missing ACs                  | description has no "Acceptance Criteria" section |
+| 6. DoD Gate                     | status = In Review |
+
+Apply the same comment templates and transition logic as daily mode (Phase 1, Checks 1–6).
+
+For the DoD gate (Check 6), run the same verification steps:
+```bash
+gh pr list --search "SCRUM-{n}" --state merged --json number,mergedAt | jq .
+```
+Search ticket comments for "QA Eval Loop Report" and label `bmad-code-review-approved`.
+Check for open bugs: `searchJiraIssuesUsingJql("project = SCRUM AND issueType = Bug AND text ~ 'SCRUM-{n}' AND status != Done")`
+
+### Phase 2 — Single-Ticket Report
+
+Print in this exact format:
+
+```
+SM Agent — SCRUM-{n} — {YYYY-MM-DD}
+
+Ticket  : SCRUM-{n} {summary}
+Status  : {status}
+Assignee: {name or UNASSIGNED}
+Age     : {n} day(s) in current status
+
+CHECKS
+  Stuck In Progress  : {OK | AT RISK — {n} days | N/A}
+  Stuck In Review    : {OK | NEEDS ATTENTION — {n} days | N/A}
+  Blocked            : {None | BLOCKED by SCRUM-{x} ({blocker status})}
+  Assignee           : {OK | UNASSIGNED}
+  Acceptance Criteria: {Present | MISSING}
+  DoD Gate           : {PASSED | FAILED — missing: [...] | N/A (not In Review)}
+  Velocity           : N/A (sprint-wide metric — run /sm-agent for full sprint health)
+
+ACTIONS TAKEN
+  {List each JIRA comment posted or transition applied, or "No action needed"}
+```
+
+### Hard Stops — single-ticket mode
+
+- Ticket key does not exist or JIRA API returns an error
 - A blocker chain creates a circular dependency (A blocks B blocks A)
 
 ---
