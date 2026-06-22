@@ -22,7 +22,7 @@ const BG: Record<ToastType, string> = {
 const Toast: React.FC<ToastProps> = ({ message, type }) => (
   <div style={{
     background: BG[type],
-    color: '#fff',
+    color: 'var(--color-surface)',
     padding: '14px 20px',
     borderRadius: 'var(--radius-lg)',
     boxShadow: 'var(--shadow-lg)',
