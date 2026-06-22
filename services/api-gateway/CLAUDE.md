@@ -60,7 +60,15 @@ The gateway does not expose its own business endpoints. It proxies all routes.
 | /api/v1/risk/**       | risk-service         | 8085 | Yes          |
 | /api/v1/executions/** | execution-service    | 8086 | Yes          |
 | /api/v1/audit/**      | audit-service        | 8087 | Yes          |
+| /api/v1/notifications/stream | notification-service | 8088 | Yes (SSE — see note) |
+| /api/v1/notifications/** | notification-service | 8088 | Yes         |
 | /actuator/**          | gateway self         | 8080 | No           |
+
+**SSE routing note**: `GET /api/v1/notifications/stream` is handled by `SseProxyFilter`
+(not Spring Cloud Gateway MVC routing) because Gateway MVC 4.1.x buffers response bodies
+before forwarding, which is incompatible with infinite SSE streams. `SseProxyFilter` runs at
+`Ordered.LOWEST_PRECEDENCE - 1` (after Spring Security / JwtValidationFilter, before
+DispatcherServlet) and pipes bytes directly to `HttpServletResponse.getOutputStream()`.
 
 See openapi.yaml for full routing contract and auth requirements.
 
@@ -92,7 +100,7 @@ None — the gateway has no domain entities or database tables.
 
 ## 11. Key Business Rules
 
-- JWT validation must run as a GlobalFilter with order -1 (highest priority)
+- JWT validation must run as a OncePerRequestFilter with order -1 (highest priority)
 - Login endpoint (/api/v1/auth/login) is the only path that bypasses JWT check
 - Actuator endpoints bypass JWT check (internal health probes only)
 - JWT algorithm: HS256 — secret from JWT_SECRET environment variable
@@ -103,3 +111,7 @@ None — the gateway has no domain entities or database tables.
 - Spring Cloud Gateway MVC (servlet stack) with Java 21 virtual threads — do NOT introduce WebFlux/reactive code
 - Virtual threads enabled via spring.threads.virtual.enabled=true — all servlet threads are virtual
 - Filters extend OncePerRequestFilter (servlet) — not GlobalFilter (reactive)
+- SseProxyFilter (LOWEST_PRECEDENCE - 1) handles GET /api/v1/notifications/stream:
+  bypasses Gateway MVC response buffering by writing directly to HttpServletResponse
+- GatewayConfig provides `sseRequestFactory` bean (SimpleClientHttpRequestFactory,
+  connectTimeout=5000ms, readTimeout=0) for the SSE upstream connection

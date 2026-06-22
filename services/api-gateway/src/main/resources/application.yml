@@ -73,6 +73,12 @@ management:
         enabled: true
       show-details: always
 
+notification:
+  service:
+    url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8088}
+  stream:
+    connect-timeout-ms: 5000
+
 logging:
   level:
     com.brokerdealer: INFO
