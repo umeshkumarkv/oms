@@ -25,4 +25,6 @@ public class InstrumentResponse {
     Integer minQuantity;
     Integer maxQuantity;
     String dataTimestamp;
+    String cusip;
+    String secNumber;
 }

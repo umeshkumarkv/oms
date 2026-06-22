@@ -315,6 +315,58 @@ class MarketDataControllerTest {
     }
 
     @Test
+    void shouldIncludeCusipAndSecNumberInGetInstrumentResponse() throws Exception {
+        InstrumentResponse response = InstrumentResponse.builder()
+                .symbol("AAPL")
+                .bidPrice("174.95")
+                .askPrice("175.05")
+                .lastPrice("175.00")
+                .change("1.25")
+                .changePct("0.71")
+                .tradable(true)
+                .halted(false)
+                .minQuantity(1)
+                .maxQuantity(10000)
+                .dataTimestamp("2026-04-27T06:00:00Z")
+                .cusip("037833100")
+                .secNumber("320193")
+                .build();
+
+        when(marketDataService.getInstrument("AAPL")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/market/instrument/AAPL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cusip").value("037833100"))
+                .andExpect(jsonPath("$.data.secNumber").value("320193"));
+    }
+
+    @Test
+    void shouldReturnNullCusipAndSecNumberForInstrumentWithoutIdentifiers() throws Exception {
+        InstrumentResponse response = InstrumentResponse.builder()
+                .symbol("HALT")
+                .bidPrice("49.90")
+                .askPrice("50.10")
+                .lastPrice("50.00")
+                .change("0")
+                .changePct("0")
+                .tradable(true)
+                .halted(true)
+                .minQuantity(1)
+                .maxQuantity(10000)
+                .dataTimestamp("2026-04-27T06:00:00Z")
+                .cusip("999999999")
+                .secNumber("9999999")
+                .build();
+
+        when(marketDataService.getInstrument("HALT")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/market/instrument/HALT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cusip").value("999999999"))
+                .andExpect(jsonPath("$.data.secNumber").value("9999999"));
+    }
+
+    @Test
     void shouldReturn200WithInstrumentSummaryListIncludingNewFields() throws Exception {
         List<InstrumentSummaryResponse> instruments = List.of(
                 InstrumentSummaryResponse.builder()
