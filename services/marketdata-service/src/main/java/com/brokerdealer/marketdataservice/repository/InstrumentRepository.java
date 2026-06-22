@@ -12,4 +12,10 @@ public interface InstrumentRepository extends JpaRepository<Instrument, String> 
     List<Instrument> findAllByOrderBySymbolAsc();
 
     List<Instrument> findAllByTradableIsTrueAndTradingHaltedIsFalseOrderBySymbolAsc();
+
+    List<Instrument> findBySymbolContainingIgnoreCaseOrderBySymbolAsc(String symbol);
+
+    List<Instrument> findByCusipIgnoreCaseOrderBySymbolAsc(String cusip);
+
+    List<Instrument> findBySecNumberIgnoreCaseOrderBySymbolAsc(String secNumber);
 }
