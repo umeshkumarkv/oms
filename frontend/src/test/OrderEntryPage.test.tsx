@@ -1279,4 +1279,51 @@ describe('OrderEntryPage — API error surfacing (SCRUM-192)', () => {
       )).toBeInTheDocument()
     })
   })
+
+  it('shouldShowWarningToastWhenGetInstrumentsFetchFails', async () => {
+    const { getInstruments } = await import('../api/marketApi')
+    vi.mocked(getInstruments).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+
+    await waitFor(() =>
+      expect(screen.getByText(
+        'Failed to load instrument list — symbol autocomplete unavailable'
+      )).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowWarningToastWhenGetInstrumentFetchFailsWithNetworkError', async () => {
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'NVDA' } })
+    })
+    await waitFor(
+      () => expect(screen.getByText(
+        'Failed to fetch quote for NVDA — market data temporarily unavailable'
+      )).toBeInTheDocument(),
+      { timeout: 1500 }
+    )
+  })
+
+  it('shouldShowQuoteUnavailableMessageInMarketQuotePanelWhenGetInstrumentNetworkFails', async () => {
+    const { getInstrument } = await import('../api/marketApi')
+    vi.mocked(getInstrument).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search ticker — e.g. AAPL, MSFT, NVDA'), { target: { value: 'NVDA' } })
+    })
+    await waitFor(
+      () => expect(screen.getByText(
+        'Unable to fetch quote — market data temporarily unavailable'
+      )).toBeInTheDocument(),
+      { timeout: 1500 }
+    )
+  })
 })

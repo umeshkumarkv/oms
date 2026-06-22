@@ -184,6 +184,7 @@ const OrderEntryPage: React.FC = () => {
   const [symbolNotFound, setSymbolNotFound] = useState(false)
   const [portfolioError, setPortfolioError] = useState(false)
   const [clientsError,   setClientsError]   = useState(false)
+  const [quoteError,     setQuoteError]     = useState(false)
 
   const symbolDebounce    = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clientSelectRef   = useRef<HTMLSelectElement>(null)
@@ -236,6 +237,7 @@ const OrderEntryPage: React.FC = () => {
     setSubmitError(null)
     setQuote(null)
     setSymbolNotFound(false)
+    setQuoteError(false)
     setSide('BUY')
     setOrderType('LIMIT')
     setRoutingDestination('')
@@ -268,7 +270,9 @@ const OrderEntryPage: React.FC = () => {
   )
 
   useEffect(() => {
-    getInstruments().then(setInstruments)
+    getInstruments().then(setInstruments).catch(() => {
+      addToast('Failed to load instrument list — symbol autocomplete unavailable', TOAST_TYPE.WARNING)
+    })
     getHolidays().then(setHolidays).catch(() => {
       addToast('Failed to load market holidays — holiday dates may not be excluded from the date picker', TOAST_TYPE.WARNING)
     })
@@ -290,10 +294,11 @@ const OrderEntryPage: React.FC = () => {
 
   useEffect(() => {
     if (symbolDebounce.current) clearTimeout(symbolDebounce.current)
-    if (!symbol) { setQuote(null); setSymbolNotFound(false); return }
+    if (!symbol) { setQuote(null); setSymbolNotFound(false); setQuoteError(false); return }
     symbolDebounce.current = setTimeout(async () => {
       setQuoteLoading(true)
       setSymbolNotFound(false)
+      setQuoteError(false)
       try {
         const q = await getInstrument(symbol)
         setQuote(q)
@@ -306,6 +311,10 @@ const OrderEntryPage: React.FC = () => {
         if (code === 'SYMBOL_NOT_FOUND') {
           setSymbolNotFound(true)
           setQuote(null)
+        } else {
+          setQuote(null)
+          setQuoteError(true)
+          addToast(`Failed to fetch quote for ${symbol} — market data temporarily unavailable`, TOAST_TYPE.WARNING)
         }
       }
       setQuoteLoading(false)
@@ -849,6 +858,9 @@ const OrderEntryPage: React.FC = () => {
             </div>
             {!symbol && !quoteLoading && (
               <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
+            )}
+            {quoteError && !quoteLoading && symbol && (
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Unable to fetch quote — market data temporarily unavailable</div>
             )}
             {quoteLoading && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
