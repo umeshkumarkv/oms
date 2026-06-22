@@ -339,7 +339,7 @@ describe('OrderEntryPage — sell quantity vs holdings validation', () => {
     await act(async () => { fireEvent.click(screen.getByText('SELL')) })
 
     await waitFor(() =>
-      expect(screen.getByText('Portfolio data unavailable — holding check skipped')).toBeInTheDocument()
+      expect(screen.getByText('Unable to load portfolio data — please refresh')).toBeInTheDocument()
     )
   })
 
@@ -1195,5 +1195,88 @@ describe('OrderEntryPage — tab navigation and aria labels (SCRUM-141)', () => 
     })
 
     expect(screen.getByRole('combobox', { name: 'Client' })).toHaveFocus()
+  })
+})
+
+// ── SCRUM-192 — API error surfacing ───────────────────────────────────────────
+describe('OrderEntryPage — API error surfacing (SCRUM-192)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldShowWarningToastWhenHolidaysFetchFails', async () => {
+    const { getHolidays } = await import('../api/marketApi')
+    vi.mocked(getHolidays).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+
+    await waitFor(() =>
+      expect(screen.getByText(
+        'Failed to load market holidays — holiday dates may not be excluded from the date picker'
+      )).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowErrorToastWhenClientsFetchFails', async () => {
+    const { getClients } = await import('../api/clientApi')
+    vi.mocked(getClients).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+
+    await waitFor(() =>
+      expect(screen.getByText(
+        'Failed to load client list — please refresh and try again'
+      )).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowErrorOptionInClientDropdownWhenClientsFetchFails', async () => {
+    const { getClients } = await import('../api/clientApi')
+    vi.mocked(getClients).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+
+    await waitFor(() => {
+      const option = screen.getByRole('option', { name: 'Failed to load clients' }) as HTMLOptionElement
+      expect(option).toBeInTheDocument()
+      expect(option.value).toBe('API_ERROR')
+    })
+  })
+
+  it('shouldShowInlinePortfolioErrorWhenPortfolioFetchFails', async () => {
+    const { getPortfolio } = await import('../api/clientApi')
+    vi.mocked(getPortfolio).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByRole('combobox', { name: 'Client' }), {
+        target: { value: 'a1000000-0000-0000-0000-000000000001' },
+      })
+    })
+    await act(async () => {})
+
+    await waitFor(() =>
+      expect(screen.getByText(
+        'Unable to load portfolio data — please refresh'
+      )).toBeInTheDocument()
+    )
+  })
+
+  it('shouldShowBothToastsWhenHolidaysAndClientsBothFail', async () => {
+    const { getHolidays } = await import('../api/marketApi')
+    const { getClients } = await import('../api/clientApi')
+    vi.mocked(getHolidays).mockRejectedValueOnce(new Error('Network error'))
+    vi.mocked(getClients).mockRejectedValueOnce(new Error('Network error'))
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.getByText(
+        'Failed to load market holidays — holiday dates may not be excluded from the date picker'
+      )).toBeInTheDocument()
+      expect(screen.getByText(
+        'Failed to load client list — please refresh and try again'
+      )).toBeInTheDocument()
+    })
   })
 })

@@ -13,8 +13,10 @@ import { Client, Portfolio } from '../types/client.types'
 import { OrderSide, OrderType, TimeInForce } from '../types/order.types'
 import { DEFAULT_VENUE, SOR_VENUES } from '../config/sorVenues'
 import { formatPriceToTwoDecimal } from '../utils/priceUtils'
-import { IDLE_TIMER_SECONDS, SYMBOL_DEBOUNCE_MS, TOAST_DISMISS_MS, TOAST_SUCCESS_NAV_MS } from '../utils/constants'
-import Toast from '../components/Toast'
+import { IDLE_TIMER_SECONDS, SYMBOL_DEBOUNCE_MS, TOAST_SUCCESS_NAV_MS } from '../utils/constants'
+import ToastStack from '../components/ToastStack'
+import { TOAST_TYPE } from '../components/Toast'
+import { useToast } from '../hooks/useToast'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: string | number): string => {
@@ -176,9 +178,7 @@ const OrderEntryPage: React.FC = () => {
 
   const [submitting,   setSubmitting]   = useState(false)
   const [submitError,  setSubmitError]  = useState<SubmitError | null>(null)
-  const [showToast,    setShowToast]    = useState(false)
-  const [toastMsg,     setToastMsg]     = useState('')
-  const [toastType,    setToastType]    = useState<'success' | 'warning' | 'error'>('success')
+  const { toasts, addToast } = useToast()
   const [fieldErrors,  setFieldErrors]  = useState<FieldErrors>({})
   const [showModal,    setShowModal]    = useState(false)
   const [symbolNotFound, setSymbolNotFound] = useState(false)
@@ -270,10 +270,7 @@ const OrderEntryPage: React.FC = () => {
   useEffect(() => {
     getInstruments().then(setInstruments)
     getHolidays().then(setHolidays).catch(() => {
-      setToastMsg('Failed to load market holidays — holiday dates may not be excluded from the date picker')
-      setToastType('warning')
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), TOAST_DISMISS_MS)
+      addToast('Failed to load market holidays — holiday dates may not be excluded from the date picker', TOAST_TYPE.WARNING)
     })
     getClients().then((list) => {
       setClients(list)
@@ -281,10 +278,7 @@ const OrderEntryPage: React.FC = () => {
       if (list.length > 0) clientSelectRef.current?.focus()
     }).catch(() => {
       setClientsError(true)
-      setToastMsg('Failed to load client list — please refresh and try again')
-      setToastType('error')
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), TOAST_DISMISS_MS)
+      addToast('Failed to load client list — please refresh and try again', TOAST_TYPE.ERROR)
     })
   }, [])
 
@@ -407,10 +401,8 @@ const OrderEntryPage: React.FC = () => {
         gtdDate: tif === 'GTD' && gtdDateStr ? gtdDateStr : undefined,
         routingDestination: SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination,
       })
-      setToastMsg(`Order ${res.orderId} submitted successfully`)
-      setToastType('success')
-      setShowToast(true)
-      setTimeout(() => { setShowToast(false); navigate('/orders') }, TOAST_SUCCESS_NAV_MS)
+      addToast(`Order ${res.orderId} submitted successfully`, TOAST_TYPE.SUCCESS, TOAST_SUCCESS_NAV_MS)
+      setTimeout(() => navigate('/orders'), TOAST_SUCCESS_NAV_MS)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string; details?: ErrorDetail[] } } } }
       const errBody  = axiosErr?.response?.data?.error
@@ -462,7 +454,7 @@ const OrderEntryPage: React.FC = () => {
     <div style={s.page}>
 
       {/* Toast */}
-      {showToast && <Toast message={toastMsg} type={toastType} />}
+      <ToastStack toasts={toasts} />
 
       {/* Risk Rejected Modal */}
       {showModal && submitError && (
