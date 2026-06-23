@@ -97,6 +97,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/market/instruments/search:
+    get:
+      summary: Search instruments by symbol (partial), CUSIP (exact), or SEC number (exact)
+      operationId: searchInstruments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search term — matched against symbol (partial), CUSIP (exact), or SEC number (exact)
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [SYMBOL, CUSIP, SEC_NUMBER, ALL]
+            default: ALL
+          description: Filter search to a specific match type (default ALL)
+      responses:
+        '200':
+          description: List of matching instruments (may be empty)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentSearchListResponse'
+        '400':
+          description: Missing required query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/market/instruments:
     get:
       summary: List all instruments
@@ -261,6 +302,41 @@ components:
           type: string
           description: SEC CIK identifier, nullable
           example: "320193"
+
+    InstrumentSearchResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        companyName:
+          type: string
+          nullable: true
+        exchange:
+          type: string
+          nullable: true
+        cusip:
+          type: string
+          description: 9-character CUSIP identifier, nullable
+          nullable: true
+        secNumber:
+          type: string
+          description: SEC CIK identifier, nullable
+          nullable: true
+        lastPrice:
+          type: string
+          description: BigDecimal string
+        tradable:
+          type: boolean
+
+    InstrumentSearchListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstrumentSearchResult'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
 
     InstrumentResponse:
       type: object

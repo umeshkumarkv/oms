@@ -1,6 +1,7 @@
 package com.brokerdealer.marketdataservice.service;
 
 import com.brokerdealer.marketdataservice.domain.Instrument;
+import com.brokerdealer.marketdataservice.domain.SearchType;
 import com.brokerdealer.marketdataservice.dto.response.IndexEntryResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -55,10 +56,12 @@ public class MarketDataService {
 
     private static final String CACHE_KEY_PREFIX = "market:price:";
     private static final String SEARCH_CACHE_KEY_PREFIX = "market:search:";
+    private static final String INSTRUMENT_SEARCH_CACHE_KEY_PREFIX = "market:instrument:search:";
     private static final String MOVERS_CACHE_KEY = "market:movers";
     private static final String INDICES_CACHE_KEY = "market:indices";
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static final Duration SEARCH_CACHE_TTL = Duration.ofSeconds(10);
+    private static final Duration INSTRUMENT_SEARCH_CACHE_TTL = Duration.ofSeconds(60);
     private static final int SEARCH_MAX_LIMIT = 20;
     private static final int MOVERS_LIMIT = 5;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
@@ -205,6 +208,55 @@ public class MarketDataService {
         log.debug("Search cache populated: q={}, hits={}", normalised, results.size());
 
         return results.stream().limit(effectiveLimit).toList();
+    }
+
+    public List<InstrumentSearchResponse> searchInstrumentsByType(String query, SearchType type) {
+        String normalised = query.trim();
+        String cacheKey = INSTRUMENT_SEARCH_CACHE_KEY_PREFIX + normalised.toLowerCase() + ":" + type.name();
+        log.debug("Searching instruments: query={}, type={}", normalised, type);
+
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.debug("Instrument search cache hit: query={}, type={}", normalised, type);
+            return objectMapper.convertValue(cached, new TypeReference<List<InstrumentSearchResponse>>() {});
+        }
+
+        List<InstrumentSearchResponse> results = switch (type) {
+            case SYMBOL -> instrumentRepository
+                    .findBySymbolContainingIgnoreCaseOrderBySymbolAsc(normalised)
+                    .stream()
+                    .map(instrumentSearchMapper::toSearchResponse)
+                    .toList();
+            case CUSIP -> instrumentRepository
+                    .findByCusipIgnoreCaseOrderBySymbolAsc(normalised)
+                    .stream()
+                    .map(instrumentSearchMapper::toSearchResponse)
+                    .toList();
+            case SEC_NUMBER -> instrumentRepository
+                    .findBySecNumberIgnoreCaseOrderBySymbolAsc(normalised)
+                    .stream()
+                    .map(instrumentSearchMapper::toSearchResponse)
+                    .toList();
+            case ALL -> {
+                String qUpper = normalised.toUpperCase();
+                yield instrumentRepository.findAllByOrderBySymbolAsc()
+                        .stream()
+                        .filter(i -> matchesAny(i, qUpper))
+                        .map(instrumentSearchMapper::toSearchResponse)
+                        .toList();
+            }
+        };
+
+        redisTemplate.opsForValue().set(cacheKey, results, INSTRUMENT_SEARCH_CACHE_TTL);
+        log.debug("Instrument search cache populated: query={}, type={}, hits={}", normalised, type, results.size());
+        return results;
+    }
+
+    private boolean matchesAny(Instrument instrument, String qUpper) {
+        if (instrument.getSymbol().toUpperCase().contains(qUpper)) return true;
+        if (instrument.getCusip() != null && instrument.getCusip().equalsIgnoreCase(qUpper)) return true;
+        if (instrument.getSecNumber() != null && instrument.getSecNumber().equalsIgnoreCase(qUpper)) return true;
+        return false;
     }
 
     private boolean matchesQuery(Instrument instrument, String qUpper) {

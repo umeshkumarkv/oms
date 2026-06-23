@@ -1,5 +1,6 @@
 package com.brokerdealer.marketdataservice.controller;
 
+import com.brokerdealer.marketdataservice.domain.SearchType;
 import com.brokerdealer.marketdataservice.dto.response.IndexEntryResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentResponse;
 import com.brokerdealer.marketdataservice.dto.response.InstrumentSearchResponse;
@@ -53,6 +54,15 @@ public class MarketDataController {
     public ResponseEntity<Map<String, Object>> getHolidays() {
         log.debug("GET /api/v1/market/holidays");
         List<MarketHolidayResponse> data = marketDataService.getHolidays();
+        return ResponseEntity.ok(buildSuccessResponse(data));
+    }
+
+    @GetMapping("/instruments/search")
+    public ResponseEntity<Map<String, Object>> searchInstrumentsByType(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "ALL") SearchType type) {
+        log.debug("GET /api/v1/market/instruments/search?query={}&type={}", query, type);
+        List<InstrumentSearchResponse> data = marketDataService.searchInstrumentsByType(query, type);
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 
