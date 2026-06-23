@@ -25,6 +25,8 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -100,6 +102,34 @@ class RiskRuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void shouldReturn200WithAllThirteenRulesWhenSeeded() throws Exception {
+        List<RiskRuleResponse> thirteenRules = IntStream.rangeClosed(1, 13)
+                .mapToObj(i -> RiskRuleResponse.builder()
+                        .ruleCode("RULE_" + i)
+                        .ruleName("Rule " + i)
+                        .ruleCategory("FINANCIAL_LIMIT")
+                        .description("Rule description " + i)
+                        .enabled(i <= 2)
+                        .action("REJECT")
+                        .priority(i)
+                        .build())
+                .collect(Collectors.toList());
+
+        when(riskRuleService.getAllRules()).thenReturn(thirteenRules);
+
+        mockMvc.perform(get("/api/v1/risk/rules")
+                        .header("X-User-Role", ADMIN_ROLE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(13))
+                .andExpect(jsonPath("$.data[0].ruleCode").value("RULE_1"))
+                .andExpect(jsonPath("$.data[0].enabled").value(true))
+                .andExpect(jsonPath("$.data[2].enabled").value(false))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
     }
 
     // ─── PATCH /api/v1/risk/rules/{ruleCode} ─────────────────────────────────

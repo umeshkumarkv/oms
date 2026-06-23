@@ -94,6 +94,36 @@ class RiskRuleServiceTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    void shouldMapNullThresholdValueToNullInResponse() {
+        RiskRuleConfig ruleWithNullThreshold = RiskRuleConfig.builder()
+                .ruleCode("CLIENT_ACTIVE_CHECK")
+                .ruleName("Client Active Check")
+                .ruleCategory("REDUNDANT")
+                .enabled(false)
+                .thresholdValue(null)
+                .description("Redundant with Level 2 validation")
+                .action("REJECT")
+                .priority(5)
+                .updatedAt(Instant.now())
+                .build();
+
+        RiskRuleResponse responseWithNullThreshold = RiskRuleResponse.builder()
+                .ruleCode("CLIENT_ACTIVE_CHECK")
+                .enabled(false)
+                .thresholdValue(null)
+                .build();
+
+        when(riskRuleConfigRepository.findAllByOrderByPriorityAsc()).thenReturn(List.of(ruleWithNullThreshold));
+        when(riskRuleMapper.toResponse(ruleWithNullThreshold)).thenReturn(responseWithNullThreshold);
+
+        List<RiskRuleResponse> result = riskRuleService.getAllRules();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getThresholdValue()).isNull();
+        verify(riskRuleMapper).toResponse(ruleWithNullThreshold);
+    }
+
     // ─── updateRule — happy path ──────────────────────────────────────────────
 
     @Test
