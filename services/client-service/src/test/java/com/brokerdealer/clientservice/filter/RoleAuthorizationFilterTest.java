@@ -6,7 +6,6 @@ import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
-import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.service.ClientService;
 import org.junit.jupiter.api.Test;
@@ -73,8 +72,7 @@ class RoleAuthorizationFilterTest {
     @Test
     void shouldAllowViewerToGetPortfolio() throws Exception {
         when(clientService.getPortfolio(any(UUID.class)))
-                .thenReturn(PortfolioResponse.builder().cashBalance("10000.00").reservedCash("0.00")
-                        .buyingPower("10000.00").holdings(List.of()).build());
+                .thenReturn(PortfolioResponse.builder().cashBalance("10000.00").holdings(List.of()).build());
         mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID + "/portfolio")
                         .header("X-User-Role", "VIEWER"))
                 .andExpect(status().isOk());
@@ -134,22 +132,6 @@ class RoleAuthorizationFilterTest {
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.meta.timestamp").exists())
                 .andExpect(jsonPath("$.meta.requestId").exists());
-    }
-
-    // ─── System call — reserved-cash PATCH bypasses role check ───────────────
-
-    @Test
-    void shouldAllowReservedCashPatchWithoutRoleHeader() throws Exception {
-        when(clientService.adjustReservedCash(any(UUID.class), any()))
-                .thenReturn(ReservedCashResponse.builder()
-                        .clientId(UUID.fromString(CLIENT_ID))
-                        .reservedCash("1000.00")
-                        .buyingPower("9000.00")
-                        .build());
-        mockMvc.perform(patch("/api/v1/clients/" + CLIENT_ID + "/reserved-cash")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"adjustment\":\"1000.00\",\"reason\":\"ORDER_RESERVE\"}"))
-                .andExpect(status().isOk());
     }
 
     // ─── PATCH /default-route — ADMIN only ───────────────────────────────────

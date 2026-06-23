@@ -4,16 +4,13 @@ import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.Client;
 import com.brokerdealer.clientservice.domain.DefaultRoute;
 import com.brokerdealer.clientservice.domain.Holding;
-import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.HoldingDetailResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
-import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
-import com.brokerdealer.clientservice.exception.InvalidReservationException;
 import com.brokerdealer.clientservice.exception.ValidationException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
@@ -81,7 +78,6 @@ public class ClientService {
         List<ActiveClientResponse> result = clients.stream()
                 .map(c -> {
                     BigDecimal availableCash = c.getCashBalance()
-                            .subtract(c.getReservedCash())
                             .setScale(2, RoundingMode.HALF_UP);
                     boolean cashLimitWarning = false;
                     if (c.getDailyOrderLimit() != null
@@ -133,7 +129,6 @@ public class ClientService {
                         "Client not found: " + id));
 
         List<Holding> holdings = holdingRepository.findByClientId(id);
-        BigDecimal buyingPower = client.getCashBalance().subtract(client.getReservedCash());
 
         List<HoldingDetailResponse> holdingDetails = holdings.stream()
                 .map(this::buildHoldingDetail)
@@ -150,8 +145,6 @@ public class ClientService {
                 .maxOpenOrders(client.getMaxOpenOrders())
                 .defaultRoute(client.getDefaultRoute())
                 .cashBalance(client.getCashBalance().setScale(2, RoundingMode.HALF_UP).toPlainString())
-                .reservedCash(client.getReservedCash().setScale(2, RoundingMode.HALF_UP).toPlainString())
-                .buyingPower(buyingPower.setScale(2, RoundingMode.HALF_UP).toPlainString())
                 .holdings(holdingDetails)
                 .build();
     }
@@ -212,40 +205,6 @@ public class ClientService {
     }
 
     @Transactional
-    public ReservedCashResponse adjustReservedCash(UUID id, ReservedCashRequest request) {
-        log.debug("Adjusting reserved cash: clientId={}", id);
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new ClientNotFoundException("CLIENT_NOT_FOUND",
-                        "Client not found: " + id));
-
-        BigDecimal adjustment = new BigDecimal(request.getAdjustment());
-        BigDecimal newReservedCash = client.getReservedCash().add(adjustment).setScale(2, RoundingMode.HALF_UP);
-
-        if (newReservedCash.compareTo(BigDecimal.ZERO) < 0) {
-            throw new InvalidReservationException("RESERVED_CASH_BELOW_ZERO",
-                    "Reserved cash cannot go below 0. Current: " + client.getReservedCash().toPlainString()
-                            + ", adjustment: " + adjustment.toPlainString());
-        }
-        if (newReservedCash.compareTo(client.getCashBalance()) > 0) {
-            throw new InvalidReservationException("RESERVED_CASH_EXCEEDS_BALANCE",
-                    "Reserved cash cannot exceed cash balance. Cash balance: " + client.getCashBalance().toPlainString()
-                            + ", requested reserved: " + newReservedCash.toPlainString());
-        }
-
-        client.setReservedCash(newReservedCash);
-        clientRepository.save(client);
-
-        BigDecimal buyingPower = client.getCashBalance().subtract(newReservedCash).setScale(2, RoundingMode.HALF_UP);
-        log.info("Reserved cash adjusted: clientId={} newReservedCash={} buyingPower={}", id, newReservedCash, buyingPower);
-
-        return ReservedCashResponse.builder()
-                .clientId(id)
-                .reservedCash(newReservedCash.toPlainString())
-                .buyingPower(buyingPower.toPlainString())
-                .build();
-    }
-
-    @Transactional
     public void processExecutionFill(Map<String, Object> payload) {
         UUID clientId = UUID.fromString((String) payload.get("clientId"));
         String side = (String) payload.get("side");
@@ -260,16 +219,8 @@ public class ClientService {
 
         if ("BUY".equals(side)) {
             if ("REJECTED".equals(fillType)) {
-                int remainingQty = ((Number) payload.get("remainingQuantity")).intValue();
-                BigDecimal marketPrice = new BigDecimal((String) payload.get("marketPriceAtFill"));
-                BigDecimal releaseAmount = BigDecimal.valueOf(remainingQty)
-                        .multiply(marketPrice).setScale(2, RoundingMode.HALF_UP);
-                client.setReservedCash(client.getReservedCash().subtract(releaseAmount)
-                        .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
-                log.info("Reserved cash released on rejection: clientId={} released={}", clientId, releaseAmount);
+                log.info("BUY rejection processed: clientId={} no cash mutation needed", clientId);
             } else {
-                client.setReservedCash(client.getReservedCash().subtract(fillValue)
-                        .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
                 client.setCashBalance(client.getCashBalance().subtract(fillValue)
                         .setScale(2, RoundingMode.HALF_UP));
                 client.setTurnoverToday(client.getTurnoverToday().add(fillValue).setScale(2, RoundingMode.HALF_UP));

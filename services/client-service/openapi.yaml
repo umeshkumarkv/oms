@@ -165,39 +165,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/clients/{id}/reserved-cash:
-    patch:
-      summary: Adjust client reserved cash
-      operationId: adjustReservedCash
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReservedCashRequest'
-      responses:
-        '200':
-          description: Reserved cash updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReservedCashResponse'
-        '404':
-          description: Client not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
 components:
   securitySchemes:
     bearerAuth:
@@ -256,10 +223,6 @@ components:
               enum: [NASDAQ, NYSE, ARCA, BATS]
             cashBalance:
               type: string
-            reservedCash:
-              type: string
-            buyingPower:
-              type: string
             holdings:
               type: array
               items:
@@ -290,30 +253,6 @@ components:
         meta:
           $ref: '#/components/schemas/ResponseMeta'
 
-    ReservedCashRequest:
-      type: object
-      required: [adjustment, reason]
-      properties:
-        adjustment:
-          type: string
-          description: BigDecimal as string — positive to reserve, negative to release
-        reason:
-          type: string
-
-    ReservedCashResponse:
-      type: object
-      properties:
-        data:
-          type: object
-          properties:
-            clientId:
-              type: string
-              format: uuid
-            reservedCash:
-              type: string
-        meta:
-          $ref: '#/components/schemas/ResponseMeta'
-
     ActiveClientResponse:
       type: object
       properties:
@@ -330,7 +269,7 @@ components:
           example: "125000.00"
         availableCash:
           type: string
-          description: BigDecimal as string — cashBalance minus reservedCash
+          description: BigDecimal as string — settled cash balance
           example: "48500.00"
         cashLimitWarning:
           type: boolean

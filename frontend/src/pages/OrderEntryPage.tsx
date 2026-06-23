@@ -313,10 +313,9 @@ const OrderEntryPage: React.FC = () => {
   const qty        = parseInt(quantity, 10)
   const price      = orderType === 'LIMIT' ? parseFloat(limitPrice) : parseFloat(quote?.lastPrice ?? '0')
   const orderValue = !isNaN(qty) && !isNaN(price) ? qty * price : 0
-  const buyingPower   = portfolio ? parseFloat(portfolio.buyingPower) : 0
   const cashBalance   = portfolio ? parseFloat(portfolio.cashBalance) : 0
   const postOrderCash = side === 'BUY' ? cashBalance - orderValue : cashBalance + orderValue
-  const bpUsedPct  = buyingPower > 0 ? Math.min((orderValue / buyingPower) * 100, 100) : 0
+  const bpUsedPct  = cashBalance > 0 ? Math.min((orderValue / cashBalance) * 100, 100) : 0
   const holding    = portfolio?.holdings.find((h) => h.symbol === symbol)
   const heldQty    = holding ? holding.quantity : 0
 
@@ -787,13 +786,9 @@ const OrderEntryPage: React.FC = () => {
               <span style={s.rowValue()}>{portfolio ? fmt(portfolio.cashBalance) : '—'}</span>
             </div>
             <div style={s.row}>
-              <span style={s.rowLabel}>Reserved Cash</span>
-              <span style={s.rowValue()}>{portfolio ? fmt(portfolio.reservedCash) : '—'}</span>
-            </div>
-            <div style={s.row}>
-              <span style={s.rowLabel}>Buying Power</span>
+              <span style={s.rowLabel}>Available Cash</span>
               <span style={s.rowValue(true, 'var(--color-success)')}>
-                {portfolio ? fmt(portfolio.buyingPower) : '—'}
+                {portfolio ? fmt(portfolio.cashBalance) : '—'}
               </span>
             </div>
             <div style={s.divider} />
@@ -804,7 +799,7 @@ const OrderEntryPage: React.FC = () => {
               </span>
             </div>
             <div style={s.row}>
-              <span style={s.rowLabel}>Buying Power Used</span>
+              <span style={s.rowLabel}>Cash Used</span>
               <span style={s.rowValue()}>{portfolio ? `${bpUsedPct.toFixed(1)}%` : '—'}</span>
             </div>
             <div style={{ background: 'var(--color-border)', height: '6px', borderRadius: 'var(--radius-pill)', overflow: 'hidden', marginTop: '4px' }}>

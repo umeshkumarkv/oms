@@ -21,8 +21,6 @@ export interface Holding {
 
 export interface Portfolio {
   cashBalance: string
-  reservedCash: string
-  buyingPower: string
   holdings: Holding[]
 }
 

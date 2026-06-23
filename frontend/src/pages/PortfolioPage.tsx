@@ -161,8 +161,6 @@ const PortfolioPage: React.FC = () => {
 
   // ── Derived metrics ──────────────────────────────────────────────────────
   const cashBalance   = portfolio ? parseFloat(portfolio.cashBalance)  : 0
-  const reservedCash  = portfolio ? parseFloat(portfolio.reservedCash) : 0
-  const buyingPower   = cashBalance - reservedCash
   const holdingsValue = portfolio?.holdings.reduce((sum, h) => sum + parseFloat(h.marketValue), 0) ?? 0
   const portfolioValue = cashBalance + holdingsValue
 
@@ -206,13 +204,9 @@ const PortfolioPage: React.FC = () => {
               <div style={styles.cardLabel}>Cash Balance</div>
               <div style={styles.cardValue()}>{formatCurrency(cashBalance)}</div>
             </div>
-            <div style={styles.card('#f59e0b')}>
-              <div style={styles.cardLabel}>Reserved Cash</div>
-              <div style={styles.cardValue('#d97706')}>{formatCurrency(reservedCash)}</div>
-            </div>
             <div style={styles.card('#10b981')}>
-              <div style={styles.cardLabel}>Buying Power</div>
-              <div style={styles.cardValue('#059669')}>{formatCurrency(buyingPower)}</div>
+              <div style={styles.cardLabel}>Available Cash</div>
+              <div style={styles.cardValue('#059669')}>{formatCurrency(cashBalance)}</div>
             </div>
             <div style={styles.card('#3b82f6')}>
               <div style={styles.cardLabel}>Portfolio Value</div>

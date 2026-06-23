@@ -2,15 +2,12 @@ package com.brokerdealer.clientservice.service;
 
 import com.brokerdealer.clientservice.client.MarketDataClient;
 import com.brokerdealer.clientservice.domain.*;
-import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
-import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.exception.ClientNotFoundException;
-import com.brokerdealer.clientservice.exception.InvalidReservationException;
 import com.brokerdealer.clientservice.exception.ValidationException;
 import com.brokerdealer.clientservice.mapper.ClientMapper;
 import com.brokerdealer.clientservice.repository.ClientRepository;
@@ -72,10 +69,37 @@ class ClientServiceTest {
                 .kycExpiryDate(kycExpiry)
                 .marginCallActive(false)
                 .cashBalance(BigDecimal.valueOf(100000))
-                .reservedCash(BigDecimal.ZERO)
                 .dailyOrderCount(0)
                 .dailyOrderValue(BigDecimal.ZERO)
                 .turnoverToday(BigDecimal.ZERO)
+                .build();
+    }
+
+    private Client buildClientWithBalance(UUID id, BigDecimal cashBalance) {
+        return Client.builder()
+                .id(id)
+                .name("Test Client")
+                .accountType(AccountType.CASH)
+                .status(ClientStatus.ACTIVE)
+                .tradingEnabled(true)
+                .kycStatus(KycStatus.VERIFIED)
+                .kycExpiryDate(LocalDate.of(2027, 12, 31))
+                .marginCallActive(false)
+                .maxOpenOrders(10)
+                .cashBalance(cashBalance)
+                .dailyOrderCount(0)
+                .dailyOrderValue(BigDecimal.ZERO)
+                .turnoverToday(BigDecimal.ZERO)
+                .build();
+    }
+
+    private Holding buildHolding(UUID clientId, String symbol, int quantity, String avgPrice) {
+        return Holding.builder()
+                .id(UUID.randomUUID())
+                .clientId(clientId)
+                .symbol(symbol)
+                .quantity(quantity)
+                .avgPrice(new BigDecimal(avgPrice))
                 .build();
     }
 
@@ -152,39 +176,10 @@ class ClientServiceTest {
         assertThat(result.getStatus()).isEqualTo(ClientStatus.BLOCKED);
     }
 
-    private Client buildClientWithBalance(UUID id, BigDecimal cashBalance, BigDecimal reservedCash) {
-        return Client.builder()
-                .id(id)
-                .name("Test Client")
-                .accountType(AccountType.CASH)
-                .status(ClientStatus.ACTIVE)
-                .tradingEnabled(true)
-                .kycStatus(KycStatus.VERIFIED)
-                .kycExpiryDate(LocalDate.of(2027, 12, 31))
-                .marginCallActive(false)
-                .maxOpenOrders(10)
-                .cashBalance(cashBalance)
-                .reservedCash(reservedCash)
-                .dailyOrderCount(0)
-                .dailyOrderValue(BigDecimal.ZERO)
-                .turnoverToday(BigDecimal.ZERO)
-                .build();
-    }
-
-    private Holding buildHolding(UUID clientId, String symbol, int quantity, String avgPrice) {
-        return Holding.builder()
-                .id(UUID.randomUUID())
-                .clientId(clientId)
-                .symbol(symbol)
-                .quantity(quantity)
-                .avgPrice(new BigDecimal(avgPrice))
-                .build();
-    }
-
     @Test
-    void shouldReturnPortfolioWithHoldingsAndComputedValues() {
+    void shouldReturnPortfolioWithCashBalanceOnly() {
         UUID id = UUID.fromString("a1000000-0000-0000-0000-000000000001");
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"));
         Holding aaplHolding = buildHolding(id, "AAPL", 500, "168.4000");
 
         when(clientRepository.findById(id)).thenReturn(Optional.of(client));
@@ -201,8 +196,6 @@ class ClientServiceTest {
         assertThat(result.getMarginCallActive()).isFalse();
         assertThat(result.getMaxOpenOrders()).isEqualTo(10);
         assertThat(result.getCashBalance()).isEqualTo("100000.00");
-        assertThat(result.getReservedCash()).isEqualTo("5000.00");
-        assertThat(result.getBuyingPower()).isEqualTo("95000.00");
         assertThat(result.getHoldings()).hasSize(1);
         assertThat(result.getHoldings().get(0).getSymbol()).isEqualTo("AAPL");
         assertThat(result.getHoldings().get(0).getQuantity()).isEqualTo(500);
@@ -214,7 +207,7 @@ class ClientServiceTest {
     @Test
     void shouldReturnEmptyHoldingsForClientWithNoHoldings() {
         UUID id = UUID.fromString("a5000000-0000-0000-0000-000000000005");
-        Client client = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        Client client = buildClientWithBalance(id, new BigDecimal("50000.00"));
 
         when(clientRepository.findById(id)).thenReturn(Optional.of(client));
         when(holdingRepository.findByClientId(id)).thenReturn(Collections.emptyList());
@@ -222,13 +215,13 @@ class ClientServiceTest {
         PortfolioResponse result = clientService.getPortfolio(id);
 
         assertThat(result.getHoldings()).isEmpty();
-        assertThat(result.getBuyingPower()).isEqualTo("50000.00");
+        assertThat(result.getCashBalance()).isEqualTo("50000.00");
     }
 
     @Test
     void shouldReturnNullPriceFieldsWhenMarketDataUnavailable() {
         UUID id = UUID.fromString("a1000000-0000-0000-0000-000000000001");
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"));
         Holding holding = buildHolding(id, "AAPL", 500, "168.4000");
 
         when(clientRepository.findById(id)).thenReturn(Optional.of(client));
@@ -249,79 +242,6 @@ class ClientServiceTest {
         when(clientRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> clientService.getPortfolio(id))
-                .isInstanceOf(ClientNotFoundException.class)
-                .extracting("errorCode")
-                .isEqualTo("CLIENT_NOT_FOUND");
-    }
-
-    private ReservedCashRequest buildReservedCashRequest(String adjustment) {
-        ReservedCashRequest req = new ReservedCashRequest();
-        req.setAdjustment(adjustment);
-        req.setReason("test reason");
-        return req;
-    }
-
-    @Test
-    void shouldIncreaseReservedCashOnPositiveAdjustment() {
-        UUID id = UUID.randomUUID();
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
-
-        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
-        when(clientRepository.save(any(Client.class))).thenReturn(client);
-
-        ReservedCashResponse result = clientService.adjustReservedCash(id, buildReservedCashRequest("10000.00"));
-
-        assertThat(result.getClientId()).isEqualTo(id);
-        assertThat(result.getReservedCash()).isEqualTo("15000.00");
-        assertThat(result.getBuyingPower()).isEqualTo("85000.00");
-    }
-
-    @Test
-    void shouldDecreaseReservedCashOnNegativeAdjustment() {
-        UUID id = UUID.randomUUID();
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("20000.00"));
-
-        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
-        when(clientRepository.save(any(Client.class))).thenReturn(client);
-
-        ReservedCashResponse result = clientService.adjustReservedCash(id, buildReservedCashRequest("-5000.00"));
-
-        assertThat(result.getReservedCash()).isEqualTo("15000.00");
-        assertThat(result.getBuyingPower()).isEqualTo("85000.00");
-    }
-
-    @Test
-    void shouldThrowInvalidReservationWhenResultWouldGoBelowZero() {
-        UUID id = UUID.randomUUID();
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
-
-        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
-
-        assertThatThrownBy(() -> clientService.adjustReservedCash(id, buildReservedCashRequest("-10000.00")))
-                .isInstanceOf(InvalidReservationException.class)
-                .extracting("errorCode")
-                .isEqualTo("RESERVED_CASH_BELOW_ZERO");
-    }
-
-    @Test
-    void shouldThrowInvalidReservationWhenResultWouldExceedCashBalance() {
-        UUID id = UUID.randomUUID();
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
-
-        when(clientRepository.findById(id)).thenReturn(Optional.of(client));
-
-        assertThatThrownBy(() -> clientService.adjustReservedCash(id, buildReservedCashRequest("99999.00")))
-                .isInstanceOf(InvalidReservationException.class)
-                .extracting("errorCode")
-                .isEqualTo("RESERVED_CASH_EXCEEDS_BALANCE");
-    }
-
-    @Test
-    void shouldThrowClientNotFoundWhenAdjustingReservedCashForUnknownId() {
-        UUID id = UUID.randomUUID();
-        when(clientRepository.findById(id)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> clientService.adjustReservedCash(id, buildReservedCashRequest("1000.00")))
                 .isInstanceOf(ClientNotFoundException.class)
                 .extracting("errorCode")
                 .isEqualTo("CLIENT_NOT_FOUND");
@@ -349,7 +269,7 @@ class ClientServiceTest {
     @Test
     void shouldReturnPortfolioWithDefaultRoute() {
         UUID id = UUID.fromString("a1000000-0000-0000-0000-000000000001");
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"));
         client.setDefaultRoute(DefaultRoute.NYSE);
 
         when(clientRepository.findById(id)).thenReturn(Optional.of(client));
@@ -369,7 +289,7 @@ class ClientServiceTest {
     @Test
     void shouldUpdateDefaultRouteToNyse() {
         UUID id = UUID.randomUUID();
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"));
         client.setDefaultRoute(DefaultRoute.NASDAQ);
 
         when(clientRepository.findById(id)).thenReturn(Optional.of(client));
@@ -386,7 +306,7 @@ class ClientServiceTest {
     void shouldUpdateDefaultRouteToAllValidValues() {
         for (DefaultRoute route : DefaultRoute.values()) {
             UUID id = UUID.randomUUID();
-            Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+            Client client = buildClientWithBalance(id, new BigDecimal("100000.00"));
             client.setDefaultRoute(DefaultRoute.NASDAQ);
 
             when(clientRepository.findById(id)).thenReturn(Optional.of(client));
@@ -401,7 +321,7 @@ class ClientServiceTest {
     @Test
     void shouldThrowValidationExceptionForInvalidRouteValue() {
         UUID id = UUID.randomUUID();
-        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"), BigDecimal.ZERO);
+        Client client = buildClientWithBalance(id, new BigDecimal("100000.00"));
 
         when(clientRepository.findById(id)).thenReturn(Optional.of(client));
 
@@ -428,10 +348,10 @@ class ClientServiceTest {
     void shouldReturnRankedActiveClientsWhenLimitIsValid() {
         UUID id1 = UUID.randomUUID();
         UUID id2 = UUID.randomUUID();
-        Client c1 = buildClientWithBalance(id1, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+        Client c1 = buildClientWithBalance(id1, new BigDecimal("100000.00"));
         c1.setName("Alice Corp");
         c1.setTurnoverToday(new BigDecimal("50000.00"));
-        Client c2 = buildClientWithBalance(id2, new BigDecimal("80000.00"), BigDecimal.ZERO);
+        Client c2 = buildClientWithBalance(id2, new BigDecimal("80000.00"));
         c2.setName("Bob Ltd");
         c2.setTurnoverToday(new BigDecimal("20000.00"));
 
@@ -446,7 +366,7 @@ class ClientServiceTest {
         assertThat(result.get(0).getClientId()).isEqualTo(id1);
         assertThat(result.get(0).getClientName()).isEqualTo("Alice Corp");
         assertThat(result.get(0).getTurnoverToday()).isEqualTo("50000.00");
-        assertThat(result.get(0).getAvailableCash()).isEqualTo("95000.00");
+        assertThat(result.get(0).getAvailableCash()).isEqualTo("100000.00");
         assertThat(result.get(0).getCashLimitWarning()).isFalse();
         assertThat(result.get(1).getClientId()).isEqualTo(id2);
         assertThat(result.get(1).getTurnoverToday()).isEqualTo("20000.00");
@@ -518,7 +438,7 @@ class ClientServiceTest {
     @Test
     void shouldDegradeGracefullyWhenRedisReadFails() {
         UUID id = UUID.randomUUID();
-        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"));
         c.setName("Fallback Corp");
         c.setTurnoverToday(new BigDecimal("10000.00"));
 
@@ -536,7 +456,7 @@ class ClientServiceTest {
     @Test
     void shouldDegradeGracefullyWhenRedisWriteFails() {
         UUID id = UUID.randomUUID();
-        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"));
         c.setName("WriteFailCorp");
         c.setTurnoverToday(new BigDecimal("5000.00"));
 
@@ -556,8 +476,7 @@ class ClientServiceTest {
     @Test
     void shouldComputeCashLimitWarningTrueWhenAvailableCashBelowThreshold() {
         UUID id = UUID.randomUUID();
-        // dailyOrderLimit = 100000, threshold = 10000; availableCash = 5000 → warning
-        Client c = buildClientWithBalance(id, new BigDecimal("5000.00"), BigDecimal.ZERO);
+        Client c = buildClientWithBalance(id, new BigDecimal("5000.00"));
         c.setName("Warning Corp");
         c.setTurnoverToday(new BigDecimal("90000.00"));
         c.setDailyOrderLimit(new BigDecimal("100000.00"));
@@ -575,8 +494,7 @@ class ClientServiceTest {
     @Test
     void shouldComputeCashLimitWarningFalseWhenAvailableCashAboveThreshold() {
         UUID id = UUID.randomUUID();
-        // dailyOrderLimit = 100000, threshold = 10000; availableCash = 50000 → no warning
-        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        Client c = buildClientWithBalance(id, new BigDecimal("50000.00"));
         c.setName("Safe Corp");
         c.setTurnoverToday(new BigDecimal("10000.00"));
         c.setDailyOrderLimit(new BigDecimal("100000.00"));
@@ -594,11 +512,9 @@ class ClientServiceTest {
     @Test
     void shouldComputeCashLimitWarningFalseWhenDailyOrderLimitIsNull() {
         UUID id = UUID.randomUUID();
-        // dailyOrderLimit is null → warning must always be false
-        Client c = buildClientWithBalance(id, new BigDecimal("100.00"), BigDecimal.ZERO);
+        Client c = buildClientWithBalance(id, new BigDecimal("100.00"));
         c.setName("No Limit Corp");
         c.setTurnoverToday(new BigDecimal("500.00"));
-        // dailyOrderLimit not set — null
 
         ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
@@ -610,12 +526,12 @@ class ClientServiceTest {
         assertThat(result.get(0).getCashLimitWarning()).isFalse();
     }
 
-    // --- processExecutionFill turnoverToday tests ---
+    // --- processExecutionFill tests ---
 
     @Test
     void shouldIncrementTurnoverOnBuyFillInProcessExecutionFill() {
         UUID clientId = UUID.randomUUID();
-        Client client = buildClientWithBalance(clientId, new BigDecimal("100000.00"), new BigDecimal("10000.00"));
+        Client client = buildClientWithBalance(clientId, new BigDecimal("100000.00"));
         client.setTurnoverToday(new BigDecimal("20000.00"));
 
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
@@ -639,7 +555,7 @@ class ClientServiceTest {
     @Test
     void shouldIncrementTurnoverOnSellFillInProcessExecutionFill() {
         UUID clientId = UUID.randomUUID();
-        Client client = buildClientWithBalance(clientId, new BigDecimal("50000.00"), BigDecimal.ZERO);
+        Client client = buildClientWithBalance(clientId, new BigDecimal("50000.00"));
         client.setTurnoverToday(new BigDecimal("10000.00"));
 
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
@@ -664,7 +580,7 @@ class ClientServiceTest {
     @Test
     void shouldNotIncrementTurnoverOnRejectedFillInProcessExecutionFill() {
         UUID clientId = UUID.randomUUID();
-        Client client = buildClientWithBalance(clientId, new BigDecimal("100000.00"), new BigDecimal("5000.00"));
+        Client client = buildClientWithBalance(clientId, new BigDecimal("100000.00"));
         client.setTurnoverToday(new BigDecimal("0.00"));
 
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
@@ -678,8 +594,6 @@ class ClientServiceTest {
         payload.put("executedPrice", "150.00");
         payload.put("fillValue", "15000.00");
         payload.put("symbol", "AAPL");
-        payload.put("remainingQuantity", 100);
-        payload.put("marketPriceAtFill", "150.00");
 
         clientService.processExecutionFill(payload);
 

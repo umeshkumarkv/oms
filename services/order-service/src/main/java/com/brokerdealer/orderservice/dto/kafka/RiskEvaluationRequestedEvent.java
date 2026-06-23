@@ -26,7 +26,7 @@ public class RiskEvaluationRequestedEvent {
     private Boolean marginCallActive;
 
     // --- Portfolio snapshot fields (SCRUM-119) ---
-    private String buyingPower;          // BigDecimal as String — cashBalance - reservedCash
+    private String buyingPower;          // BigDecimal as String — cashBalance minus in-flight BUY commitments
     private Integer holdingsForSymbol;   // quantity held for this symbol, 0 if none
     private String kycStatus;            // "VERIFIED" | "PENDING" | "EXPIRED"
     private String kycExpiryDate;        // ISO 8601 date string e.g. "2027-01-01"
