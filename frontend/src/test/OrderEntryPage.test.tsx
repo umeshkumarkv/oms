@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import OrderEntryPage from '../pages/OrderEntryPage'
 import { useIdleTimer } from '../hooks/useIdleTimer'
@@ -20,9 +20,7 @@ vi.mock('../hooks/useOrderEntryBidAsk', () => ({
 
 // ── Mock API modules ──────────────────────────────────────────────────────────
 vi.mock('../api/marketApi', () => ({
-  getInstruments: vi.fn().mockResolvedValue([
-    { symbol: 'AAPL', lastPrice: '175.00', bidPrice: '174.90', askPrice: '175.10', tradable: true, halted: false, minQuantity: 1, maxQuantity: 10000, dataTimestamp: '2026-05-08T10:00:00Z' },
-  ]),
+  searchInstruments: vi.fn().mockResolvedValue([]),
   getInstrument: vi.fn().mockResolvedValue(null),
   getHolidays: vi.fn().mockResolvedValue([
     { holidayDate: '2026-07-04', holidayName: 'Independence Day' },
@@ -1280,19 +1278,6 @@ describe('OrderEntryPage — API error surfacing (SCRUM-192)', () => {
     })
   })
 
-  it('shouldShowWarningToastWhenGetInstrumentsFetchFails', async () => {
-    const { getInstruments } = await import('../api/marketApi')
-    vi.mocked(getInstruments).mockRejectedValueOnce(new Error('Network error'))
-
-    renderPage()
-
-    await waitFor(() =>
-      expect(screen.getByText(
-        'Failed to load instrument list — symbol autocomplete unavailable'
-      )).toBeInTheDocument()
-    )
-  })
-
   it('shouldShowWarningToastWhenGetInstrumentFetchFailsWithNetworkError', async () => {
     const { getInstrument } = await import('../api/marketApi')
     vi.mocked(getInstrument).mockRejectedValueOnce(new Error('Network error'))
@@ -1324,6 +1309,236 @@ describe('OrderEntryPage — API error surfacing (SCRUM-192)', () => {
         'Unable to fetch quote — market data temporarily unavailable'
       )).toBeInTheDocument(),
       { timeout: 1500 }
+    )
+  })
+})
+
+// ── Typeahead tests (SCRUM-140) ───────────────────────────────────────────────
+describe('OrderEntryPage — instrument typeahead', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  const SEARCH_RESULTS = [
+    { symbol: 'AAPL', companyName: 'Apple Inc.', exchange: 'NASDAQ', lastPrice: '175.00', tradable: true, cusip: '037833100', secNumber: 'S001' },
+    { symbol: 'AAPLX', companyName: 'Apple Extended', exchange: 'NYSE', lastPrice: '10.00', tradable: false, cusip: '037833101', secNumber: 'S002' },
+  ]
+
+  it('shouldCallSearchApiAfter300msDebounceWith1PlusChar', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue(SEARCH_RESULTS)
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'A' } })
+    })
+
+    await waitFor(
+      () => expect(vi.mocked(searchInstruments)).toHaveBeenCalledWith('A', 10),
+      { timeout: 1000 }
+    )
+  })
+
+  it('shouldShowDropdownWithSymbolCompanyNameExchangeAndPrice', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue(SEARCH_RESULTS)
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
+    })
+
+    await waitFor(
+      () => {
+        const listbox = screen.getByRole('listbox', { name: 'Instrument search results' })
+        expect(listbox).toBeInTheDocument()
+        expect(within(listbox).getByText('AAPL')).toBeInTheDocument()
+        expect(within(listbox).getByText('Apple Inc.')).toBeInTheDocument()
+        expect(within(listbox).getByText('NASDAQ')).toBeInTheDocument()
+        expect(within(listbox).getByText('175.00')).toBeInTheDocument()
+      },
+      { timeout: 1000 }
+    )
+  })
+
+  it('shouldShowHaltedLabelForNonTradableInstrument', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue(SEARCH_RESULTS)
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPLX' } })
+    })
+
+    await waitFor(
+      () => expect(screen.getByText('⛔ HALTED')).toBeInTheDocument(),
+      { timeout: 1000 }
+    )
+  })
+
+  it('shouldPopulateSymbolFieldOnDropdownClick', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue(SEARCH_RESULTS)
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
+    })
+
+    const listbox = await waitFor(
+      () => screen.getByRole('listbox', { name: 'Instrument search results' }),
+      { timeout: 1000 }
+    )
+
+    await act(async () => {
+      fireEvent.mouseDown(within(listbox).getAllByRole('option')[0])
+    })
+
+    expect(screen.getByLabelText('Symbol')).toHaveValue('AAPL')
+    expect(screen.queryByRole('listbox', { name: 'Instrument search results' })).not.toBeInTheDocument()
+  })
+
+  it('shouldNavigateDropdownWithArrowKeys', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue(SEARCH_RESULTS)
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
+    })
+
+    const listbox = await waitFor(
+      () => screen.getByRole('listbox', { name: 'Instrument search results' }),
+      { timeout: 1000 }
+    )
+
+    const input = screen.getByLabelText('Symbol')
+
+    await act(async () => { fireEvent.keyDown(input, { key: 'ArrowDown' }) })
+    expect(within(listbox).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
+
+    await act(async () => { fireEvent.keyDown(input, { key: 'ArrowDown' }) })
+    expect(within(listbox).getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shouldCloseDropdownOnEscape', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue(SEARCH_RESULTS)
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
+    })
+
+    await waitFor(
+      () => expect(screen.getByRole('listbox', { name: 'Instrument search results' })).toBeInTheDocument(),
+      { timeout: 1000 }
+    )
+
+    await act(async () => {
+      fireEvent.keyDown(screen.getByLabelText('Symbol'), { key: 'Escape' })
+    })
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
+  it('shouldShowNoInstrumentsFoundWhenSearchReturnsEmpty', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue([])
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'ZZZZ' } })
+    })
+
+    await waitFor(
+      () => expect(screen.getByText('No instruments found')).toBeInTheDocument(),
+      { timeout: 1000 }
+    )
+  })
+
+  it('shouldEnforce9CharMaxLengthAttribute', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    expect(screen.getByLabelText('Symbol')).toHaveAttribute('maxlength', '9')
+  })
+
+  it('shouldCallSearchApiWithCompanyNameQueryAndShowResult', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue([
+      { symbol: 'AAPL', companyName: 'Apple Inc.', exchange: 'NASDAQ', lastPrice: '175.00', tradable: true, cusip: '037833100', secNumber: 'S001' },
+    ])
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'Apple' } })
+    })
+
+    await waitFor(
+      () => {
+        // onChange uppercases the input before it reaches searchInstruments
+        expect(vi.mocked(searchInstruments)).toHaveBeenCalledWith('APPLE', 10)
+        expect(screen.getByRole('listbox', { name: 'Instrument search results' })).toBeInTheDocument()
+        expect(screen.getByText('AAPL')).toBeInTheDocument()
+      },
+      { timeout: 1000 }
+    )
+  })
+
+  it('shouldCallSearchApiWithCusipQueryAndShowResult', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockResolvedValue([
+      { symbol: 'AAPL', companyName: 'Apple Inc.', exchange: 'NASDAQ', lastPrice: '175.00', tradable: true, cusip: '037833100', secNumber: 'S001' },
+    ])
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: '037833100' } })
+    })
+
+    await waitFor(
+      () => {
+        expect(vi.mocked(searchInstruments)).toHaveBeenCalledWith('037833100', 10)
+        expect(screen.getByRole('listbox', { name: 'Instrument search results' })).toBeInTheDocument()
+        expect(screen.getByText('AAPL')).toBeInTheDocument()
+      },
+      { timeout: 1000 }
+    )
+  })
+
+  it('shouldShowWarningToastWhenSearchInstrumentsFails', async () => {
+    const { searchInstruments } = await import('../api/marketApi')
+    vi.mocked(searchInstruments).mockRejectedValue(new Error('Network error'))
+
+    renderPage()
+    await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
+    })
+
+    await waitFor(
+      () => expect(screen.getByText(
+        'Instrument search unavailable — enter symbol manually'
+      )).toBeInTheDocument(),
+      { timeout: 1000 }
     )
   })
 })

@@ -5,10 +5,10 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import { useOrderEntryBidAsk } from '../hooks/useOrderEntryBidAsk'
-import { getHolidays, getInstrument, getInstruments } from '../api/marketApi'
+import { getHolidays, getInstrument, searchInstruments } from '../api/marketApi'
 import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
-import { Holiday, Instrument } from '../types/market.types'
+import { Holiday, Instrument, InstrumentSearchResult } from '../types/market.types'
 import { Client, Portfolio } from '../types/client.types'
 import { OrderSide, OrderType, TimeInForce } from '../types/order.types'
 import { DEFAULT_VENUE, SOR_VENUES } from '../config/sorVenues'
@@ -170,7 +170,9 @@ const OrderEntryPage: React.FC = () => {
   const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
   const [routingDestination, setRoutingDestination] = useState('')
 
-  const [instruments,  setInstruments]  = useState<Instrument[]>([])
+  const [searchResults, setSearchResults] = useState<InstrumentSearchResult[]>([])
+  const [focusedIdx,    setFocusedIdx]    = useState(-1)
+  const [dropdownOpen,  setDropdownOpen]  = useState(false)
   const [quote,        setQuote]        = useState<Instrument | null>(null)
   const [portfolio,    setPortfolio]    = useState<Portfolio | null>(null)
   const [quoteLoading, setQuoteLoading] = useState(false)
@@ -186,7 +188,10 @@ const OrderEntryPage: React.FC = () => {
   const [clientsError,   setClientsError]   = useState(false)
   const [quoteError,     setQuoteError]     = useState(false)
 
-  const symbolDebounce    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const symbolDebounce        = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchDebounce        = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchErrorToastedRef = useRef(false)
+  const skipNextSearchRef     = useRef(false)
   const clientSelectRef   = useRef<HTMLSelectElement>(null)
   const routeSelectRef    = useRef<HTMLSelectElement>(null)
   const focusOnRestartRef = useRef(false)
@@ -229,6 +234,9 @@ const OrderEntryPage: React.FC = () => {
     if (!isExpired) return
     setSymbol('')
     setSymbolInput('')
+    setSearchResults([])
+    setFocusedIdx(-1)
+    setDropdownOpen(false)
     setQuantity('')
     setLimitPrice('')
     setTif('DAY')
@@ -270,9 +278,6 @@ const OrderEntryPage: React.FC = () => {
   )
 
   useEffect(() => {
-    getInstruments().then(setInstruments).catch(() => {
-      addToast('Failed to load instrument list — symbol autocomplete unavailable', TOAST_TYPE.WARNING)
-    })
     getHolidays().then(setHolidays).catch(() => {
       addToast('Failed to load market holidays — holiday dates may not be excluded from the date picker', TOAST_TYPE.WARNING)
     })
@@ -325,9 +330,38 @@ const OrderEntryPage: React.FC = () => {
     if (quote) setLimitPrice(formatPriceToTwoDecimal(side === 'BUY' ? quote.askPrice : quote.bidPrice))
   }, [side, quote])
 
-  const suggestions = symbolInput.length >= 1
-    ? instruments.filter((i) => i.symbol.startsWith(symbolInput.toUpperCase())).slice(0, 6)
-    : []
+  useEffect(() => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    if (symbolInput.length < 1) { setSearchResults([]); setDropdownOpen(false); return }
+    searchDebounce.current = setTimeout(async () => {
+      if (skipNextSearchRef.current) { skipNextSearchRef.current = false; return }
+      try {
+        const results = await searchInstruments(symbolInput, 10)
+        setSearchResults(results)
+        setDropdownOpen(true)
+        setFocusedIdx(-1)
+        searchErrorToastedRef.current = false
+      } catch {
+        setSearchResults([])
+        setDropdownOpen(false)
+        if (!searchErrorToastedRef.current) {
+          addToast('Instrument search unavailable — enter symbol manually', TOAST_TYPE.WARNING)
+          searchErrorToastedRef.current = true
+        }
+      }
+    }, 300)
+    return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current) }
+  }, [symbolInput]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onSelectInstrument = useCallback((r: InstrumentSearchResult) => {
+    skipNextSearchRef.current = true
+    setSymbol(r.symbol)
+    setSymbolInput(r.symbol)
+    setDropdownOpen(false)
+    setSearchResults([])
+    setFocusedIdx(-1)
+    setSymbolNotFound(false)
+  }, [])
 
   const qty        = parseInt(quantity, 10)
   const price      = orderType === 'LIMIT' ? parseFloat(limitPrice) : parseFloat(quote?.lastPrice ?? '0')
@@ -583,33 +617,62 @@ const OrderEntryPage: React.FC = () => {
                   : { ...s.input,      paddingLeft: '36px' }}
                 placeholder="Search ticker — e.g. AAPL, MSFT, NVDA"
                 value={symbolInput}
+                maxLength={9}
                 onChange={(e) => {
                   const v = e.target.value.toUpperCase()
                   setSymbolInput(v)
                   setSymbol(v)
                   setSymbolNotFound(false)
                 }}
-                onKeyDown={(e) => { if (e.key === 'Escape') setSymbolInput(symbol) }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setDropdownOpen(false)
+                    setSearchResults([])
+                    setFocusedIdx(-1)
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setFocusedIdx(i => Math.min(i + 1, searchResults.length - 1))
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setFocusedIdx(i => Math.max(i - 1, 0))
+                  } else if (e.key === 'Enter' && dropdownOpen && focusedIdx >= 0 && searchResults[focusedIdx]) {
+                    e.preventDefault()
+                    onSelectInstrument(searchResults[focusedIdx])
+                  }
+                }}
                 autoComplete="off"
                 disabled={isExpired}
               />
             </div>
-            {suggestions.length > 0 && symbolInput && symbolInput !== symbol && (
+            {dropdownOpen && symbolInput && (
               <div style={{
                 position: 'absolute', top: '100%', left: 0, right: 0,
-                background: '#fff', border: '1.5px solid var(--color-border)',
+                background: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)',
-                zIndex: 100,
-              }}>
-                {suggestions.map((i) => (
+                zIndex: 100, maxHeight: '400px', overflowY: 'auto' as const,
+              }} role="listbox" aria-label="Instrument search results">
+                {searchResults.length === 0 ? (
+                  <div style={{ padding: '9px 12px', fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                    No instruments found
+                  </div>
+                ) : searchResults.map((r, idx) => (
                   <div
-                    key={i.symbol}
-                    style={{ padding: '9px 12px', cursor: 'pointer', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}
-                    onMouseDown={() => { setSymbol(i.symbol); setSymbolInput(i.symbol) }}
+                    key={r.symbol}
+                    role="option"
+                    aria-selected={idx === focusedIdx}
+                    style={{
+                      padding: '9px 12px', cursor: 'pointer', fontSize: '13px',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
+                      background: idx === focusedIdx ? 'var(--color-primary-light)' : undefined,
+                    }}
+                    onMouseDown={() => onSelectInstrument(r)}
+                    onMouseEnter={() => setFocusedIdx(idx)}
                   >
-                    <span style={{ fontWeight: 600 }}>{i.symbol}</span>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>
-                      {i.halted ? '⛔ HALTED' : `$${i.lastPrice}`}
+                    <span style={{ fontWeight: 600, minWidth: '48px' }}>{r.symbol}</span>
+                    <span style={{ flex: 1, color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{r.companyName}</span>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{r.exchange}</span>
+                    <span style={{ color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' as const }}>
+                      {r.tradable ? r.lastPrice : '⛔ HALTED'}
                     </span>
                   </div>
                 ))}

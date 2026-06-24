@@ -73,3 +73,13 @@ export interface IndexEntry {
   currentValue: string
   percentChange: string
 }
+
+export interface InstrumentSearchResult {
+  symbol: string
+  companyName: string
+  exchange: string
+  lastPrice: string
+  tradable: boolean
+  cusip: string
+  secNumber: string
+}

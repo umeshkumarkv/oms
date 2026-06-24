@@ -28,6 +28,7 @@ export function useNotifications(token: string, userId: string, _role: string) {
         if (!event.data || event.data === ':keepalive') return
         try {
           const payload = JSON.parse(event.data)
+          if (!payload.title && !payload.message) return
           const msg: NotificationMessage = {
             id: crypto.randomUUID(),
             type: payload.type,
