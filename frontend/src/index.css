@@ -333,3 +333,8 @@ body {
 .order-form-card .field-group:focus-within > label {
   font-size: 12px;
 }
+
+/* Typeahead dropdown — SCRUM-140 */
+.typeahead-option--focused {
+  background: var(--color-primary-light);
+}

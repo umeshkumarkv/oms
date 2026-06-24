@@ -663,10 +663,10 @@ const OrderEntryPage: React.FC = () => {
                     key={r.symbol}
                     role="option"
                     aria-selected={idx === focusedIdx}
+                    className={idx === focusedIdx ? 'typeahead-option--focused' : undefined}
                     style={{
                       padding: '9px 12px', cursor: 'pointer', fontSize: '13px',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
-                      background: idx === focusedIdx ? 'var(--color-primary-light)' : undefined,
                     }}
                     onMouseDown={() => onSelectInstrument(r)}
                     onMouseEnter={() => setFocusedIdx(idx)}

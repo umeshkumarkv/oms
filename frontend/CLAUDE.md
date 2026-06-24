@@ -235,6 +235,7 @@ Global utility classes defined in `src/index.css`:
 | `.toast-fade-out`       | Fade-out animation for dismissed toasts (opacity 1→0, 0.3s)  |
 | `.order-form-card`      | Scoping anchor on the Order Entry left card — namespaces focus-visible and `.field-group` CSS rules (SCRUM-141) |
 | `.field-group`          | Label + field wrapper on the Order Entry form — triggers `:focus-within` label enlargement (SCRUM-141) |
+| `.typeahead-option--focused` | Keyboard-focused row highlight in the instrument typeahead dropdown (SCRUM-140) |
 
 Do not add global classes without documenting them here.
 
