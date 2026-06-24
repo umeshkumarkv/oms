@@ -21,12 +21,6 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getErrorCode(), ex.getMessage(), List.of());
     }
 
-    @ExceptionHandler(InvalidReservationException.class)
-    public ResponseEntity<Map<String, Object>> handleInvalidReservationException(InvalidReservationException ex) {
-        log.warn("Invalid reservation: code={} message={}", ex.getErrorCode(), ex.getMessage());
-        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getErrorCode(), ex.getMessage(), List.of());
-    }
-
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
         log.warn("Validation error: code={} message={}", ex.getErrorCode(), ex.getMessage());

@@ -1,11 +1,9 @@
 package com.brokerdealer.clientservice.controller;
 
-import com.brokerdealer.clientservice.dto.request.ReservedCashRequest;
 import com.brokerdealer.clientservice.dto.request.UpdateDefaultRouteRequest;
 import com.brokerdealer.clientservice.dto.response.ActiveClientResponse;
 import com.brokerdealer.clientservice.dto.response.ClientProfileResponse;
 import com.brokerdealer.clientservice.dto.response.PortfolioResponse;
-import com.brokerdealer.clientservice.dto.response.ReservedCashResponse;
 import com.brokerdealer.clientservice.dto.response.UpdateDefaultRouteResponse;
 import com.brokerdealer.clientservice.service.ClientService;
 import jakarta.validation.Valid;
@@ -53,15 +51,6 @@ public class ClientController {
     public ResponseEntity<Map<String, Object>> getPortfolio(@PathVariable UUID id) {
         log.debug("GET /api/v1/clients/{}/portfolio", id);
         PortfolioResponse data = clientService.getPortfolio(id);
-        return ResponseEntity.ok(buildSuccessResponse(data));
-    }
-
-    @PatchMapping("/{id}/reserved-cash")
-    public ResponseEntity<Map<String, Object>> adjustReservedCash(
-            @PathVariable UUID id,
-            @Valid @RequestBody ReservedCashRequest request) {
-        log.debug("PATCH /api/v1/clients/{}/reserved-cash", id);
-        ReservedCashResponse data = clientService.adjustReservedCash(id, request);
         return ResponseEntity.ok(buildSuccessResponse(data));
     }
 

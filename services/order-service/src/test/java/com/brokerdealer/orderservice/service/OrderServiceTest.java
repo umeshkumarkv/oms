@@ -117,7 +117,6 @@ class OrderServiceTest {
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         clientData.setCashBalance("100000.00");
-        clientData.setBuyingPower("95000.00");
         clientData.setMaxOpenOrders(10);
         clientData.setHoldings(Collections.emptyList());
         ClientResponse clientResponse = new ClientResponse();
@@ -147,9 +146,6 @@ class OrderServiceTest {
 
         // Default: no holidays (so any future weekday is valid)
         when(marketDataServiceClient.getHolidays()).thenReturn(Collections.emptyList());
-
-        // Default: cash reservation succeeds
-        when(clientServiceClient.reserveCash(any(), any())).thenReturn(true);
 
         // Default: Redis returns nothing (cache miss)
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -593,12 +589,11 @@ class OrderServiceTest {
     // --- BUY cash validation (SCRUM-135: combined settled+in-flight view) ---
 
     @Test
-    void shouldValidateBuyOrderUsingCombinedViewAndSaveWithoutCallingReserveCash() {
-        // cashBalance=100000, committed=0, orderValue=1500 (10 * 150) → passes; reserveCash never called
+    void shouldValidateBuyOrderUsingCombinedCashAndCommitmentsView() {
+        // cashBalance=100000, committed=0, orderValue=1500 (10 * 150) → passes
         orderService.submitOrder(limitBuyRequest(), userId);
 
         verify(orderRepository).save(any(Order.class));
-        verify(clientServiceClient, never()).reserveCash(any(), any());
         verify(orderRepository).sumOpenBuyOrderValues(eq(clientId), any());
     }
 
@@ -611,7 +606,6 @@ class OrderServiceTest {
 
         orderService.submitOrder(request, userId);
 
-        verify(clientServiceClient, never()).reserveCash(any(), any());
         verify(orderRepository, never()).sumOpenBuyOrderValues(any(), any());
         verify(orderRepository).save(any(Order.class));
     }
@@ -794,7 +788,6 @@ class OrderServiceTest {
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         clientData.setCashBalance("100000.00");
-        clientData.setBuyingPower("95000.00");
         clientData.setMaxOpenOrders(10);
         clientData.setHoldings(List.of(holding));
         ClientResponse clientResponse = new ClientResponse();
@@ -829,7 +822,6 @@ class OrderServiceTest {
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         clientData.setCashBalance("100000.00");
-        clientData.setBuyingPower("50000.00");
         clientData.setMaxOpenOrders(5);
         clientData.setHoldings(Collections.emptyList());
         ClientResponse clientResponse = new ClientResponse();
@@ -851,7 +843,6 @@ class OrderServiceTest {
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         clientData.setCashBalance("100000.00");
-        clientData.setBuyingPower("50000.00");
         clientData.setHoldings(null);
         ClientResponse clientResponse = new ClientResponse();
         clientResponse.setData(clientData);
@@ -940,7 +931,6 @@ class OrderServiceTest {
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         clientData.setCashBalance(null);   // null cashBalance → defaults to ZERO
-        clientData.setBuyingPower(null);
         clientData.setHoldings(Collections.emptyList());
         ClientResponse clientResponse = new ClientResponse();
         clientResponse.setData(clientData);
@@ -983,13 +973,12 @@ class OrderServiceTest {
     }
 
     @Test
-    void shouldNotReserveCashForShortSellOrders() {
+    void shouldSaveOrderForShortSellOrders() {
         SubmitOrderRequest request = marketBuyRequest();
         request.setSide("SHORT_SELL");
 
         orderService.submitOrder(request, userId);
 
-        verify(clientServiceClient, never()).reserveCash(any(), any());
         verify(orderRepository).save(any(Order.class));
     }
 
@@ -1135,13 +1124,6 @@ class OrderServiceTest {
                 .isInstanceOf(InsufficientBuyingPowerException.class);
         verify(orderRepository, never()).save(any());
         verify(orderEventProducer, never()).publishOrderStateChanged(any());
-    }
-
-    @Test
-    void shouldNeverCallReserveCashOnClientServiceForAnyOrderSide() {
-        // BUY — must not call reserveCash
-        orderService.submitOrder(marketBuyRequest(), userId);
-        verify(clientServiceClient, never()).reserveCash(any(), any());
     }
 
     @Test
@@ -1448,7 +1430,6 @@ class OrderServiceTest {
         clientData.setKycStatus("VERIFIED");
         clientData.setKycExpiryDate(LocalDate.now().plusYears(1));
         clientData.setCashBalance("100000.00");
-        clientData.setBuyingPower("95000.00");
         clientData.setMaxOpenOrders(10);
         clientData.setHoldings(quantity > 0 ? List.of(holding) : Collections.emptyList());
         ClientResponse clientResponse = new ClientResponse();

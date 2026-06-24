@@ -35,8 +35,6 @@ vi.mock('../api/clientApi', () => ({
   ]),
   getPortfolio: vi.fn().mockResolvedValue({
     cashBalance: '50000.00',
-    reservedCash: '0.00',
-    buyingPower: '50000.00',
     holdings: [],
   }),
 }))
@@ -190,8 +188,6 @@ describe('OrderEntryPage — order preview', () => {
 
 const portfolioWithHoldings = {
   cashBalance: '75000.00',
-  reservedCash: '0.00',
-  buyingPower: '75000.00',
   holdings: [{ symbol: 'AAPL', quantity: 100, avgPrice: '170.00', currentPrice: '175.00', marketValue: '17500.00' }],
 }
 

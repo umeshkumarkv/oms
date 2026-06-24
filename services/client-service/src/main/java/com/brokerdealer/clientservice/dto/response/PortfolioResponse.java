@@ -23,7 +23,5 @@ public class PortfolioResponse {
     Integer maxOpenOrders;
     DefaultRoute defaultRoute;
     String cashBalance;
-    String reservedCash;
-    String buyingPower;
     List<HoldingDetailResponse> holdings;
 }

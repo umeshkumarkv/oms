@@ -48,9 +48,6 @@ public class Client {
     @Column(name = "cash_balance", nullable = false, precision = 18, scale = 2)
     private BigDecimal cashBalance;
 
-    @Column(name = "reserved_cash", nullable = false, precision = 18, scale = 2)
-    private BigDecimal reservedCash;
-
     @Column(name = "trading_limit", precision = 18, scale = 2)
     private BigDecimal tradingLimit;
 
