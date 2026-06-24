@@ -339,6 +339,7 @@ const OrderEntryPage: React.FC = () => {
         const results = await searchInstruments(symbolInput, 10)
         setSearchResults(results)
         setDropdownOpen(true)
+        if (results.length > 0) setSymbolNotFound(false)
         setFocusedIdx(-1)
         searchErrorToastedRef.current = false
       } catch {
@@ -621,7 +622,9 @@ const OrderEntryPage: React.FC = () => {
                 onChange={(e) => {
                   const v = e.target.value.toUpperCase()
                   setSymbolInput(v)
-                  setSymbol(v)
+                  // Only drive the quote-fetch when the input is a valid ticker.
+                  // CUSIP / company-name queries must go to the search API only.
+                  setSymbol(/^[A-Z]{1,6}$/.test(v) ? v : '')
                   setSymbolNotFound(false)
                 }}
                 onKeyDown={(e) => {
@@ -679,7 +682,7 @@ const OrderEntryPage: React.FC = () => {
               </div>
             )}
             {quoteLoading && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Fetching quote…</div>}
-            {symbolNotFound && <div style={s.errorText}>Symbol not found. Please search and select a valid instrument.</div>}
+            {symbolNotFound && !(dropdownOpen && searchResults.length > 0) && <div style={s.errorText}>Symbol not found. Please search and select a valid instrument.</div>}
             {fieldErrors.symbol && <div style={s.errorText}>{fieldErrors.symbol}</div>}
           </div>
 
