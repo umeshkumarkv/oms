@@ -412,4 +412,16 @@ class ClientControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray());
     }
+
+    @Test
+    void shouldReturn404WhenPatchingRemovedReservedCashEndpoint() throws Exception {
+        mockMvc.perform(patch("/api/v1/clients/{id}/reserved-cash", CLIENT_001)
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"adjustment\":\"500.00\",\"reason\":\"test\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ENDPOINT_NOT_FOUND"))
+                .andExpect(jsonPath("$.meta.timestamp").exists())
+                .andExpect(jsonPath("$.meta.requestId").exists());
+    }
 }
