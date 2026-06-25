@@ -32,7 +32,7 @@ public class OrderValueLimitRule implements RiskRule {
         BigDecimal orderValue = new BigDecimal(request.getOrderValue());
         if (orderValue.compareTo(threshold) > 0) {
             return RiskResult.rejected(getRuleCode(),
-                    "Order value " + orderValue.toPlainString() + " exceeds limit of " + threshold.toPlainString());
+                    "Order value limit exceeded — " + getRuleCode());
         }
         return RiskResult.passed();
     }

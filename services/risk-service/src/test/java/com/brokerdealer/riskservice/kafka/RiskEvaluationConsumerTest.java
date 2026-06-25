@@ -62,7 +62,8 @@ class RiskEvaluationConsumerTest {
         RiskEvaluationResult result = captor.getValue();
         assertThat(result.getOrderId()).isEqualTo(orderId);
         assertThat(result.getResult()).isEqualTo("PASSED");
-        assertThat(result.getRuleCode()).isNull();
+        assertThat(result.getViolatedRuleCode()).isNull();
+        assertThat(result.getRejectionReason()).isNull();
         assertThat(result.getTimestamp()).isNotNull();
     }
 
@@ -81,7 +82,7 @@ class RiskEvaluationConsumerTest {
                 "orderValue", "2250000.00"
         );
         when(riskEvaluationService.evaluate(any())).thenReturn(
-                RiskResult.rejected("SINGLE_ORDER_QTY_LIMIT", "Qty 15000 exceeds limit of 10000"));
+                RiskResult.rejected("SINGLE_ORDER_QTY_LIMIT", "Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT"));
 
         riskEvaluationConsumer.consumeRiskEvaluationRequested(event);
 
@@ -91,8 +92,36 @@ class RiskEvaluationConsumerTest {
         RiskEvaluationResult result = captor.getValue();
         assertThat(result.getOrderId()).isEqualTo(orderId);
         assertThat(result.getResult()).isEqualTo("REJECTED");
-        assertThat(result.getRuleCode()).isEqualTo("SINGLE_ORDER_QTY_LIMIT");
-        assertThat(result.getReason()).contains("15000");
+        assertThat(result.getViolatedRuleCode()).isEqualTo("SINGLE_ORDER_QTY_LIMIT");
+        assertThat(result.getRejectionReason()).isEqualTo("Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT");
+    }
+
+    @Test
+    void shouldPublishRejectedResultWithOrderValueLimitReason() {
+        UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        Map<String, Object> event = Map.of(
+                "orderId", orderId.toString(),
+                "clientId", clientId.toString(),
+                "symbol", "AAPL",
+                "side", "BUY",
+                "orderType", "LIMIT",
+                "quantity", 100,
+                "limitPrice", "6000.00",
+                "orderValue", "600000.00"
+        );
+        when(riskEvaluationService.evaluate(any())).thenReturn(
+                RiskResult.rejected("ORDER_VALUE_LIMIT", "Order value limit exceeded — ORDER_VALUE_LIMIT"));
+
+        riskEvaluationConsumer.consumeRiskEvaluationRequested(event);
+
+        ArgumentCaptor<RiskEvaluationResult> captor = ArgumentCaptor.forClass(RiskEvaluationResult.class);
+        verify(riskResultProducer).publishRiskResult(captor.capture());
+
+        RiskEvaluationResult result = captor.getValue();
+        assertThat(result.getResult()).isEqualTo("REJECTED");
+        assertThat(result.getViolatedRuleCode()).isEqualTo("ORDER_VALUE_LIMIT");
+        assertThat(result.getRejectionReason()).isEqualTo("Order value limit exceeded — ORDER_VALUE_LIMIT");
     }
 
     @Test

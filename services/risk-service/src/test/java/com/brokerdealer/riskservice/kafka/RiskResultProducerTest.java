@@ -31,8 +31,8 @@ class RiskResultProducerTest {
         RiskEvaluationResult result = RiskEvaluationResult.builder()
                 .orderId(orderId)
                 .result("PASSED")
-                .ruleCode(null)
-                .reason(null)
+                .violatedRuleCode(null)
+                .rejectionReason(null)
                 .timestamp(Instant.now())
                 .build();
 
@@ -47,8 +47,8 @@ class RiskResultProducerTest {
         RiskEvaluationResult result = RiskEvaluationResult.builder()
                 .orderId(orderId)
                 .result("REJECTED")
-                .ruleCode("SINGLE_ORDER_QTY_LIMIT")
-                .reason("Qty exceeds limit")
+                .violatedRuleCode("SINGLE_ORDER_QTY_LIMIT")
+                .rejectionReason("Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT")
                 .timestamp(Instant.now())
                 .build();
 

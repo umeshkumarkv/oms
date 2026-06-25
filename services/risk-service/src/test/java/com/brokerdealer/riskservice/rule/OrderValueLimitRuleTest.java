@@ -41,7 +41,7 @@ class OrderValueLimitRuleTest {
         RiskResult result = rule.evaluate(requestWithValue("600000.00"), context);
         assertThat(result.getResult()).isEqualTo("REJECTED");
         assertThat(result.getFailedRule()).isEqualTo("ORDER_VALUE_LIMIT");
-        assertThat(result.getReason()).contains("600000").contains("500000");
+        assertThat(result.getReason()).isEqualTo("Order value limit exceeded — ORDER_VALUE_LIMIT");
     }
 
     @Test
