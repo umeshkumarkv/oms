@@ -40,7 +40,7 @@ class SingleOrderQtyLimitRuleTest {
         RiskResult result = rule.evaluate(requestWithQty(15000), context);
         assertThat(result.getResult()).isEqualTo("REJECTED");
         assertThat(result.getFailedRule()).isEqualTo("SINGLE_ORDER_QTY_LIMIT");
-        assertThat(result.getReason()).contains("15000").contains("10000");
+        assertThat(result.getReason()).isEqualTo("Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT");
     }
 
     @Test

@@ -29,7 +29,7 @@ public class SingleOrderQtyLimitRule implements RiskRule {
         BigDecimal qty = BigDecimal.valueOf(request.getQuantity());
         if (qty.compareTo(threshold) > 0) {
             return RiskResult.rejected(getRuleCode(),
-                    "Qty " + request.getQuantity() + " exceeds limit of " + threshold.toPlainString());
+                    "Single order quantity limit exceeded — " + getRuleCode());
         }
         return RiskResult.passed();
     }

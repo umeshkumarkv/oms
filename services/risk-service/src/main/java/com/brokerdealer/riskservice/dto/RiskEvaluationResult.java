@@ -14,7 +14,7 @@ public class RiskEvaluationResult {
     UUID clientId;
     UUID userId;
     String result;
-    String ruleCode;
-    String reason;
+    String violatedRuleCode;
+    String rejectionReason;
     Instant timestamp;
 }

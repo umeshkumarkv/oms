@@ -36,8 +36,8 @@ public class RiskEvaluationConsumer {
                 .clientId(request.getClientId())
                 .userId(request.getUserId())
                 .result(result.getResult())
-                .ruleCode(result.getFailedRule())
-                .reason(result.getReason())
+                .violatedRuleCode(result.getFailedRule())
+                .rejectionReason(result.getReason())
                 .timestamp(Instant.now())
                 .build());
     }
