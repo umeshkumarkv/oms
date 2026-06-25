@@ -13,6 +13,6 @@ public class RiskEvaluationResultEvent {
 
     private UUID orderId;
     private String result;    // "PASSED" | "REJECTED"
-    private String ruleCode;  // null if PASSED
-    private String reason;    // null if PASSED
+    private String violatedRuleCode;  // null if PASSED
+    private String rejectionReason;   // null if PASSED
 }

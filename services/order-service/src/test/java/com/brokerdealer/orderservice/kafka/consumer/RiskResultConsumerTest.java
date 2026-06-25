@@ -48,14 +48,16 @@ class RiskResultConsumerTest {
         Map<String, Object> payload = Map.of(
                 "orderId", orderId.toString(),
                 "result", "REJECTED",
-                "ruleCode", "SINGLE_ORDER_QTY_LIMIT",
-                "reason", "Quantity 15000 exceeds limit of 10000"
+                "violatedRuleCode", "SINGLE_ORDER_QTY_LIMIT",
+                "rejectionReason", "Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT"
         );
 
         riskResultConsumer.consumeRiskResult(payload);
 
         verify(orderStateMachineService).transitionOnRiskRejected(
-                orderId, "SINGLE_ORDER_QTY_LIMIT", "Quantity 15000 exceeds limit of 10000");
+                orderId,
+                "Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT",
+                "SINGLE_ORDER_QTY_LIMIT");
         verify(orderStateMachineService, never()).transitionOnRiskPassed(any());
     }
 

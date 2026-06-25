@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -80,7 +81,7 @@ public class OrderStateMachineService {
     }
 
     @Transactional
-    public void transitionOnRiskRejected(UUID orderId, String ruleCode, String reason) {
+    public void transitionOnRiskRejected(UUID orderId, String rejectionReason, String violatedRuleCode) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
@@ -97,7 +98,7 @@ public class OrderStateMachineService {
 
         OrderStatus fromState = order.getStatus();
         order.setStatus(OrderStatus.RISK_REJECTED);
-        order.setRejectionReason(ruleCode + ": " + reason);
+        order.setRejectionReason(rejectionReason);
         orderRepository.save(order);
 
         orderEventProducer.publishOrderStateChanged(OrderStateChangedEvent.builder()
@@ -108,13 +109,16 @@ public class OrderStateMachineService {
                 .toState(OrderStatus.RISK_REJECTED.name())
                 .triggeredBy(TRIGGERED_BY_RISK_ENGINE)
                 .timestamp(Instant.now().toString())
-                .metadata(Collections.emptyMap())
+                .metadata(Map.of(
+                        "rejectionReason",  rejectionReason  != null ? rejectionReason  : "",
+                        "violatedRuleCode", violatedRuleCode != null ? violatedRuleCode : ""
+                ))
                 .build());
 
         log.info("Order state transition: orderId={} {} -> {}", orderId, fromState, OrderStatus.RISK_REJECTED);
 
         evictRedisOrderState(orderId);
-        log.info("Order risk rejected: orderId={} ruleCode={}", orderId, ruleCode);
+        log.info("Order risk rejected: orderId={} violatedRuleCode={}", orderId, violatedRuleCode);
     }
 
     private static final String TRIGGERED_BY_EXECUTION = "SYSTEM:EXECUTION_ENGINE";

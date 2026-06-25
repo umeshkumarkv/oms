@@ -31,7 +31,7 @@ public class RiskResultConsumer {
         if ("PASSED".equals(event.getResult())) {
             orderStateMachineService.transitionOnRiskPassed(orderId);
         } else if ("REJECTED".equals(event.getResult())) {
-            orderStateMachineService.transitionOnRiskRejected(orderId, event.getRuleCode(), event.getReason());
+            orderStateMachineService.transitionOnRiskRejected(orderId, event.getRejectionReason(), event.getViolatedRuleCode());
         } else {
             log.warn("Unknown risk result received: orderId={} result={}", orderId, event.getResult());
         }

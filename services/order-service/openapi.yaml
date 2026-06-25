@@ -441,6 +441,13 @@ components:
           type: string
         status:
           type: string
+        rejectionReason:
+          type: string
+          nullable: true
+          description: >
+            Human-readable risk rule rejection reason. Non-null only for RISK_REJECTED orders.
+            Format: "{rule description} — {ruleCode}"
+          example: "Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT"
         createdAt:
           type: string
           format: date-time

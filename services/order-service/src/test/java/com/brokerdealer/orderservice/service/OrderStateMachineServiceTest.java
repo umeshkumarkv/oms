@@ -140,10 +140,11 @@ class OrderStateMachineServiceTest {
             return o;
         }).when(orderRepository).save(any(Order.class));
 
-        orderStateMachineService.transitionOnRiskRejected(orderId, "SINGLE_ORDER_QTY_LIMIT", "Qty 15000 exceeds 10000");
+        orderStateMachineService.transitionOnRiskRejected(orderId,
+                "Single order qty limit exceeded — SINGLE_ORDER_QTY_LIMIT", "SINGLE_ORDER_QTY_LIMIT");
 
         assertThat(capturedStatuses).containsExactly(OrderStatus.RISK_REJECTED);
-        assertThat(capturedReasons).containsExactly("SINGLE_ORDER_QTY_LIMIT: Qty 15000 exceeds 10000");
+        assertThat(capturedReasons).containsExactly("Single order qty limit exceeded — SINGLE_ORDER_QTY_LIMIT");
     }
 
     @Test
@@ -151,7 +152,8 @@ class OrderStateMachineServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(newOrder()));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        orderStateMachineService.transitionOnRiskRejected(orderId, "ORDER_VALUE_LIMIT", "Value exceeds 500000");
+        orderStateMachineService.transitionOnRiskRejected(orderId,
+                "Order value limit exceeded — ORDER_VALUE_LIMIT", "ORDER_VALUE_LIMIT");
 
         ArgumentCaptor<OrderStateChangedEvent> eventCaptor = ArgumentCaptor.forClass(OrderStateChangedEvent.class);
         verify(orderEventProducer).publishOrderStateChanged(eventCaptor.capture());
@@ -160,6 +162,8 @@ class OrderStateMachineServiceTest {
         assertThat(event.getFromState()).isEqualTo("NEW");
         assertThat(event.getToState()).isEqualTo("RISK_REJECTED");
         assertThat(event.getTriggeredBy()).isEqualTo("SYSTEM:RISK_ENGINE");
+        assertThat(event.getMetadata()).containsEntry("rejectionReason", "Order value limit exceeded — ORDER_VALUE_LIMIT");
+        assertThat(event.getMetadata()).containsEntry("violatedRuleCode", "ORDER_VALUE_LIMIT");
     }
 
     @Test
@@ -167,7 +171,7 @@ class OrderStateMachineServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(newOrder()));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        orderStateMachineService.transitionOnRiskRejected(orderId, "RULE", "reason");
+        orderStateMachineService.transitionOnRiskRejected(orderId, "reason — RULE", "RULE");
 
         verify(redisTemplate).delete("order:state:" + orderId);
     }
@@ -192,7 +196,7 @@ class OrderStateMachineServiceTest {
         order.setStatus(OrderStatus.RISK_REJECTED);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-        orderStateMachineService.transitionOnRiskRejected(orderId, "RULE", "reason");
+        orderStateMachineService.transitionOnRiskRejected(orderId, "reason — RULE", "RULE");
 
         verify(orderRepository, never()).save(any());
         verify(orderEventProducer, never()).publishOrderStateChanged(any());
@@ -236,7 +240,7 @@ class OrderStateMachineServiceTest {
     void shouldThrowWhenOrderNotFoundOnRejectedResult() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> orderStateMachineService.transitionOnRiskRejected(orderId, "RULE", "reason"))
+        assertThatThrownBy(() -> orderStateMachineService.transitionOnRiskRejected(orderId, "reason — RULE", "RULE"))
                 .isInstanceOf(OrderNotFoundException.class)
                 .hasMessageContaining("Order not found");
     }
