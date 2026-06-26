@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import OrderBlotterPage from '../pages/OrderBlotterPage'
 import { formatBlotterTimestamp } from '../utils/dateUtils'
@@ -128,5 +128,76 @@ describe('OrderBlotterPage — Created column', () => {
 
     await waitFor(() => expect(container).toBeInTheDocument())
     expect(container.querySelector('table')).toBeInTheDocument()
+  })
+})
+
+// ── Rejection Reason drawer tests ─────────────────────────────────────────────
+
+describe('OrderBlotterPage — Rejection Reason drawer', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  const renderPage = () =>
+    render(
+      <MemoryRouter>
+        <OrderBlotterPage />
+      </MemoryRouter>
+    )
+
+  it('shouldShowRejectionReasonSectionForRiskRejectedOrderWithReason', async () => {
+    const { getOrders } = await import('../api/orderApi')
+    vi.mocked(getOrders).mockResolvedValue({
+      orders: [makeOrder({ status: 'RISK_REJECTED', rejectionReason: 'ORDER_VALUE_LIMIT exceeded' })],
+      page: 0, pageSize: 25, totalCount: 1, totalPages: 1,
+    } as never)
+
+    renderPage()
+
+    await waitFor(() => screen.getByText('AAPL'))
+
+    const row = screen.getByText('AAPL').closest('tr')!
+    fireEvent.click(row)
+
+    await waitFor(() => {
+      expect(screen.getByText('Rejection Reason')).toBeInTheDocument()
+      expect(screen.getByText('ORDER_VALUE_LIMIT exceeded')).toBeInTheDocument()
+    })
+  })
+
+  it('shouldNotShowRejectionReasonSectionForNonRejectedOrder', async () => {
+    const { getOrders } = await import('../api/orderApi')
+    vi.mocked(getOrders).mockResolvedValue({
+      orders: [makeOrder({ status: 'FILLED', rejectionReason: null })],
+      page: 0, pageSize: 25, totalCount: 1, totalPages: 1,
+    } as never)
+
+    renderPage()
+
+    await waitFor(() => screen.getByText('AAPL'))
+
+    const row = screen.getByText('AAPL').closest('tr')!
+    fireEvent.click(row)
+
+    // 'Order Details' section heading only exists inside the open drawer
+    await waitFor(() => expect(screen.getByText('Order Details')).toBeInTheDocument())
+    expect(screen.queryByText('Rejection Reason')).toBeNull()
+  })
+
+  it('shouldNotShowRejectionReasonSectionForRiskRejectedOrderWithNullReason', async () => {
+    const { getOrders } = await import('../api/orderApi')
+    vi.mocked(getOrders).mockResolvedValue({
+      orders: [makeOrder({ status: 'RISK_REJECTED', rejectionReason: null })],
+      page: 0, pageSize: 25, totalCount: 1, totalPages: 1,
+    } as never)
+
+    renderPage()
+
+    await waitFor(() => screen.getByText('AAPL'))
+
+    const row = screen.getByText('AAPL').closest('tr')!
+    fireEvent.click(row)
+
+    // 'Order Details' section heading only exists inside the open drawer
+    await waitFor(() => expect(screen.getByText('Order Details')).toBeInTheDocument())
+    expect(screen.queryByText('Rejection Reason')).toBeNull()
   })
 })

@@ -637,6 +637,22 @@ const OrderBlotterPage: React.FC = () => {
                 </div>
               </div>
 
+              {selectedOrder.status === 'RISK_REJECTED' && selectedOrder.rejectionReason != null && (
+                <div style={s.dSection}>
+                  <div style={{ ...s.dSTitle, color: 'var(--color-error)' }}>Rejection Reason</div>
+                  <div style={{
+                    background: 'var(--color-error-bg)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    color: 'var(--color-text-primary)',
+                    lineHeight: '1.5',
+                  }}>
+                    {selectedOrder.rejectionReason}
+                  </div>
+                </div>
+              )}
+
               {drawerLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0' }}>
                   <div className="skeleton" style={{ height: '20px', width: '100%' }} />
