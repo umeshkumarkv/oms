@@ -663,19 +663,33 @@ Add JIRA comment with the full report.
 **Attach screenshots to JIRA** — upload every PNG captured during this attempt as an attachment on the ticket.
 This makes screenshots visible directly on the ticket without requiring access to the local filesystem.
 
+> **One-time setup required** — generate an Atlassian API token at
+> https://id.atlassian.com/manage-profile/security/api-tokens
+> then add to your shell profile (`~/.zshrc` or `~/.bashrc`):
+> ```bash
+> export ATLASSIAN_EMAIL="umesh.kotaladinne@wissen.com"
+> export ATLASSIAN_TOKEN="<your-api-token>"
+> ```
+> Without these, the upload step is skipped and screenshots remain local only.
+
 ```bash
 CLOUD_ID="297494a9-8b49-4897-ad63-f98ef7533d3d"
-for screenshot in frontend/test-results/qa-scrum-{n}-attempt-{attempt}/*.png; do
-  if [ -f "$screenshot" ]; then
-    curl -s -X POST \
-      -u "${ATLASSIAN_EMAIL}:${ATLASSIAN_TOKEN}" \
-      -H "X-Atlassian-Token: no-check" \
-      -F "file=@${screenshot}" \
-      "https://api.atlassian.com/ex/jira/${CLOUD_ID}/rest/api/3/issue/SCRUM-{n}/attachments" \
-      | jq -r '.[] | "  Attached: \(.filename)"' 2>/dev/null \
-      || echo "  Skipped: $screenshot (ATLASSIAN_EMAIL or ATLASSIAN_TOKEN not set)"
-  fi
-done
+if [ -z "${ATLASSIAN_EMAIL}" ] || [ -z "${ATLASSIAN_TOKEN}" ]; then
+  echo "⚠️  ATLASSIAN_EMAIL / ATLASSIAN_TOKEN not set — screenshots NOT attached to JIRA."
+  echo "   Local path: frontend/test-results/qa-scrum-{n}-attempt-{attempt}/"
+  echo "   Set the env vars (see qa-eval-loop.md setup note above) to enable auto-attach."
+else
+  for screenshot in frontend/test-results/qa-scrum-{n}-attempt-{attempt}/*.png; do
+    if [ -f "$screenshot" ]; then
+      curl -s -X POST \
+        -u "${ATLASSIAN_EMAIL}:${ATLASSIAN_TOKEN}" \
+        -H "X-Atlassian-Token: no-check" \
+        -F "file=@${screenshot}" \
+        "https://api.atlassian.com/ex/jira/${CLOUD_ID}/rest/api/3/issue/SCRUM-{n}/attachments" \
+        | jq -r '.[] | "  Attached: \(.filename)"' 2>/dev/null
+    fi
+  done
+fi
 ```
 
 If the `test-results/` directory contains no PNGs (story has no UI ACs), skip silently and note "No UI screenshots — REST-only story."
