@@ -660,43 +660,57 @@ QA PASSED — {total}/{total} checks verified. Ready to merge.
 
 Add JIRA comment with the full report.
 
-**Attach screenshots to JIRA** — upload every PNG captured during this attempt as an attachment on the ticket.
-This makes screenshots visible directly on the ticket without requiring access to the local filesystem.
+**Attach screenshots to JIRA** — requires a one-time Atlassian API token setup (2 minutes).
 
-> **One-time setup required** — generate an Atlassian API token at
-> https://id.atlassian.com/manage-profile/security/api-tokens
-> then add to your shell profile (`~/.zshrc` or `~/.bashrc`):
-> ```bash
-> export ATLASSIAN_EMAIL="umesh.kotaladinne@wissen.com"
-> export ATLASSIAN_TOKEN="<your-api-token>"
-> ```
-> Without these, the upload step is skipped and screenshots remain local only.
+> **One-time setup:**
+> 1. Generate token at https://id.atlassian.com/manage-profile/security/api-tokens
+> 2. Add to `~/.zshrc`: `export ATLASSIAN_EMAIL="umesh.kotaladinne@wissen.com"` and `export ATLASSIAN_TOKEN="<token>"`
+> 3. Run `! source ~/.zshrc` in Claude Code — agent will auto-attach from that point forward.
+>
+> **Why this is needed:** The Atlassian MCP only exposes text-based tools (comments, transitions).
+> Binary file attachment requires the REST multipart API (`POST /issue/{key}/attachments`) which
+> needs a credential — the `ATLASSIAN_TOKEN` above. There is no zero-setup alternative for PNG uploads.
 
 ```bash
 CLOUD_ID="297494a9-8b49-4897-ad63-f98ef7533d3d"
+SCREENSHOTS_DIR="frontend/test-results/qa-scrum-{n}-attempt-{attempt}"
+
 if [ -z "${ATLASSIAN_EMAIL}" ] || [ -z "${ATLASSIAN_TOKEN}" ]; then
-  echo "⚠️  ATLASSIAN_EMAIL / ATLASSIAN_TOKEN not set — screenshots NOT attached to JIRA."
-  echo "   Local path: frontend/test-results/qa-scrum-{n}-attempt-{attempt}/"
-  echo "   Set the env vars (see qa-eval-loop.md setup note above) to enable auto-attach."
+  echo "⚠️  ATLASSIAN_EMAIL / ATLASSIAN_TOKEN not set — screenshots NOT attached."
+  echo "   See one-time setup note above."
 else
-  for screenshot in frontend/test-results/qa-scrum-{n}-attempt-{attempt}/*.png; do
-    if [ -f "$screenshot" ]; then
-      curl -s -X POST \
-        -u "${ATLASSIAN_EMAIL}:${ATLASSIAN_TOKEN}" \
-        -H "X-Atlassian-Token: no-check" \
-        -F "file=@${screenshot}" \
-        "https://api.atlassian.com/ex/jira/${CLOUD_ID}/rest/api/3/issue/SCRUM-{n}/attachments" \
-        | jq -r '.[] | "  Attached: \(.filename)"' 2>/dev/null
-    fi
+  for screenshot in ${SCREENSHOTS_DIR}/*.png; do
+    [ -f "$screenshot" ] || continue
+    curl -s -X POST \
+      -u "${ATLASSIAN_EMAIL}:${ATLASSIAN_TOKEN}" \
+      -H "X-Atlassian-Token: no-check" \
+      -F "file=@${screenshot}" \
+      "https://api.atlassian.com/ex/jira/${CLOUD_ID}/rest/api/3/issue/SCRUM-{n}/attachments" \
+      | jq -r '.[] | "  Attached: \(.filename)"'
   done
 fi
 ```
 
-If the `test-results/` directory contains no PNGs (story has no UI ACs), skip silently and note "No UI screenshots — REST-only story."
+If `test-results/` has no PNGs (REST-only story), skip and note "No UI screenshots."
 
 The ticket is already **In Review** (set by Dev Eval Loop when the PR was raised).
 Do NOT transition the status — it is correct as-is.
 The SM Agent will transition In Review → Done after the PR is merged and DoD is verified.
+
+Post execution audit comment on SCRUM-{n} (no Write Guard required — informational only):
+```
+END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME))
+```
+Comment body:
+```
+⏱ QA Eval Loop Execution Audit ({ISO 8601 timestamp})
+  Execution time : {printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+  Tokens consumed: {session input + output token count}
+  Attempts used  : {attempt} / {max_attempts}
+  REST ACs       : {n} / {n} passed
+  UI ACs         : {n} / {n} passed
+  Outcome        : ALL ACs PASSED — ready for SM Agent merge gate
+```
 
 ---
 
