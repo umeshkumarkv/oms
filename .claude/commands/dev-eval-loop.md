@@ -155,6 +155,9 @@ MANDATORY FIXES FROM PRIOR ATTEMPTS — resolve every item before this attempt i
 8. **Exception** — new `exception/XxxException.java` + update `GlobalExceptionHandler` if needed
 9. **Config** — Resilience4j, RestTemplate, Redis config if this story requires external calls
 10. **Tests** — unit tests for service + controller; cover every AC + every error path
+    - **Stale spec rule:** if this story modifies or removes a feature that existing Playwright specs
+      (`frontend/e2e/*.spec.ts`) assert, update those specs to match the new behavior in the same commit.
+      A spec that asserts old behavior and now fails is a FAIL in Category 10 — do not leave it broken.
 
 #### Mandatory standards — enforce every line
 
@@ -266,6 +269,8 @@ Check every category and mark PASS or FAIL with file:line evidence for each FAIL
 - [ ] Controller test covers: 200/201/202, 404, 400/422
 - [ ] Tests use `@ExtendWith(MockitoExtension.class)` or `@WebMvcTest`
 - [ ] Test method names: camelCase, descriptive
+- [ ] If story modifies or removes frontend-visible behavior: all `frontend/e2e/*.spec.ts` tests
+  that asserted the old behavior have been updated or removed in this commit
 
 **Category 11 — Security**
 - [ ] No hardcoded credentials or secrets
