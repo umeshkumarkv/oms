@@ -11,6 +11,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,13 +46,28 @@ public class AuditEventConsumer {
             String triggeredBy = (String) event.get("triggeredBy");
             String timestamp = (String) event.get("timestamp");
 
+            Instant eventTs = parseTimestamp(timestamp);
+
+            if (auditLogRepository.existsByEntityIdAndNewStateAndEventTimestamp(orderId, toState, eventTs)) {
+                log.info("Duplicate order.state.changed skipped: orderId={} toState={}", orderId, toState);
+                return;
+            }
+
             ActorType actorType = (triggeredBy != null && triggeredBy.startsWith("USER:"))
                     ? ActorType.USER : ActorType.SYSTEM;
 
-            Map<String, Object> meta = Map.of(
-                    "clientId", clientId != null ? clientId.toString() : "",
-                    "triggeredBy", triggeredBy != null ? triggeredBy : ""
-            );
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("clientId",    clientId != null ? clientId.toString() : "");
+            meta.put("triggeredBy", triggeredBy != null ? triggeredBy : "");
+
+            if ("RISK_REJECTED".equals(toState)) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> eventMetadata = event.get("metadata") instanceof Map
+                        ? (Map<String, Object>) event.get("metadata")
+                        : Collections.emptyMap();
+                meta.put("rejectionReason",  eventMetadata.getOrDefault("rejectionReason", ""));
+                meta.put("violatedRuleCode", eventMetadata.getOrDefault("violatedRuleCode", ""));
+            }
 
             AuditLog auditLog = AuditLog.builder()
                     .entityType("ORDER")
@@ -60,7 +77,7 @@ public class AuditEventConsumer {
                     .newState(toState)
                     .actorId(userId)
                     .actorType(actorType)
-                    .eventTimestamp(parseTimestamp(timestamp))
+                    .eventTimestamp(eventTs)
                     .metadata(toJson(meta))
                     .build();
 
