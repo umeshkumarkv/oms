@@ -46,6 +46,11 @@ If the user types "no", stop at that step and show the recommended fix for the u
 
 ## Phase 0 — Fetch Pipeline State
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 ```bash
 # If PR number provided
 gh pr view {n} --json headRefName --jq '.headRefName'
@@ -193,6 +198,9 @@ Category     : {failure category}
 Root Cause   : {one-line summary}
 Action Taken : {what was fixed | what is recommended}
 Next Step    : {CI will re-run | human must apply fix}
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
 ```
 
 ## Hard Stops — always pause and ask the user

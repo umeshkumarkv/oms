@@ -89,6 +89,11 @@ Do NOT execute the git push or gh pr create until the user types "yes".
 
 ## Phase 0 — Pre-flight (all gates must pass before any code)
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 1. Fetch the JIRA story using `getJiraIssue(SCRUM-{n})`
 2. Extract: summary, description, acceptance criteria, tech constraints, blocked-by links, labels
 
@@ -420,6 +425,9 @@ Eval Loop  : Passed on attempt {attempt} / {max_attempts}
 {if attempt > 1: Fixed between attempts: {list of what changed}}
 
 Next step  : /qa-eval-loop SCRUM-{n}  (after code review approves PR)
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
 ```
 
 ---

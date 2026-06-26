@@ -46,6 +46,11 @@ If the user types "no", show the full findings report but do not post to GitHub.
 
 ## Phase 0 — Setup
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 1. Read `CLAUDE.md` fully — all 19 sections. Do not skip any.
 2. Identify the service from the ticket or PR
 3. Read `services/{service}/CLAUDE.md`
@@ -227,6 +232,24 @@ Action required: fix violations on branch {branch-name} and re-run /code-review 
 
 Apply the **JIRA Write Guard**, then transition ticket: In Review → **In Progress**
 (Rationale: code is not reviewable until violations are fixed; returning to In Progress signals active rework.)
+
+---
+
+## Phase 4 — Summary to User
+
+```
+CODE REVIEW — SCRUM-{n} COMPLETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PR             : #{pr-number} — {pr-title}
+Verdict        : {APPROVED | REQUEST CHANGES — {n} violation(s)}
+Categories     : {n} / 12 passed
+{if violations: Top issues: {comma-separated category names}}
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
+
+Next step      : {/qa-eval-loop SCRUM-{n} | Fix violations and re-run /code-review SCRUM-{n}}
+```
 
 ## Hard Stops — always pause and ask the user
 

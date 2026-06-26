@@ -27,6 +27,11 @@ Escalate to human if: requirement contradicts an architectural decision in CLAUD
 
 ## Phase 0 — Understand the Product Context
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 1. Fetch current roadmap and open Epics:
    ```
    searchJiraIssuesUsingJql("project = SCRUM AND issueType = Epic ORDER BY created DESC")
@@ -181,6 +186,9 @@ BACKLOG ORDER
 
 NEXT STEP
   Run: /ba-agent epic:{epic-key}
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
 ```
 
 ---

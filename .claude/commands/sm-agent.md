@@ -29,6 +29,11 @@ Escalate to human if: a ticket cannot be closed because DoD criteria are unmet.
 
 ## Phase 0 — Fetch Sprint State
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 ```
 searchJiraIssuesUsingJql(
   "project = SCRUM AND sprint in openSprints() ORDER BY status ASC",
@@ -189,6 +194,12 @@ For each flagged ticket (AT RISK, BLOCKED, UNASSIGNED, NO ACS):
 Print the full standup summary.
 List any JIRA comments posted.
 Highlight the most urgent item needing human action today.
+
+End every report with:
+```
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
+```
 
 ## Hard Stops — daily mode
 

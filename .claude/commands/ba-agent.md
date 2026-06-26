@@ -25,6 +25,11 @@ Escalate to PM Agent if: requirement scope is ambiguous or the PRD is missing.
 
 ## Phase 0 — Understand the Requirement
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 1. Parse the input — if it is a Confluence page ID, fetch the page content first
 2. Read `CLAUDE.md` fully — pay special attention to:
    - Section 2: Tech Stack (what is locked)
@@ -176,6 +181,9 @@ AMBIGUITIES (need human decision)
 
 NEXT STEP
   Run /architect-agent SCRUM-{n} for each story before development begins.
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
 ```
 
 ## Hard Stops — always pause and ask the user

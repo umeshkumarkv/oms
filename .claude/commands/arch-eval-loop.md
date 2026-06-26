@@ -70,6 +70,11 @@ Do NOT execute the JIRA write operation until the user types "yes".
 
 ## Phase 0 — Pre-flight
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 1. Fetch the JIRA story: `getJiraIssue(SCRUM-{n})`
 2. Verify the story has label `bmad-dor-ready` or that ACs exist — if neither, STOP: "Run /ba-agent first."
 3. Read root `CLAUDE.md` fully (all sections)
@@ -356,6 +361,9 @@ DESIGN COMPLETE
 DoR STATUS : APPROVED (label: bmad-arch-approved)
 
 Next step  : /dev-eval-loop SCRUM-{n}
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
 ```
 
 ---

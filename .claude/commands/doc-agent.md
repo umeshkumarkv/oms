@@ -43,6 +43,11 @@ If the user types "no", stop at that step and tell the user what remains.
 
 ## Phase 0 — Read the PR
 
+Record the session start time before any work begins:
+```bash
+START_TIME=$(date +%s)
+```
+
 1. If given a JIRA ticket, find the PR:
    ```bash
    gh pr list --search "SCRUM-{n}" --json number,title,headRefName,mergedAt
@@ -218,6 +223,9 @@ DOCS PR
 
 NO CHANGES NEEDED
   {list any files that were checked but needed no update}
+
+Execution time : {END_TIME=$(date +%s); elapsed=$((END_TIME-START_TIME)); printf '%dm %ds' $((elapsed/60)) $((elapsed%60))}
+Tokens consumed: {session input + output tokens from the Claude Code usage counter if visible}
 ```
 
 ## Hard Stops — always pause and ask the user
