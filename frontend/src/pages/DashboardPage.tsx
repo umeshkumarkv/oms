@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, ClipboardList, FilePlus, Radio, TrendingUp } from 'lucide-react'
+import { Briefcase, ClipboardList, FilePlus, TrendingUp } from 'lucide-react'
 import { getOrders } from '../api/orderApi'
 import { getMarketMovers, getMarketIndices } from '../api/marketApi'
 import { getActiveClients } from '../api/clientApi'
@@ -24,15 +24,6 @@ const isExpiringSoon = (order: OrderSummary): boolean => {
   return diff > 0 && diff <= 2 * 24 * 60 * 60 * 1000
 }
 
-const relativeTime = (iso: string): string => {
-  const diff = Date.now() - new Date(iso).getTime()
-  const s = Math.floor(diff / 1000)
-  if (s < 60)  return `${s}s ago`
-  const m = Math.floor(s / 60)
-  if (m < 60)  return `${m}m ago`
-  const h = Math.floor(m / 60)
-  return `${h}h ago`
-}
 
 const formatDate = (iso: string): string => {
   try {
@@ -86,12 +77,6 @@ const s = {
   sectionBody:   { padding: '0' } as React.CSSProperties,
   emptyMsg:      { padding: '36px 24px', textAlign: 'center' as const, color: 'var(--color-text-muted)', fontSize: '13px' } as React.CSSProperties,
 
-  // Activity row
-  actRow:  { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
-  actDot:  (color: string) => ({ width: '8px', height: '8px', borderRadius: '50%', background: color, marginTop: '5px', flexShrink: 0 } as React.CSSProperties),
-  actText: { flex: 1, fontSize: '13px', color: 'var(--color-text-primary)' } as React.CSSProperties,
-  actTime: { fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-
   // GTD row
   gtdRow:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)', fontSize: '13px' } as React.CSSProperties,
   sidePill:   (side: string) => ({
@@ -111,8 +96,6 @@ const s = {
   },
   actionIcon:  { color: 'var(--color-primary)' } as React.CSSProperties,
   actionLabel: { fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' } as React.CSSProperties,
-  rightCol:    { display: 'flex', flexDirection: 'column' as const, gap: '16px' },
-
   // Market intelligence tiles
   moverColHead: { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
   moverRow:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)' } as React.CSSProperties,
@@ -132,13 +115,6 @@ interface Metrics {
   gtdExpiringSoon: OrderSummary[]
 }
 
-interface ActivityEvent {
-  id:        string
-  color:     string
-  message:   string
-  timestamp: string
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const DashboardPage: React.FC = () => {
@@ -147,8 +123,6 @@ const DashboardPage: React.FC = () => {
   const [loading,       setLoading]       = useState(true)
   const [metrics,       setMetrics]       = useState<Metrics | null>(null)
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
-  const [activityEvents] = useState<ActivityEvent[]>([])
-
   const intervalRef         = useRef<ReturnType<typeof setInterval> | null>(null)
   const moversIntervalRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const indicesIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -306,106 +280,71 @@ const DashboardPage: React.FC = () => {
 
       </div>
 
-      {/* Two-column layout */}
+      {/* Quick Actions + GTD Expiring Soon */}
       <div style={s.grid2}>
 
-        {/* Left — Recent Activity */}
+        {/* Quick Actions */}
         <div style={s.section}>
           <div style={s.sectionHeader}>
-            <h2 style={s.sectionTitle}>Recent Activity</h2>
-            <span style={s.refreshNote}>Live events</span>
+            <h2 style={s.sectionTitle}>Quick Actions</h2>
+          </div>
+          <div style={{ padding: '16px' }}>
+            <div style={s.actions}>
+              {quickActions.map(({ icon, label, path }) => (
+                <button
+                  key={path}
+                  style={s.actionBtn}
+                  onClick={() => navigate(path)}
+                  onMouseEnter={e => {
+                    const b = e.currentTarget as HTMLButtonElement
+                    b.style.boxShadow = 'var(--shadow-md)'
+                    b.style.borderColor = 'var(--color-primary)'
+                  }}
+                  onMouseLeave={e => {
+                    const b = e.currentTarget as HTMLButtonElement
+                    b.style.boxShadow = 'var(--shadow-sm)'
+                    b.style.borderColor = 'var(--color-border)'
+                  }}
+                >
+                  <div style={s.actionIcon}>{icon}</div>
+                  <div style={s.actionLabel}>{label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* GTD Expiring Soon */}
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <h2 style={s.sectionTitle}>GTD Expiring Soon</h2>
+            <span style={s.refreshNote}>Within 2 days</span>
           </div>
           <div style={s.sectionBody}>
-            {activityEvents.length === 0 ? (
-              <div style={s.emptyMsg}>
-                <Radio size={32} style={{ color: 'var(--color-text-muted)', marginBottom: '10px' }} />
-                <div style={{ marginBottom: '6px' }}>Live feed connects when WebSocket is active</div>
-                <div style={{
-                  display: 'inline-block', fontSize: '10px', fontWeight: 600,
-                  padding: '2px 8px', borderRadius: 'var(--radius-pill)',
-                  background: 'var(--color-primary-light)', color: 'var(--color-primary)',
-                }}>
-                  Coming in SCRUM-25
-                </div>
+            {loading ? (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton" style={{ height: '20px', width: '100%' }} />
+                <div className="skeleton" style={{ height: '20px', width: '80%' }} />
               </div>
+            ) : !metrics || metrics.gtdExpiringSoon.length === 0 ? (
+              <div style={s.emptyMsg}>No GTD orders expiring within 2 days</div>
             ) : (
-              activityEvents.slice(0, 5).map((ev) => (
-                <div key={ev.id} style={s.actRow}>
-                  <div style={s.actDot(ev.color)} />
-                  <div style={s.actText}>{ev.message}</div>
-                  <div style={s.actTime}>{relativeTime(ev.timestamp)}</div>
+              metrics.gtdExpiringSoon.map((order) => (
+                <div key={order.id} style={s.gtdRow}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '13px' }}>{order.symbol}</span>
+                    <span style={s.sidePill(order.side)}>{order.side}</span>
+                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>{order.quantity.toLocaleString()} shares</span>
+                  </div>
+                  <div style={s.expiryWarn}>
+                    Expires {order.expiryDate ? formatDate(order.expiryDate) : '—'}
+                  </div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Right — Quick Actions + GTD Expiring Soon */}
-        <div style={s.rightCol}>
-
-          {/* Quick Actions */}
-          <div style={s.section}>
-            <div style={s.sectionHeader}>
-              <h2 style={s.sectionTitle}>Quick Actions</h2>
-            </div>
-            <div style={{ padding: '16px' }}>
-              <div style={s.actions}>
-                {quickActions.map(({ icon, label, path }) => (
-                  <button
-                    key={path}
-                    style={s.actionBtn}
-                    onClick={() => navigate(path)}
-                    onMouseEnter={e => {
-                      const b = e.currentTarget as HTMLButtonElement
-                      b.style.boxShadow = 'var(--shadow-md)'
-                      b.style.borderColor = 'var(--color-primary)'
-                    }}
-                    onMouseLeave={e => {
-                      const b = e.currentTarget as HTMLButtonElement
-                      b.style.boxShadow = 'var(--shadow-sm)'
-                      b.style.borderColor = 'var(--color-border)'
-                    }}
-                  >
-                    <div style={s.actionIcon}>{icon}</div>
-                    <div style={s.actionLabel}>{label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* GTD Expiring Soon */}
-          <div style={s.section}>
-            <div style={s.sectionHeader}>
-              <h2 style={s.sectionTitle}>GTD Expiring Soon</h2>
-              <span style={s.refreshNote}>Within 2 days</span>
-            </div>
-            <div style={s.sectionBody}>
-              {loading ? (
-                <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className="skeleton" style={{ height: '20px', width: '100%' }} />
-                  <div className="skeleton" style={{ height: '20px', width: '80%' }} />
-                </div>
-              ) : !metrics || metrics.gtdExpiringSoon.length === 0 ? (
-                <div style={s.emptyMsg}>No GTD orders expiring within 2 days</div>
-              ) : (
-                metrics.gtdExpiringSoon.map((order) => (
-                  <div key={order.id} style={s.gtdRow}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '13px' }}>{order.symbol}</span>
-                      <span style={s.sidePill(order.side)}>{order.side}</span>
-                      <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>{order.quantity.toLocaleString()} shares</span>
-                    </div>
-                    <div style={s.expiryWarn}>
-                      Expires {order.expiryDate ? formatDate(order.expiryDate) : '—'}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
       </div>
 
       {/* ── Market Intelligence Tiles ── */}
