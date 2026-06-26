@@ -62,7 +62,7 @@ const ADMIN_GROUP: NavGroup = {
 const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
   const { user } = useAuth()
   const userRole = user?.role ?? ''
-  const allGroups = userRole === 'ADMIN' ? [GROUPS[0], ADMIN_GROUP] : GROUPS
+  const allGroups = userRole === 'ADMIN' ? [ADMIN_GROUP] : GROUPS
   const visibleGroups = allGroups.map(group => ({
     ...group,
     items: group.items.filter(item => !item.roles || item.roles.includes(userRole)),

@@ -4,12 +4,14 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import AdminPanelPage from '../pages/AdminPanelPage'
 import * as apiClient from '../api/apiClient'
 import * as riskApi from '../api/riskApi'
+import { useAuth } from '../context/AuthContext'
 import { RiskRule } from '../types/risk.types'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
 vi.mock('../api/apiClient')
 vi.mock('../api/riskApi')
+vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }))
 
 const mockUser = { username: 'admin01', role: 'ADMIN' as const, sub: 'u1' }
 
@@ -65,6 +67,13 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  vi.mocked(useAuth).mockReturnValue({
+    user: { token: 'test-token', userId: 'u1', username: 'admin01', role: 'ADMIN', displayName: 'Admin User' },
+    sessionExpired: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    clearSessionExpired: vi.fn(),
+  })
   vi.mocked(apiClient.getCurrentUser).mockReturnValue(mockUser as never)
   vi.mocked(riskApi.getRiskRules).mockResolvedValue(MOCK_RULES)
   vi.mocked(riskApi.getRiskRuleAudit).mockResolvedValue([])

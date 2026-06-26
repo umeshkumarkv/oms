@@ -46,8 +46,10 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
   const [showTooltip,   setShowTooltip]   = useState<boolean>(false)
   const [tradingDate,   setTradingDate]   = useState<string>('')
   const { user: authUser, logout } = useAuth()
+  const isAdmin = authUser?.role === 'ADMIN'
 
   useEffect(() => {
+    if (isAdmin) return
     const fetchStatus = () => {
       getMarketHours()
         .then(h => {
@@ -62,10 +64,11 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
     fetchStatus()
     const id = setInterval(fetchStatus, 60_000)
     return () => clearInterval(id)
-  }, [])
+  }, [isAdmin])
 
   // Fetch holidays once to compute the correct trading date
   useEffect(() => {
+    if (isAdmin) return
     getHolidays()
       .then(holidays => {
         const set = new Set(holidays.map(h => h.holidayDate))
@@ -75,10 +78,11 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
         // Fallback: skip holiday check, just roll back weekends
         setTradingDate(fmtTradingDate(getTradingDate(new Set())))
       })
-  }, [])
+  }, [isAdmin])
 
   // Refresh trading date at ET midnight so the display rolls over without a page refresh
   useEffect(() => {
+    if (isAdmin) return
     const msUntilETMidnight = (): number => {
       const etStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
       const etNow = new Date(etStr)
@@ -98,7 +102,7 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
     }
     tid = setTimeout(refresh, msUntilETMidnight())
     return () => clearTimeout(tid)
-  }, [])
+  }, [isAdmin])
 
   const displayName = authUser?.displayName ?? ''
   const role        = authUser?.role ?? ''
@@ -175,8 +179,8 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
       {/* Right section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
 
-        {/* Market status pill — three states: error / open / closed / loading (hidden) */}
-        {marketError ? (
+        {/* Market status pill — hidden for ADMIN (403 from API; admins don't trade) */}
+        {!isAdmin && marketError ? (
           <div
             style={{ position: 'relative', flexShrink: 0 }}
             onMouseEnter={() => setShowTooltip(true)}
@@ -218,7 +222,7 @@ const NavBar: React.FC<NavBarProps> = ({ onBurgerClick, sidebarCollapsed }) => {
               </div>
             )}
           </div>
-        ) : marketOpen !== null && (
+        ) : !isAdmin && marketOpen !== null && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
             padding: '3px 10px',

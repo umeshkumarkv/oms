@@ -109,9 +109,9 @@ describe('Sidebar role-based visibility', () => {
     expect(screen.getByText('Admin Panel')).toBeInTheDocument()
   })
 
-  it('shouldShowOnlyDashboardAndAdminPanelForAdmin', () => {
+  it('shouldShowOnlyAdminPanelForAdmin', () => {
     renderSidebar('ADMIN')
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
     expect(screen.getByText('Admin Panel')).toBeInTheDocument()
     expect(screen.queryByText('Order Blotter')).not.toBeInTheDocument()
     expect(screen.queryByText('Market Data')).not.toBeInTheDocument()
