@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { formatBlotterTimestamp } from '../utils/dateUtils'
 import { getExecutions, GetOrdersParams, getOrder, getOrders } from '../api/orderApi'
 import { useNotificationsContext } from '../context/NotificationsContext'
 import { getOrderAudit } from '../api/auditApi'
@@ -145,14 +146,7 @@ const fmtUsd = (v: string | number): string => {
 const fmtDateTime = (iso: string): string =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
 
-const relTime = (iso: string): string => {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (mins < 1)  return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)  return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
-}
+
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
@@ -557,8 +551,8 @@ const OrderBlotterPage: React.FC = () => {
                       </span>
                     </td>
                     <td style={s.td}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }} title={new Date(order.createdAt).toLocaleString()}>
-                        {relTime(order.createdAt)}
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                        {formatBlotterTimestamp(order.createdAt)}
                       </span>
                     </td>
                   </tr>
