@@ -23,13 +23,13 @@ const threeClients: ActiveClient[] = [
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ActiveClientsPanel — column headers', () => {
-  it('shouldRenderTableWithFiveColumnHeaders', () => {
+  it('shouldRenderTableWithFourColumnHeaders', () => {
     render(<ActiveClientsPanel clients={threeClients} error={false} />)
     expect(screen.getByText('#')).toBeInTheDocument()
     expect(screen.getByText('Client Name')).toBeInTheDocument()
     expect(screen.getByText("Today's Turnover")).toBeInTheDocument()
     expect(screen.getByText('Available Cash')).toBeInTheDocument()
-    expect(screen.getByText('Status')).toBeInTheDocument()
+    expect(screen.queryByText('Status')).not.toBeInTheDocument()
   })
 })
 
@@ -57,20 +57,20 @@ describe('ActiveClientsPanel — data rows', () => {
     expect(screen.getByText('$500.00')).toBeInTheDocument()
   })
 
-  it('shouldShowLowCashPillWhenCashLimitWarningTrue', () => {
-    render(<ActiveClientsPanel clients={[makeClient({ cashLimitWarning: true })]} error={false} />)
-    expect(screen.getByText('⚠ Low Cash')).toBeInTheDocument()
+  it('shouldApplyWarningRowHighlightWhenCashLimitWarningTrue', () => {
+    const { container } = render(<ActiveClientsPanel clients={[makeClient({ cashLimitWarning: true })]} error={false} />)
+    expect(container.querySelector('[style*="color-warning-bg"]')).toBeInTheDocument()
   })
 
-  it('shouldShowOkPillWhenCashLimitWarningFalse', () => {
-    render(<ActiveClientsPanel clients={[makeClient({ cashLimitWarning: false })]} error={false} />)
-    expect(screen.getByText('OK')).toBeInTheDocument()
+  it('shouldNotApplyWarningRowHighlightWhenCashLimitWarningFalse', () => {
+    const { container } = render(<ActiveClientsPanel clients={[makeClient({ cashLimitWarning: false })]} error={false} />)
+    expect(container.querySelector('[style*="color-warning-bg"]')).not.toBeInTheDocument()
   })
 
-  it('shouldShowBothPillTypesWhenMixedWarnings', () => {
-    render(<ActiveClientsPanel clients={threeClients} error={false} />)
-    expect(screen.getByText('⚠ Low Cash')).toBeInTheDocument()
-    expect(screen.getAllByText('OK').length).toBe(2)
+  it('shouldApplyWarningHighlightOnlyToLowCashRowsInMixedList', () => {
+    const { container } = render(<ActiveClientsPanel clients={threeClients} error={false} />)
+    const warningRows = container.querySelectorAll('[style*="color-warning-bg"]')
+    expect(warningRows.length).toBe(1)
   })
 })
 

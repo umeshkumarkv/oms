@@ -6,7 +6,6 @@ import {
   ClipboardList,
   LineChart,
   Briefcase,
-  ScrollText,
   Settings,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -49,12 +48,6 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/market', icon: <LineChart size={ICON} />, label: 'Market Data' },
       { to: '/portfolio', icon: <Briefcase size={ICON} />, label: 'Portfolio' },
-    ],
-  },
-  {
-    label: 'Compliance',
-    items: [
-      { to: '/audit', icon: <ScrollText size={ICON} />, label: 'Audit Trail' },
     ],
   },
 ]

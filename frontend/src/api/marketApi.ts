@@ -45,3 +45,8 @@ export const searchInstruments = async (q: string, limit = 10): Promise<Instrume
   const res = await http.get('/market/search', { params: { q, limit } })
   return res.data.data
 }
+
+export const searchInstrumentsV2 = async (query: string): Promise<InstrumentSearchResult[]> => {
+  const res = await http.get('/market/instruments/search', { params: { query } })
+  return res.data.data
+}

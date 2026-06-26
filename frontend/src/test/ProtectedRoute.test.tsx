@@ -125,7 +125,7 @@ describe('Sidebar role-based visibility', () => {
     expect(screen.getByText('Order Blotter')).toBeInTheDocument()
     expect(screen.getByText('Market Data')).toBeInTheDocument()
     expect(screen.getByText('Portfolio')).toBeInTheDocument()
-    expect(screen.getByText('Audit Trail')).toBeInTheDocument()
+    expect(screen.queryByText('Audit Trail')).not.toBeInTheDocument()
     expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument()
   })
 })

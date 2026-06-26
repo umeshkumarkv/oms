@@ -114,6 +114,7 @@ public class OrderService {
         }
         // Check 3: client status must be ACTIVE
         if (!"ACTIVE".equals(clientResponse.getData().getStatus())) {
+            log.warn("Order rejected — client account inactive: clientId={}", request.getClientId());
             throw new ClientInactiveException(request.getClientId().toString());
         }
         // Check 4: trading must be enabled

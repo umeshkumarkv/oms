@@ -15,7 +15,7 @@ function formatCompact(val: string): string {
 const s = {
   colHead: {
     display: 'grid',
-    gridTemplateColumns: '48px 1fr 140px 140px 100px',
+    gridTemplateColumns: '48px 1fr 140px 140px',
     fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const,
     letterSpacing: '0.05em', color: 'var(--color-text-secondary)',
     padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)',
@@ -27,7 +27,7 @@ const s = {
 
   row: (warn: boolean) => ({
     display: 'grid',
-    gridTemplateColumns: '48px 1fr 140px 140px 100px',
+    gridTemplateColumns: '48px 1fr 140px 140px',
     padding: '12px 20px',
     borderBottom: '1px solid var(--color-border-light)',
     fontSize: '13px',
@@ -54,20 +54,6 @@ const s = {
     color: 'var(--color-text-primary)',
   } as React.CSSProperties,
 
-  statusCell: {
-    textAlign: 'center' as const,
-  } as React.CSSProperties,
-
-  pill: (warn: boolean) => ({
-    display: 'inline-block',
-    padding: '2px 8px',
-    borderRadius: 'var(--radius-pill)',
-    fontSize: '11px',
-    fontWeight: 700,
-    background: warn ? 'var(--color-warning-bg)' : 'var(--color-success-bg)',
-    color:      warn ? 'var(--color-warning)'    : 'var(--color-success)',
-  } as React.CSSProperties),
-
   empty: {
     padding: '36px 24px',
     textAlign: 'center' as const,
@@ -77,7 +63,7 @@ const s = {
 
   skeletonRow: {
     display: 'grid',
-    gridTemplateColumns: '48px 1fr 140px 140px 100px',
+    gridTemplateColumns: '48px 1fr 140px 140px',
     padding: '12px 20px',
     gap: '12px',
     borderBottom: '1px solid var(--color-border-light)',
@@ -109,7 +95,6 @@ const ActiveClientsPanel: React.FC<Props> = ({ clients, error }) => {
             <div className="skeleton" style={{ height: '16px' }} />
             <div className="skeleton" style={{ height: '16px' }} />
             <div className="skeleton" style={{ height: '16px' }} />
-            <div className="skeleton" style={{ height: '16px', width: '60px', margin: '0 auto' }} />
           </div>
         ))}
       </div>
@@ -128,7 +113,6 @@ const ActiveClientsPanel: React.FC<Props> = ({ clients, error }) => {
         <div style={s.headCell('left')}>Client Name</div>
         <div style={s.headCell('right')}>Today's Turnover</div>
         <div style={s.headCell('right')}>Available Cash</div>
-        <div style={s.headCell('center')}>Status</div>
       </div>
 
       {/* Data rows */}
@@ -138,11 +122,6 @@ const ActiveClientsPanel: React.FC<Props> = ({ clients, error }) => {
           <div style={s.name}>{c.clientName}</div>
           <div style={s.money}>{formatCompact(c.turnoverToday)}</div>
           <div style={s.money}>{formatCompact(c.availableCash)}</div>
-          <div style={s.statusCell}>
-            <span style={s.pill(c.cashLimitWarning)}>
-              {c.cashLimitWarning ? '⚠ Low Cash' : 'OK'}
-            </span>
-          </div>
         </div>
       ))}
     </div>

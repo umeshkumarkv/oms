@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, Search } from 'lucide-react'
+import { AlertTriangle, Info, Search } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import { useOrderEntryBidAsk } from '../hooks/useOrderEntryBidAsk'
-import { getHolidays, getInstrument, searchInstruments } from '../api/marketApi'
+import { getHolidays, getInstrument, searchInstrumentsV2 } from '../api/marketApi'
 import { getClients, getPortfolio } from '../api/clientApi'
 import { submitOrder } from '../api/orderApi'
 import { Holiday, Instrument, InstrumentSearchResult } from '../types/market.types'
@@ -187,9 +187,12 @@ const OrderEntryPage: React.FC = () => {
   const [portfolioError, setPortfolioError] = useState(false)
   const [clientsError,   setClientsError]   = useState(false)
   const [quoteError,     setQuoteError]     = useState(false)
+  const [searchLoading,  setSearchLoading]  = useState(false)
+  const [selectedInstrumentName, setSelectedInstrumentName] = useState('')
 
   const symbolDebounce        = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchDebounce        = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchContainerRef    = useRef<HTMLDivElement>(null)
   const searchErrorToastedRef = useRef(false)
   const skipNextSearchRef     = useRef(false)
   const clientSelectRef   = useRef<HTMLSelectElement>(null)
@@ -246,6 +249,7 @@ const OrderEntryPage: React.FC = () => {
     setQuote(null)
     setSymbolNotFound(false)
     setQuoteError(false)
+    setSelectedInstrumentName('')
     setSide('BUY')
     setOrderType('LIMIT')
     setRoutingDestination('')
@@ -282,9 +286,10 @@ const OrderEntryPage: React.FC = () => {
       addToast('Failed to load market holidays — holiday dates may not be excluded from the date picker', TOAST_TYPE.WARNING)
     })
     getClients().then((list) => {
-      setClients(list)
+      const eligible = list.filter(c => c.status === 'ACTIVE' && c.tradingEnabled && c.kycStatus === 'VERIFIED')
+      setClients(eligible)
       setClientsError(false)
-      if (list.length > 0) clientSelectRef.current?.focus()
+      if (eligible.length > 0) clientSelectRef.current?.focus()
     }).catch(() => {
       setClientsError(true)
       addToast('Failed to load client list — please refresh and try again', TOAST_TYPE.ERROR)
@@ -335,8 +340,9 @@ const OrderEntryPage: React.FC = () => {
     if (symbolInput.length < 1) { setSearchResults([]); setDropdownOpen(false); return }
     searchDebounce.current = setTimeout(async () => {
       if (skipNextSearchRef.current) { skipNextSearchRef.current = false; return }
+      setSearchLoading(true)
       try {
-        const results = await searchInstruments(symbolInput, 10)
+        const results = await searchInstrumentsV2(symbolInput)
         setSearchResults(results)
         setDropdownOpen(true)
         if (results.length > 0) setSymbolNotFound(false)
@@ -349,6 +355,8 @@ const OrderEntryPage: React.FC = () => {
           addToast('Instrument search unavailable — enter symbol manually', TOAST_TYPE.WARNING)
           searchErrorToastedRef.current = true
         }
+      } finally {
+        setSearchLoading(false)
       }
     }, 300)
     return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current) }
@@ -362,6 +370,15 @@ const OrderEntryPage: React.FC = () => {
     setSearchResults([])
     setFocusedIdx(-1)
     setSymbolNotFound(false)
+    setSelectedInstrumentName(r.companyName ?? '')
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!searchContainerRef.current?.contains(e.target as Node)) setDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   const qty        = parseInt(quantity, 10)
@@ -405,6 +422,7 @@ const OrderEntryPage: React.FC = () => {
     limitPrice:   orderType === 'MARKET' || (!isNaN(parseFloat(limitPrice)) && parseFloat(limitPrice) > 0 && limitPriceDecimalError === null),
     gtdDate:      tif === 'DAY' || (gtdDate !== null && gtdDateStr >= tomorrowStr() && !isWeekendOrHoliday(gtdDateStr)),
     notHalted:    !quote || !quote.halted,
+    tradable:     !quote || quote.tradable,
     sellHoldings: side !== 'SELL' || portfolio === null || isNaN(qty) || heldQty >= qty,
   }
 
@@ -484,6 +502,10 @@ const OrderEntryPage: React.FC = () => {
     }
   }
 
+  const sideColor  = side === 'BUY'  ? 'var(--color-buy)'
+                   : side === 'SELL' ? 'var(--color-sell)'
+                   :                   'var(--color-warning)'
+
   const submitBg   = submitting || !allChecksPass || symbolNotFound
     ? '#9ca3af'
     : side === 'BUY'
@@ -559,7 +581,15 @@ const OrderEntryPage: React.FC = () => {
             style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}
           >
             <div className="field-group">
-              <label htmlFor="client-select" style={s.label}>Client</label>
+              <label htmlFor="client-select" style={s.label}>
+                Client
+                <span
+                  title="Only clients eligible to trade are shown — active, trading enabled, KYC verified"
+                  style={{ marginLeft: '4px', cursor: 'help', verticalAlign: 'middle', display: 'inline-flex' }}
+                >
+                  <Info size={14} strokeWidth={2.5} color="var(--color-text-muted)" />
+                </span>
+              </label>
               <select
                 id="client-select"
                 ref={clientSelectRef}
@@ -601,7 +631,7 @@ const OrderEntryPage: React.FC = () => {
           </div>
 
           {/* Row 2 — Symbol typeahead (full-width, search icon) */}
-          <div className="field-group" style={{ ...s.fieldGroup, position: 'relative' }}>
+          <div ref={searchContainerRef} className="field-group" style={{ ...s.fieldGroup, position: 'relative' }}>
             <label style={s.label}>Symbol</label>
             <div style={{ position: 'relative' }}>
               <span style={{
@@ -646,14 +676,18 @@ const OrderEntryPage: React.FC = () => {
                 disabled={isExpired}
               />
             </div>
-            {dropdownOpen && symbolInput && (
+            {(searchLoading || dropdownOpen) && symbolInput && (
               <div style={{
                 position: 'absolute', top: '100%', left: 0, right: 0,
                 background: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)',
                 zIndex: 100, maxHeight: '400px', overflowY: 'auto' as const,
               }} role="listbox" aria-label="Instrument search results">
-                {searchResults.length === 0 ? (
+                {searchLoading ? (
+                  <div style={{ padding: '9px 12px', fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                    Searching…
+                  </div>
+                ) : searchResults.length === 0 ? (
                   <div style={{ padding: '9px 12px', fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                     No instruments found
                   </div>
@@ -681,6 +715,11 @@ const OrderEntryPage: React.FC = () => {
               </div>
             )}
             {quoteLoading && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Fetching quote…</div>}
+            {quote && !quote.tradable && (
+              <div style={s.alertBadge('warning')}>
+                <AlertTriangle size={14} strokeWidth={2.5} /> This instrument is not tradable — order submission blocked
+              </div>
+            )}
             {symbolNotFound && !(dropdownOpen && searchResults.length > 0) && <div style={s.errorText}>Symbol not found. Please search and select a valid instrument.</div>}
             {fieldErrors.symbol && <div style={s.errorText}>{fieldErrors.symbol}</div>}
           </div>
@@ -713,8 +752,8 @@ const OrderEntryPage: React.FC = () => {
                 aria-label="Order Type"
                 onKeyDown={(e) => rove(e, [marketRef, limitRef], ['MARKET', 'LIMIT'].indexOf(orderType), (i) => setOrderType((['MARKET', 'LIMIT'] as OrderType[])[i]))}
               >
-                <button ref={marketRef} tabIndex={orderType === 'MARKET' ? 0 : -1} style={s.toggleBtn(orderType === 'MARKET')} onClick={() => setOrderType('MARKET')} disabled={isExpired} aria-pressed={orderType === 'MARKET'}>MARKET</button>
-                <button ref={limitRef}  tabIndex={orderType === 'LIMIT'  ? 0 : -1} style={s.toggleBtn(orderType === 'LIMIT')}  onClick={() => setOrderType('LIMIT')}  disabled={isExpired} aria-pressed={orderType === 'LIMIT'}>LIMIT</button>
+                <button ref={marketRef} tabIndex={orderType === 'MARKET' ? 0 : -1} style={s.toggleBtn(orderType === 'MARKET', sideColor)} onClick={() => setOrderType('MARKET')} disabled={isExpired} aria-pressed={orderType === 'MARKET'}>MARKET</button>
+                <button ref={limitRef}  tabIndex={orderType === 'LIMIT'  ? 0 : -1} style={s.toggleBtn(orderType === 'LIMIT',  sideColor)} onClick={() => setOrderType('LIMIT')}  disabled={isExpired} aria-pressed={orderType === 'LIMIT'}>LIMIT</button>
               </div>
             </div>
             <div className="field-group">
@@ -732,7 +771,7 @@ const OrderEntryPage: React.FC = () => {
                 <button
                   ref={dayRef}
                   tabIndex={tif === 'DAY' ? 0 : -1}
-                  style={s.toggleBtn(tif === 'DAY')}
+                  style={s.toggleBtn(tif === 'DAY', sideColor)}
                   onClick={() => { setTif('DAY'); setGtdDate(null) }}
                   disabled={isExpired}
                   aria-pressed={tif === 'DAY'}
@@ -740,7 +779,7 @@ const OrderEntryPage: React.FC = () => {
                 <button
                   ref={gtdRef}
                   tabIndex={tif === 'GTD' ? 0 : -1}
-                  style={s.toggleBtn(tif === 'GTD')}
+                  style={s.toggleBtn(tif === 'GTD', sideColor)}
                   onClick={() => setTif('GTD')}
                   disabled={isExpired}
                   aria-pressed={tif === 'GTD'}
@@ -915,7 +954,12 @@ const OrderEntryPage: React.FC = () => {
           <div style={{ ...s.card, flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border-light)' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Market Quote</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{symbol || '—'}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{symbol || '—'}</span>
+                {selectedInstrumentName && (
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{selectedInstrumentName}</span>
+                )}
+              </span>
             </div>
             {!symbol && !quoteLoading && (
               <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Enter a symbol to see the current quote.</div>
