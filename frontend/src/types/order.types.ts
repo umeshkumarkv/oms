@@ -44,6 +44,7 @@ export interface OrderSummary {
   filledQuantity?: number
   avgFillPrice?: string
   routingDestination?: string
+  rejectionReason?: string | null
 }
 
 export type FillType = 'PARTIAL' | 'FULL'
