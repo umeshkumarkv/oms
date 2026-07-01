@@ -170,11 +170,84 @@ class AuditEventConsumerTest {
         Map<String, Object> event = new HashMap<>();
         event.put("orderId",  orderId.toString());
         event.put("toState",  "VALIDATED");
+        event.put("timestamp", "2026-05-01T10:00:00Z");
+        when(auditLogRepository.existsByEntityIdAndNewStateAndEventTimestamp(any(), any(), any())).thenReturn(false);
         when(auditLogRepository.save(any())).thenThrow(new RuntimeException("DB error"));
 
         assertThatThrownBy(() -> auditEventConsumer.consumeOrderStateChanged(event))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("DB error");
+    }
+
+    // ─── SCRUM-178: RISK_REJECTED metadata enrichment + idempotency ──────────
+
+    @Test
+    void shouldSaveAuditLogWithRejectionMetadataWhenRiskRejected() {
+        Map<String, Object> eventMetadata = new HashMap<>();
+        eventMetadata.put("rejectionReason",  "Single order quantity limit exceeded — SINGLE_ORDER_QTY_LIMIT");
+        eventMetadata.put("violatedRuleCode", "SINGLE_ORDER_QTY_LIMIT");
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("orderId",     orderId.toString());
+        event.put("toState",     "RISK_REJECTED");
+        event.put("fromState",   "VALIDATED");
+        event.put("clientId",    clientId.toString());
+        event.put("triggeredBy", "SYSTEM:RISK_ENGINE");
+        event.put("timestamp",   "2026-05-01T10:00:00Z");
+        event.put("metadata",    eventMetadata);
+
+        when(auditLogRepository.existsByEntityIdAndNewStateAndEventTimestamp(any(), any(), any())).thenReturn(false);
+
+        auditEventConsumer.consumeOrderStateChanged(event);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+
+        AuditLog saved = captor.getValue();
+        assertThat(saved.getNewState()).isEqualTo("RISK_REJECTED");
+        assertThat(saved.getActorType()).isEqualTo(ActorType.SYSTEM);
+        assertThat(saved.getMetadata()).contains("rejectionReason");
+        assertThat(saved.getMetadata()).contains("SINGLE_ORDER_QTY_LIMIT");
+        assertThat(saved.getMetadata()).contains("violatedRuleCode");
+        assertThat(saved.getMetadata()).doesNotContain("buyingPower");
+        assertThat(saved.getMetadata()).doesNotContain("balance");
+    }
+
+    @Test
+    void shouldNotIncludeRejectionMetadataForNonRiskRejectedTransition() {
+        Map<String, Object> event = new HashMap<>();
+        event.put("orderId",     orderId.toString());
+        event.put("toState",     "VALIDATED");
+        event.put("fromState",   "NEW");
+        event.put("clientId",    clientId.toString());
+        event.put("triggeredBy", "SYSTEM:OMS");
+        event.put("timestamp",   "2026-05-01T10:00:00Z");
+
+        when(auditLogRepository.existsByEntityIdAndNewStateAndEventTimestamp(any(), any(), any())).thenReturn(false);
+
+        auditEventConsumer.consumeOrderStateChanged(event);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+
+        AuditLog saved = captor.getValue();
+        assertThat(saved.getNewState()).isEqualTo("VALIDATED");
+        assertThat(saved.getMetadata()).doesNotContain("rejectionReason");
+        assertThat(saved.getMetadata()).doesNotContain("violatedRuleCode");
+    }
+
+    @Test
+    void shouldSkipDuplicateEventForIdempotency() {
+        Map<String, Object> event = new HashMap<>();
+        event.put("orderId",   orderId.toString());
+        event.put("toState",   "RISK_REJECTED");
+        event.put("timestamp", "2026-05-01T10:00:00Z");
+
+        when(auditLogRepository.existsByEntityIdAndNewStateAndEventTimestamp(any(), any(), any())).thenReturn(true);
+
+        auditEventConsumer.consumeOrderStateChanged(event);
+
+        verify(auditLogRepository, never()).save(any());
     }
 
     // ─── consumeExecutionCompleted — happy path ───────────────────────────────
