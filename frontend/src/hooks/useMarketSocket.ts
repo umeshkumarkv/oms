@@ -33,7 +33,7 @@ interface UseMarketSocketResult {
  */
 export function useMarketSocket(symbols: string[]): UseMarketSocketResult {
   const [ticks,  setTicks]  = useState<Record<string, TickData>>({})
-  const [wsLive, setWsLive] = useState(false)
+  const [wsLive, setWsLive] = useState(() => marketDataWs.isConnected())
 
   // Track which symbols we have currently subscribed
   const subscribedRef = useRef<string[]>([])
