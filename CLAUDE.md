@@ -1,6 +1,6 @@
 # CLAUDE.md — Broker Dealer OMS POC
 # Principal Architect: Umesh Kumar KV
-# Version: 1.3 | June 2026
+# Version: 1.4 | July 2026
 # Status: Active — Sprint 4
 
 ---
@@ -29,20 +29,23 @@ Every feature follows this pipeline in order. No step may be skipped.
 Gate labels on JIRA tickets enforce the pipeline.
 
 ```
-1. PM Agent        /pm-agent "requirement"
+1. PM Agent        /pm-eval-loop "requirement"
    → Writes PRD, creates Epic, prioritizes backlog
+   → Validates PRD quality (10 items), retries up to 2× on gaps
+   → Escalates to human if PRD gaps persist after 2 attempts
    → Gate label: bmad-prd-approved on Epic
 
-2. BA Agent        /ba-agent epic:{key}
+2. BA Agent        /ba-eval-loop epic:{key}
    → Decomposes Epic into Stories with full ACs
-   → Runs DoR checklist (8 items), tags story bmad-dor-ready
-   → Gate: all 8 DoR items checked except architect sign-off
+   → Validates story quality (9 items) per story, retries up to 2× on gaps
+   → Escalates to PM Eval Loop if story gaps persist after 2 attempts
+   → Gate: all 9 story quality items checked except architect sign-off
 
 3. Architect       /arch-eval-loop SCRUM-{n}
    → Writes per-story technical design doc (endpoint, DB, Kafka, tests)
    → Validates all 11 DoR items after every design attempt
    → Retries up to 2× with gaps fed back as mandatory constraints
-   → Escalates to BA Agent with gap evidence if exhausted after 2 attempts
+   → Escalates to BA Eval Loop with gap evidence if exhausted after 2 attempts
    → Gate label: bmad-arch-approved (or bmad-arch-blocked if escalated)
 
 4. Dev             /dev-eval-loop SCRUM-{n}
@@ -56,10 +59,12 @@ Gate labels on JIRA tickets enforce the pipeline.
    → Escalates to human with full violation list if exhausted after 3 attempts
    → Gate: push + PR raised on first passing attempt
 
-5. Code Review     /code-review SCRUM-{n}
+5. Code Review     /code-review-eval-loop SCRUM-{n}
    → 12-category audit against CLAUDE.md standards
-   → Approves or requests changes on GitHub PR
-   → Gate: PR reviewDecision = APPROVED
+   → Tracks review rounds across invocations — round N verifies prior violations resolved
+   → Retries up to 3 rounds — each round follows a dev fix cycle
+   → Escalates to human if violations persist after 3 rounds
+   → Gate: PR reviewDecision = APPROVED + label bmad-code-review-approved
 
 6. QA              /qa-eval-loop SCRUM-{n}
    → Requires: PR reviewDecision = APPROVED
@@ -68,44 +73,49 @@ Gate labels on JIRA tickets enforce the pipeline.
    → Escalates to human with full curl evidence posted to JIRA if exhausted
    → Gate: all ACs pass, JIRA → In Review
 
-7. SM Agent        /sm-agent  (daily)
+7. SM Agent        /sm-eval-loop  (daily)
    → Sprint health check, velocity, blocker detection
+   → Validates report completeness (8 items), retries up to 2× on incomplete data
    → Enforces DoD gate before closing tickets as Done
    → Gate: QA passed + PR merged + CI green
 
-8. DevOps Agent    /devops-agent pr:{n}
-   → Monitors CI/CD pipeline, auto-fixes compilation/test failures
+8. DevOps Agent    /devops-eval-loop pr:{n}
+   → Diagnoses CI/CD failures, applies fix, verifies CI goes green
+   → Retries up to 3× — each attempt classifies failure and applies targeted fix
+   → Escalates to human with full log evidence if CI still fails after 3 attempts
    → Triggered on pipeline failure
 
-9. Doc Agent       /doc-agent SCRUM-{n}  (post-merge)
+9. Doc Agent       /doc-eval-loop SCRUM-{n}  (post-merge)
    → Updates openapi.yaml and service CLAUDE.md
+   → Validates doc completeness (8 items), retries up to 2× on gaps
+   → Escalates to human for API contract conflicts after 2 attempts
    → Raises a docs PR — never commits directly
 ```
 
-### Eval Loop Behaviour — All Three Loops
+### Eval Loop Behaviour — All Nine Loops
 
-| Property              | /arch-eval-loop | /dev-eval-loop  | /qa-eval-loop   |
-|-----------------------|-----------------|-----------------|-----------------|
-| Max attempts          | 2               | 3               | 3               |
-| Evaluator             | DoR (11 items)  | 12-cat review + mvn + JaCoCo | ACs + 4 edge cases |
-| Findings fed back     | Yes — gap list  | Yes — file:line violations | Yes — curl evidence |
-| Write guard on retry  | No (local only) | No (local only) | No (local only) |
-| Write guard on exit   | JIRA label      | git push + gh pr | JIRA transition |
-| Escalation target     | BA Agent        | Human + JIRA    | Human + JIRA    |
+| Property              | /pm-eval-loop   | /ba-eval-loop   | /arch-eval-loop | /dev-eval-loop  | /code-review-eval-loop | /qa-eval-loop   | /sm-eval-loop   | /devops-eval-loop | /doc-eval-loop  |
+|-----------------------|-----------------|-----------------|-----------------|-----------------|------------------------|-----------------|-----------------|-------------------|-----------------|
+| Max attempts          | 2               | 2 per story     | 2               | 3               | 3 rounds               | 3               | 2               | 3                 | 2               |
+| Evaluator             | PRD quality (10 items) | Story quality (9 items) | DoR (11 items) | 12-cat review + mvn + JaCoCo | 12-cat PR audit | ACs + 4 edge cases | Report completeness (8 items) | CI run = green | Doc completeness (8 items) |
+| Findings fed back     | Yes — gap list  | Yes — gap list per story | Yes — gap list | Yes — file:line violations | Yes — prior round violations | Yes — curl evidence | Yes — incomplete checks | Yes — fix history | Yes — gap list |
+| Write guard on retry  | No (local only) | No (local only) | No (local only) | No (local only) | No (local only)        | No (local only) | No (local only) | No (local only)   | No (local only) |
+| Write guard on exit   | JIRA label      | JIRA label      | JIRA label      | git push + gh pr | gh pr approve/reject + JIRA label | JIRA transition | JIRA transition | git push          | git push + gh pr |
+| Escalation target     | Human           | PM Eval Loop    | BA Eval Loop    | Human + JIRA    | Human + JIRA           | Human + JIRA    | Human           | Human + JIRA      | Human           |
 
-The inner retry cycle runs entirely on local files or curl calls.
+The inner retry cycle runs entirely on local files, curl calls, or CI run checks.
 JIRA and GitHub write guards fire only at loop exit — human approval
 is required exactly once per story, not once per attempt.
 
 ### BMAD JIRA Labels
 
-| Label                     | Set by            | Meaning                                      |
-|---------------------------|-------------------|----------------------------------------------|
-| bmad-prd-approved         | PM Agent          | Epic has an approved PRD                     |
-| bmad-dor-ready            | BA Agent          | Story passes 8/9 DoR checks (arch pending)   |
-| bmad-arch-approved        | Architect Agent   | Technical design complete, full DoR passed   |
-| bmad-arch-blocked         | Architect Agent   | Design blocked — ACs or story incomplete     |
-| bmad-code-review-approved | Code Review Agent | PR approved by code-review agent             |
+| Label                     | Set by               | Meaning                                      |
+|---------------------------|----------------------|----------------------------------------------|
+| bmad-prd-approved         | PM Eval Loop         | Epic has an approved PRD (10 quality checks) |
+| bmad-dor-ready            | BA Eval Loop         | Story passes 9 quality checks (arch pending) |
+| bmad-arch-approved        | Arch Eval Loop       | Technical design complete, full DoR passed   |
+| bmad-arch-blocked         | Arch Eval Loop       | Design blocked — ACs or story incomplete     |
+| bmad-code-review-approved | Code Review Eval Loop| PR approved — all 12 categories clean        |
 
 ---
 
@@ -769,9 +779,9 @@ Both apply. Neither overrides the other.
 
 | Field          | Value                                               |
 |----------------|-----------------------------------------------------|
-| Version        | 1.3                                                 |
+| Version        | 1.4                                                 |
 | Owner          | Umesh Kumar KV — Principal Architect                |
-| Last Updated   | June 2026 — removed single-shot agent fallbacks (architect-agent, dev-agent, qa-agent); eval loops are the only pipeline variants |
+| Last Updated   | July 2026 — extended eval loop pattern to all 9 BMAD agents; pm-eval-loop, ba-eval-loop, code-review-eval-loop, sm-eval-loop, devops-eval-loop, doc-eval-loop added; single-shot variants deprecated |
 | GitHub         | github.com/umeshkumarkv/broker-dealer               |
 | Confluence     | BD-POC > AI SDLC Standards > CLAUDE.md              |
 | Update Rule    | Update this file before introducing any new pattern |
