@@ -7,6 +7,7 @@ import com.brokerdealer.executionservice.dto.response.MarketDataResponse;
 import com.brokerdealer.executionservice.kafka.producer.ExecutionEventProducer;
 import com.brokerdealer.executionservice.repository.ExecutionRepository;
 import com.brokerdealer.executionservice.repository.PendingOrderExecutionRepository;
+import com.brokerdealer.executionservice.metrics.OrderMetricsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +31,7 @@ class FillSimulationServiceTest {
     @Mock private PendingOrderExecutionRepository pendingRepository;
     @Mock private ExecutionEventProducer executionEventProducer;
     @Mock private MarketDataClient marketDataClient;
+    @Mock private OrderMetricsService orderMetricsService;
 
     @InjectMocks
     private FillSimulationService fillSimulationService;
@@ -388,6 +390,21 @@ class FillSimulationServiceTest {
         assertThat(captor.getValue().getStatus()).isEqualTo(PendingStatus.PENDING);
         assertThat(captor.getValue().getOrderId()).isEqualTo(ORDER_ID);
         verifyNoInteractions(executionRepository);
+    }
+
+    @Test
+    void shouldConvertPartialToRejectedWhenFillOrKillTrue() {
+        OrderExecutionRequest request = buildRequest(OrderType.MARKET, OrderSide.BUY,
+                50, new BigDecimal("175.50"), null);
+        request.setFillOrKill(Boolean.TRUE);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeMarketFill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.REJECTED);
+        assertThat(captor.getValue().getExecutedQty()).isZero();
     }
 
     // ── @Scheduled monitor ────────────────────────────────────────────────────

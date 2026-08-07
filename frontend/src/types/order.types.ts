@@ -26,6 +26,7 @@ export interface SubmitOrderRequest {
   limitPrice?: string
   gtdDate?: string
   routingDestination?: string
+  fillOrKill?: boolean
 }
 
 export interface OrderSummary {

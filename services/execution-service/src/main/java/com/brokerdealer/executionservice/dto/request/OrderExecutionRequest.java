@@ -21,4 +21,5 @@ public class OrderExecutionRequest {
     private String timeInForce;
     private BigDecimal orderValue;
     private BigDecimal lastPrice;
+    private Boolean fillOrKill;
 }

@@ -19,4 +19,5 @@ public class OrderExecutionRequestedEvent {
     String timeInForce;
     BigDecimal orderValue;
     BigDecimal lastPrice;
+    Boolean fillOrKill;
 }

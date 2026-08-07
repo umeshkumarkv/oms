@@ -32,6 +32,7 @@ public class FillSimulationService {
     private final PendingOrderExecutionRepository pendingRepository;
     private final ExecutionEventProducer executionEventProducer;
     private final MarketDataClient marketDataClient;
+    private final com.brokerdealer.executionservice.metrics.OrderMetricsService orderMetricsService;
 
     // Symbol overrides (FAIL→REJECTED, SLOW→PARTIAL) take precedence over quantity ranges.
     FillType determineFillOutcome(OrderExecutionRequest request) {
@@ -67,6 +68,7 @@ public class FillSimulationService {
                     .limitPrice(request.getLimitPrice())
                     .lastPrice(request.getLastPrice())
                     .orderValue(request.getOrderValue())
+                    .fillOrKill(Boolean.TRUE.equals(request.getFillOrKill()))
                     .status(PendingStatus.PENDING)
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
@@ -118,10 +120,19 @@ public class FillSimulationService {
                         FillType.FULL, fillValue, 0, marketPrice);
                 executionRepository.save(execution);
                 executionEventProducer.publishExecutionCompleted(toEvent(execution));
+                orderMetricsService.recordOrderOutcome(execution.getFillType().name());
                 log.info("FULL fill: orderId={} symbol={} executedQty={}",
                         request.getOrderId(), request.getSymbol(), request.getQuantity());
             }
-            case PARTIAL -> executePartialFill(request, executedPrice, marketPrice);
+            case PARTIAL -> {
+                // If Fill-Or-Kill was requested, convert partial outcome to cancel/reject (no partial fills)
+                if (Boolean.TRUE.equals(request.getFillOrKill())) {
+                    log.info("FOK order — converting partial to rejected/cancelled: orderId={}", request.getOrderId());
+                    executeRejectedFill(request, marketPrice);
+                } else {
+                    executePartialFill(request, executedPrice, marketPrice);
+                }
+            }
             case REJECTED -> executeRejectedFill(request, marketPrice);
         }
     }
@@ -136,6 +147,7 @@ public class FillSimulationService {
                 FillType.PARTIAL, fillValue1, tranche2Qty, marketPrice);
         executionRepository.save(tranche1);
         executionEventProducer.publishExecutionCompleted(toEvent(tranche1));
+        orderMetricsService.recordOrderOutcome(tranche1.getFillType().name());
         log.info("PARTIAL fill tranche1: orderId={} executedQty={} remainingQty={}",
                 request.getOrderId(), tranche1Qty, tranche2Qty);
 
@@ -148,6 +160,7 @@ public class FillSimulationService {
                 FillType.REJECTED, BigDecimal.ZERO, request.getQuantity(), marketPrice);
         executionRepository.save(rejection);
         executionEventProducer.publishExecutionCompleted(toEvent(rejection));
+        orderMetricsService.recordOrderOutcome(rejection.getFillType().name());
         log.info("REJECTED fill: orderId={} symbol={} qty={}",
                 request.getOrderId(), request.getSymbol(), request.getQuantity());
     }
@@ -170,6 +183,7 @@ public class FillSimulationService {
                 FillType.FULL, fillValue2, 0, marketPrice);
         executionRepository.save(tranche2);
         executionEventProducer.publishExecutionCompleted(toEvent(tranche2));
+        orderMetricsService.recordOrderOutcome(tranche2.getFillType().name());
         log.info("PARTIAL fill tranche2: orderId={} executedQty={} remainingQty=0",
                 request.getOrderId(), qty);
     }
@@ -234,6 +248,7 @@ public class FillSimulationService {
         req.setLimitPrice(pending.getLimitPrice());
         req.setOrderValue(pending.getOrderValue());
         req.setLastPrice(marketPrice);
+        req.setFillOrKill(pending.isFillOrKill());
         return req;
     }
 }

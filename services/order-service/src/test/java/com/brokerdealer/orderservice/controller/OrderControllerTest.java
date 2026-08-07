@@ -473,6 +473,27 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.data.totalCount").value(1));
     }
 
+    @Test
+    void shouldReturn400WhenFillOrKillIsMalformed() throws Exception {
+        String body = "{\n" +
+                "  \"clientOrderId\": \"CLT-ORD-001\",\n" +
+                "  \"clientId\": \"a1000000-0000-0000-0000-000000000001\",\n" +
+                "  \"symbol\": \"AAPL\",\n" +
+                "  \"side\": \"BUY\",\n" +
+                "  \"orderType\": \"MARKET\",\n" +
+                "  \"tif\": \"DAY\",\n" +
+                "  \"quantity\": 10,\n" +
+                "  \"fillOrKill\": \"notaboolean\"\n" +
+                "}"
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
     // --- GET /api/v1/orders/status-counts ---
 
     @Test

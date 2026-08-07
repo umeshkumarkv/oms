@@ -261,6 +261,7 @@ public class OrderService {
                 .expiryApplied(expiryApplied)
                 .createdBy(userId != null ? userId : UUID.randomUUID())
                 .routingDestination(resolveRoutingDestination(request.getRoutingDestination()))
+                .fillOrKill(Boolean.TRUE.equals(request.getFillOrKill()))
                 .build();
 
         Order savedOrder = orderRepository.save(order);

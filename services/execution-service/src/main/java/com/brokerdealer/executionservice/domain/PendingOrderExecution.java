@@ -49,6 +49,9 @@ public class PendingOrderExecution {
     @Column(name = "order_value", nullable = false, precision = 18, scale = 4)
     private BigDecimal orderValue;
 
+    @Column(name = "fill_or_kill", nullable = false)
+    private boolean fillOrKill = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 10)
     private PendingStatus status;
