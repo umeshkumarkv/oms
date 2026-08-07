@@ -13,3 +13,9 @@ frontend/dist/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Editor and build artifacts
+.vscode/
+coverage/
+build/
+.env*

@@ -1,3 +1,18 @@
+import React from 'react'
+import { render, screen, fireEvent } from '@testing-library/react'
+import OrderEntryPage from '../pages/OrderEntryPage'
+
+describe('OrderEntryPage FOK toggle', () => {
+  it('renders the Fill Or Kill checkbox and toggles it', () => {
+    render(<OrderEntryPage />)
+    const checkbox = screen.getByLabelText(/Fill or Kill/i)
+    expect(checkbox).toBeInTheDocument()
+    // default unchecked
+    expect((checkbox as HTMLInputElement).checked).toBe(false)
+    fireEvent.click(checkbox)
+    expect((checkbox as HTMLInputElement).checked).toBe(true)
+  })
+})
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'

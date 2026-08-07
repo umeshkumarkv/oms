@@ -169,6 +169,7 @@ const OrderEntryPage: React.FC = () => {
   const [tif,                setTif]                = useState<TimeInForce>('DAY')
   const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
   const [routingDestination, setRoutingDestination] = useState('')
+  const [fillOrKill, setFillOrKill] = useState(false)
 
   const [searchResults, setSearchResults] = useState<InstrumentSearchResult[]>([])
   const [focusedIdx,    setFocusedIdx]    = useState(-1)
@@ -461,6 +462,7 @@ const OrderEntryPage: React.FC = () => {
         tif,
         gtdDate: tif === 'GTD' && gtdDateStr ? gtdDateStr : undefined,
         routingDestination: SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination,
+        fillOrKill,
       })
       addToast(`Order ${res.orderId} submitted successfully`, TOAST_TYPE.SUCCESS, TOAST_SUCCESS_NAV_MS)
       setTimeout(() => navigate('/orders'), TOAST_SUCCESS_NAV_MS)
@@ -531,6 +533,26 @@ const OrderEntryPage: React.FC = () => {
               {submitError.message}
             </div>
             <button style={s.modalClose} onClick={() => setShowModal(false)}>Close</button>
+          </div>
+
+          {/* Row X — Fill-Or-Kill toggle */}
+          <div className="field-group" style={{ marginBottom: '14px' }}>
+            <label style={s.label}>Fill Or Kill</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                id="fok-toggle"
+                aria-label="Fill or Kill"
+                aria-describedby="fok-help"
+                type="checkbox"
+                checked={fillOrKill}
+                onChange={(e) => setFillOrKill(e.target.checked)}
+                disabled={isExpired}
+              />
+              <label htmlFor="fok-toggle" style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                Require immediate full fill (no partial fills)
+              </label>
+              <div id="fok-help" style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>When enabled, the order must be completely filled immediately or it will be canceled.</div>
+            </div>
           </div>
         </div>
       )}

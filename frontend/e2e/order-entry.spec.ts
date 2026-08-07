@@ -116,6 +116,13 @@ test.describe('Order Entry', () => {
     await expect(page.getByRole('heading', { name: 'Order Preview' })).toBeVisible()
   })
 
+  test('fill-or-kill toggle is present and can be checked', async ({ page }) => {
+    const fok = page.locator('input[aria-label="Fill or Kill"]')
+    await expect(fok).toHaveCount(1)
+    await fok.check()
+    await expect(fok).toBeChecked()
+  })
+
   test('BUY LIMIT order form renders correctly', async ({ page }) => {
     await page.getByRole('button', { name: 'BUY' }).click()
     await page.getByRole('button', { name: 'LIMIT' }).click()

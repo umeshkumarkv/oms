@@ -216,6 +216,30 @@ class OrderServiceTest {
     }
 
     @Test
+    void shouldPersistFillOrKillWhenProvidedTrue() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setFillOrKill(Boolean.TRUE);
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().isFillOrKill()).isTrue();
+    }
+
+    @Test
+    void shouldPersistFillOrKillWhenProvidedFalse() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setFillOrKill(Boolean.FALSE);
+
+        SubmitOrderResponse response = orderService.submitOrder(request, userId);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().isFillOrKill()).isFalse();
+    }
+
+    @Test
     void shouldApplyTraderExpiryForGtdOrderWithDate() {
         SubmitOrderRequest request = marketBuyRequest();
         request.setTimeInForce("GTD");

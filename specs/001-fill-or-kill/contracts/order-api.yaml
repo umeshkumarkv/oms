@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: Order API (partial) - FOK extension
+  version: 1.0.0
+paths:
+  /orders:
+    post:
+      summary: Create a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbol:
+                  type: string
+                quantity:
+                  type: integer
+                price:
+                  type: number
+                side:
+                  type: string
+                  enum: [buy, sell]
+                fillOrKill:
+                  type: boolean
+                  description: "Optional. When true the order must be fully filled immediately or canceled. Defaults to false."
+              required: [symbol, quantity, side]
+      responses:
+        '201':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+components:
+  schemas:
+    OrderResult:
+      type: object
+      properties:
+        orderId:
+          type: string
+        status:
+          type: string
+          enum: [filled, canceled, rejected, pending]
+        details:
+          type: object
+
+# Notes:
+# - Field name uses camelCase (`fillOrKill`) to match existing API style in frontend clients.
+# - Backend persistence column is `fill_or_kill` (snake_case) mapping at service layer.

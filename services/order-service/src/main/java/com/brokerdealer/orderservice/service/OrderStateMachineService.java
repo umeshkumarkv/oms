@@ -74,6 +74,7 @@ public class OrderStateMachineService {
                 .timeInForce(order.getTimeInForce().name())
                 .orderValue(order.getOrderValue())
                 .lastPrice(order.getLastPrice())
+                .fillOrKill(order.isFillOrKill())
                 .build());
 
         evictRedisOrderState(orderId);
