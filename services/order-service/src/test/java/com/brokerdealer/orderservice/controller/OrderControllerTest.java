@@ -25,6 +25,7 @@ import com.brokerdealer.orderservice.filter.RoleAuthorizationFilter;
 import com.brokerdealer.orderservice.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -39,10 +40,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -78,6 +81,43 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.data.status").value("NEW"))
                 .andExpect(jsonPath("$.meta.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
+    }
+
+    @Test
+    void shouldPassFillOrKillThroughToOrderServiceOnLimitOrder() throws Exception {
+        when(orderService.submitOrder(any(), any())).thenReturn(buildSuccessResponse());
+
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setOrderType("LIMIT");
+        body.setLimitPrice("150.00");
+        body.setFillOrKill(true);
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isAccepted());
+
+        ArgumentCaptor<SubmitOrderRequest> captor = ArgumentCaptor.forClass(SubmitOrderRequest.class);
+        verify(orderService).submitOrder(captor.capture(), any());
+        assertThat(captor.getValue().getFillOrKill()).isTrue();
+    }
+
+    @Test
+    void shouldReturn400WhenFillOrKillRequestedOnMarketOrder() throws Exception {
+        when(orderService.submitOrder(any(), any()))
+                .thenThrow(new ValidationException("fillOrKill", "FILL_OR_KILL_REQUIRES_LIMIT",
+                        "fillOrKill is only supported for LIMIT orders"));
+
+        SubmitOrderRequest body = validMarketBuyBody();
+        body.setFillOrKill(true);
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .header("X-User-Role", "TRADER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FILL_OR_KILL_REQUIRES_LIMIT"));
     }
 
     @Test

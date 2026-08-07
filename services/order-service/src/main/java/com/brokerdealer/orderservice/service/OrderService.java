@@ -261,6 +261,7 @@ public class OrderService {
                 .expiryApplied(expiryApplied)
                 .createdBy(userId != null ? userId : UUID.randomUUID())
                 .routingDestination(resolveRoutingDestination(request.getRoutingDestination()))
+                .fillOrKill(Boolean.TRUE.equals(request.getFillOrKill()))
                 .build();
 
         Order savedOrder = orderRepository.save(order);
@@ -370,6 +371,12 @@ public class OrderService {
         if (orderType == OrderType.MARKET && request.getLimitPrice() != null && !request.getLimitPrice().isBlank()) {
             throw new ValidationException("limitPrice", "LIMIT_PRICE_NOT_ALLOWED",
                     "limitPrice must not be provided for MARKET orders");
+        }
+
+        // fillOrKill rules
+        if (Boolean.TRUE.equals(request.getFillOrKill()) && orderType != OrderType.LIMIT) {
+            throw new ValidationException("fillOrKill", "FILL_OR_KILL_REQUIRES_LIMIT",
+                    "fillOrKill is only supported for LIMIT orders");
         }
     }
 

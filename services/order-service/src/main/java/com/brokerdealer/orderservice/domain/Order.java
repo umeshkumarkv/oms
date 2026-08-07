@@ -80,6 +80,9 @@ public class Order {
     @Column(name = "routing_destination", length = 50)
     private String routingDestination;
 
+    @Column(name = "fill_or_kill", nullable = false)
+    private Boolean fillOrKill;
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();

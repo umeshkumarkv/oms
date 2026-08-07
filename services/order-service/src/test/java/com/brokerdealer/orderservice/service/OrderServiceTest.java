@@ -178,6 +178,7 @@ class OrderServiceTest {
                     .expiryApplied(o.getExpiryApplied())
                     .createdBy(o.getCreatedBy())
                     .routingDestination(o.getRoutingDestination())
+                    .fillOrKill(o.getFillOrKill())
                     .build();
         });
     }
@@ -315,6 +316,41 @@ class OrderServiceTest {
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("limitPrice must not be provided");
         verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldDefaultFillOrKillToFalseWhenOmitted() {
+        SubmitOrderRequest request = marketBuyRequest();
+
+        orderService.submitOrder(request, userId);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillOrKill()).isFalse();
+    }
+
+    @Test
+    void shouldAcceptFillOrKillOnValidLimitOrder() {
+        SubmitOrderRequest request = limitBuyRequest();
+        request.setFillOrKill(true);
+
+        orderService.submitOrder(request, userId);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillOrKill()).isTrue();
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenFillOrKillRequestedOnMarketOrder() {
+        SubmitOrderRequest request = marketBuyRequest();
+        request.setFillOrKill(true);
+
+        assertThatThrownBy(() -> orderService.submitOrder(request, userId))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("fillOrKill is only supported for LIMIT orders");
+        verify(orderRepository, never()).save(any());
+        verify(orderEventProducer, never()).publishOrderStateChanged(any());
     }
 
     @Test

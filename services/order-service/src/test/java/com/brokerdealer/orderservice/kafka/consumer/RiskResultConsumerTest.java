@@ -62,6 +62,20 @@ class RiskResultConsumerTest {
     }
 
     @Test
+    void shouldInvokeTransitionOnExecutionRejectedWithReasonWhenFillTypeIsRejected() {
+        Map<String, Object> payload = Map.of(
+                "orderId", orderId.toString(),
+                "fillType", "REJECTED",
+                "rejectionReason", "Fill-or-Kill: unable to fill in full"
+        );
+
+        riskResultConsumer.consumeExecutionCompleted(payload);
+
+        verify(orderStateMachineService).transitionOnExecutionRejected(
+                orderId, "Fill-or-Kill: unable to fill in full");
+    }
+
+    @Test
     void shouldNotInvokeStateMachineForUnknownResult() {
         Map<String, Object> payload = Map.of(
                 "orderId", orderId.toString(),

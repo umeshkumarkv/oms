@@ -74,6 +74,7 @@ public class OrderStateMachineService {
                 .timeInForce(order.getTimeInForce().name())
                 .orderValue(order.getOrderValue())
                 .lastPrice(order.getLastPrice())
+                .fillOrKill(order.getFillOrKill())
                 .build());
 
         evictRedisOrderState(orderId);
@@ -153,16 +154,19 @@ public class OrderStateMachineService {
     }
 
     @Transactional
-    public void transitionOnExecutionRejected(UUID orderId) {
+    public void transitionOnExecutionRejected(UUID orderId, String rejectionReason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         if (EXECUTION_TERMINAL_STATES.contains(order.getStatus())) {
             log.warn("Idempotency: order already terminal: orderId={} status={}", orderId, order.getStatus());
             return;
         }
+        if (rejectionReason != null && !rejectionReason.isBlank()) {
+            order.setRejectionReason(rejectionReason);
+        }
         transitionState(order, order.getStatus(), OrderStatus.REJECTED, TRIGGERED_BY_EXECUTION);
         evictRedisOrderState(orderId);
-        log.info("Order REJECTED by execution: orderId={}", orderId);
+        log.info("Order REJECTED by execution: orderId={} rejectionReason={}", orderId, rejectionReason);
     }
 
     private void transitionState(Order order, OrderStatus from, OrderStatus to, String triggeredBy) {
