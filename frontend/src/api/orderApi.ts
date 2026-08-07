@@ -45,6 +45,7 @@ export const submitOrder = async (order: SubmitOrderRequest): Promise<SubmitOrde
     limitPrice:         order.limitPrice,
     gtdDate:            order.gtdDate ?? undefined,
     routingDestination: order.routingDestination,
+    fillOrKill:         order.fillOrKill,
   }
   const res = await http.post('/orders', body)
   return res.data.data

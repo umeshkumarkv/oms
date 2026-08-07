@@ -27,6 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class FillSimulationService {
 
     private static final String EXECUTION_VENUE = "MOCK_ECN";
+    private static final String FOK_KILL_REASON = "Fill-or-Kill: unable to fill in full";
 
     private final ExecutionRepository executionRepository;
     private final PendingOrderExecutionRepository pendingRepository;
@@ -77,6 +78,37 @@ public class FillSimulationService {
         }
     }
 
+    /**
+     * Fill-or-Kill orders are evaluated exactly once, immediately: never queued to
+     * {@link #monitorPendingLimitOrders()}, and any non-FULL outcome kills the whole
+     * order instead of partially filling it.
+     */
+    @Transactional
+    public void executeFillOrKill(OrderExecutionRequest request) {
+        boolean conditionMet = checkLimitCondition(request.getSide(), request.getLastPrice(), request.getLimitPrice());
+        if (!conditionMet) {
+            executeRejectedFill(request, request.getLastPrice(), FOK_KILL_REASON);
+            log.info("Fill-or-Kill killed — limit price not currently met: orderId={} symbol={}",
+                    request.getOrderId(), request.getSymbol());
+            return;
+        }
+
+        FillType outcome = determineFillOutcome(request);
+        if (outcome == FillType.FULL) {
+            BigDecimal fillValue = computeFillValue(request.getQuantity(), request.getLimitPrice());
+            Execution execution = buildExecution(request, request.getQuantity(), request.getLimitPrice(),
+                    FillType.FULL, fillValue, 0, request.getLastPrice());
+            executionRepository.save(execution);
+            executionEventProducer.publishExecutionCompleted(toEvent(execution));
+            log.info("Fill-or-Kill FULL fill: orderId={} symbol={} executedQty={}",
+                    request.getOrderId(), request.getSymbol(), request.getQuantity());
+        } else {
+            executeRejectedFill(request, request.getLastPrice(), FOK_KILL_REASON);
+            log.info("Fill-or-Kill killed — would only partially fill: orderId={} symbol={}",
+                    request.getOrderId(), request.getSymbol());
+        }
+    }
+
     @Scheduled(fixedDelay = 2000)
     public void monitorPendingLimitOrders() {
         List<PendingOrderExecution> pending = pendingRepository.findByStatus(PendingStatus.PENDING);
@@ -122,7 +154,7 @@ public class FillSimulationService {
                         request.getOrderId(), request.getSymbol(), request.getQuantity());
             }
             case PARTIAL -> executePartialFill(request, executedPrice, marketPrice);
-            case REJECTED -> executeRejectedFill(request, marketPrice);
+            case REJECTED -> executeRejectedFill(request, marketPrice, null);
         }
     }
 
@@ -143,13 +175,13 @@ public class FillSimulationService {
     }
 
     @Transactional
-    public void executeRejectedFill(OrderExecutionRequest request, BigDecimal marketPrice) {
+    public void executeRejectedFill(OrderExecutionRequest request, BigDecimal marketPrice, String rejectionReason) {
         Execution rejection = buildExecution(request, 0, marketPrice,
                 FillType.REJECTED, BigDecimal.ZERO, request.getQuantity(), marketPrice);
         executionRepository.save(rejection);
-        executionEventProducer.publishExecutionCompleted(toEvent(rejection));
-        log.info("REJECTED fill: orderId={} symbol={} qty={}",
-                request.getOrderId(), request.getSymbol(), request.getQuantity());
+        executionEventProducer.publishExecutionCompleted(toEvent(rejection, rejectionReason));
+        log.info("REJECTED fill: orderId={} symbol={} qty={} rejectionReason={}",
+                request.getOrderId(), request.getSymbol(), request.getQuantity(), rejectionReason);
     }
 
     @Async
@@ -206,6 +238,10 @@ public class FillSimulationService {
     }
 
     private ExecutionCompletedEvent toEvent(Execution execution) {
+        return toEvent(execution, null);
+    }
+
+    private ExecutionCompletedEvent toEvent(Execution execution, String rejectionReason) {
         return ExecutionCompletedEvent.builder()
                 .orderId(execution.getOrderId())
                 .executionId(execution.getId())
@@ -220,6 +256,7 @@ public class FillSimulationService {
                 .marketPriceAtFill(execution.getMarketPriceAtFill().toPlainString())
                 .executionVenue(execution.getExecutionVenue())
                 .executedAt(execution.getExecutedAt().toString())
+                .rejectionReason(rejectionReason)
                 .build();
     }
 

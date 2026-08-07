@@ -49,4 +49,7 @@ public class SubmitOrderRequest {
 
     /** Optional execution venue. Defaults to "NYSE" if absent or blank. */
     private String routingDestination;
+
+    /** Optional. Only supported for LIMIT orders. Defaults to false when omitted. */
+    private Boolean fillOrKill;
 }

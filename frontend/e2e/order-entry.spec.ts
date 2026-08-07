@@ -116,6 +116,22 @@ test.describe('Order Entry', () => {
     await expect(page.getByRole('heading', { name: 'Order Preview' })).toBeVisible()
   })
 
+  test('Fill-or-Kill toggle is enabled for LIMIT and disables/resets after switching to MARKET', async ({ page }) => {
+    await page.getByRole('button', { name: 'LIMIT' }).click()
+
+    const fokYes = page.getByRole('button', { name: 'YES' })
+    const fokNo  = page.getByRole('button', { name: 'NO' })
+    await expect(fokYes).toBeEnabled()
+
+    await fokYes.click()
+    await expect(fokYes).toHaveAttribute('aria-pressed', 'true')
+
+    await page.getByRole('button', { name: 'MARKET' }).click()
+    await expect(fokNo).toHaveAttribute('aria-pressed', 'true')
+    await expect(fokYes).toHaveAttribute('aria-pressed', 'false')
+    await expect(fokYes).toBeDisabled()
+  })
+
   test('BUY LIMIT order form renders correctly', async ({ page }) => {
     await page.getByRole('button', { name: 'BUY' }).click()
     await page.getByRole('button', { name: 'LIMIT' }).click()

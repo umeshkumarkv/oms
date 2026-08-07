@@ -255,7 +255,7 @@ class FillSimulationServiceTest {
                 1001, new BigDecimal("175.50"), null);
         when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"));
+        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"), null);
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
@@ -269,7 +269,7 @@ class FillSimulationServiceTest {
                 1001, new BigDecimal("175.50"), null);
         when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"));
+        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"), null);
 
         ArgumentCaptor<ExecutionCompletedEvent> captor = ArgumentCaptor.forClass(ExecutionCompletedEvent.class);
         verify(executionEventProducer).publishExecutionCompleted(captor.capture());
@@ -283,7 +283,7 @@ class FillSimulationServiceTest {
                 1001, new BigDecimal("175.50"), null);
         when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"));
+        fillSimulationService.executeRejectedFill(request, new BigDecimal("175.50"), null);
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
@@ -371,6 +371,65 @@ class FillSimulationServiceTest {
         assertThat(tranche1.getFillType()).isEqualTo(FillType.PARTIAL);
         assertThat(tranche1.getExecutedQty()).isEqualTo(60);
         assertThat(tranche1.getRemainingQuantity()).isEqualTo(40);
+    }
+
+    // ── executeFillOrKill ──────────────────────────────────────────────────────
+
+    @Test
+    void shouldFullyFillFillOrKillOrderWhenConditionMetAndOutcomeIsFull() {
+        // BUY limit=176.00, market=175.50 → condition met; qty=100 → FULL outcome
+        OrderExecutionRequest request = buildRequest(OrderType.LIMIT, OrderSide.BUY,
+                100, new BigDecimal("175.50"), new BigDecimal("176.00"));
+        request.setFillOrKill(true);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeFillOrKill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.FULL);
+        assertThat(captor.getValue().getExecutedQty()).isEqualTo(100);
+        assertThat(captor.getValue().getExecutedPrice()).isEqualByComparingTo(new BigDecimal("176.00"));
+        verifyNoInteractions(pendingRepository);
+    }
+
+    @Test
+    void shouldKillFillOrKillOrderInFullWhenOutcomeWouldOnlyBePartial() {
+        // BUY limit=176.00, market=175.50 → condition met; qty=50 → PARTIAL outcome, must be killed instead
+        OrderExecutionRequest request = buildRequest(OrderType.LIMIT, OrderSide.BUY,
+                50, new BigDecimal("175.50"), new BigDecimal("176.00"));
+        request.setFillOrKill(true);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeFillOrKill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.REJECTED);
+        assertThat(captor.getValue().getExecutedQty()).isZero();
+        assertThat(captor.getValue().getRemainingQuantity()).isEqualTo(50);
+
+        ArgumentCaptor<ExecutionCompletedEvent> eventCaptor = ArgumentCaptor.forClass(ExecutionCompletedEvent.class);
+        verify(executionEventProducer).publishExecutionCompleted(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getRejectionReason()).isEqualTo("Fill-or-Kill: unable to fill in full");
+        verifyNoInteractions(pendingRepository);
+    }
+
+    @Test
+    void shouldKillFillOrKillOrderImmediatelyWhenLimitPriceNotCurrentlyMet() {
+        // BUY limit=175.00, market=176.00 → condition NOT met
+        OrderExecutionRequest request = buildRequest(OrderType.LIMIT, OrderSide.BUY,
+                100, new BigDecimal("176.00"), new BigDecimal("175.00"));
+        request.setFillOrKill(true);
+        when(executionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        fillSimulationService.executeFillOrKill(request);
+
+        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
+        verify(executionRepository).save(captor.capture());
+        assertThat(captor.getValue().getFillType()).isEqualTo(FillType.REJECTED);
+        assertThat(captor.getValue().getRemainingQuantity()).isEqualTo(100);
+        verifyNoInteractions(pendingRepository);
     }
 
     // ── Queue pending LIMIT order ─────────────────────────────────────────────

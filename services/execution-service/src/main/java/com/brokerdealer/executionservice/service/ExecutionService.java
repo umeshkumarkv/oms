@@ -58,10 +58,12 @@ public class ExecutionService {
             return;
         }
 
-        log.info("Processing fill: orderId={} orderType={} symbol={}",
-                request.getOrderId(), request.getOrderType(), request.getSymbol());
+        log.info("Processing fill: orderId={} orderType={} symbol={} fillOrKill={}",
+                request.getOrderId(), request.getOrderType(), request.getSymbol(), request.getFillOrKill());
 
-        if (request.getOrderType() == OrderType.MARKET) {
+        if (Boolean.TRUE.equals(request.getFillOrKill())) {
+            fillSimulationService.executeFillOrKill(request);
+        } else if (request.getOrderType() == OrderType.MARKET) {
             fillSimulationService.executeMarketFill(request);
         } else {
             fillSimulationService.initiateLimitFill(request);

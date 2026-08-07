@@ -1707,3 +1707,88 @@ describe('OrderEntryPage — SCRUM-172 instrument search V2', () => {
     expect(screen.getByText('Apple Inc.')).toBeInTheDocument()
   })
 })
+
+describe('OrderEntryPage — Fill-or-Kill toggle', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shouldRenderFillOrKillToggleGroup', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Fill-or-Kill' })).toBeInTheDocument())
+  })
+
+  it('shouldDefaultFillOrKillToNoAndEnabledWhenOrderTypeIsLimit', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Fill-or-Kill' })).toBeInTheDocument())
+
+    const noBtn  = screen.getByRole('button', { name: 'NO' })
+    const yesBtn = screen.getByRole('button', { name: 'YES' })
+
+    // Default order type is LIMIT
+    expect(noBtn).toHaveAttribute('aria-pressed', 'true')
+    expect(yesBtn).toHaveAttribute('aria-pressed', 'false')
+    expect(noBtn).not.toBeDisabled()
+    expect(yesBtn).not.toBeDisabled()
+  })
+
+  it('shouldDisableFillOrKillToggleWhenOrderTypeIsMarket', async () => {
+    renderPage()
+    const marketBtn = await screen.findByRole('button', { name: 'MARKET' })
+    await act(async () => { fireEvent.click(marketBtn) })
+
+    const noBtn  = screen.getByRole('button', { name: 'NO' })
+    const yesBtn = screen.getByRole('button', { name: 'YES' })
+    expect(noBtn).toBeDisabled()
+    expect(yesBtn).toBeDisabled()
+    expect(noBtn).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shouldResetFillOrKillToNoWhenSwitchingFromLimitYesToMarket', async () => {
+    renderPage()
+    const yesBtn = await screen.findByRole('button', { name: 'YES' })
+    await act(async () => { fireEvent.click(yesBtn) })
+    expect(screen.getByRole('button', { name: 'YES' })).toHaveAttribute('aria-pressed', 'true')
+
+    const marketBtn = screen.getByRole('button', { name: 'MARKET' })
+    await act(async () => { fireEvent.click(marketBtn) })
+
+    expect(screen.getByRole('button', { name: 'NO' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'YES' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'YES' })).toBeDisabled()
+  })
+
+  it('shouldIncludeFillOrKillTrueInSubmitPayloadWhenYesSelectedOnLimitOrder', async () => {
+    const { submitOrder } = await import('../api/orderApi')
+    await renderAndLoadQuote()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'YES' }))
+      fireEvent.change(screen.getByPlaceholderText('Number of shares'), { target: { value: '100' } })
+    })
+    await waitFor(() => expect(screen.getByText('Review & Submit Order')).not.toBeDisabled())
+
+    await act(async () => { fireEvent.click(screen.getByText('Review & Submit Order')) })
+
+    await waitFor(() => expect(vi.mocked(submitOrder)).toHaveBeenCalled())
+    expect(vi.mocked(submitOrder).mock.calls[0][0]).toEqual(
+      expect.objectContaining({ fillOrKill: true })
+    )
+  })
+
+  it('shouldOmitFillOrKillInSubmitPayloadWhenOrderTypeIsMarket', async () => {
+    const { submitOrder } = await import('../api/orderApi')
+    await renderAndLoadQuote()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'MARKET' }))
+      fireEvent.change(screen.getByPlaceholderText('Number of shares'), { target: { value: '100' } })
+    })
+    await waitFor(() => expect(screen.getByText('Review & Submit Order')).not.toBeDisabled())
+
+    await act(async () => { fireEvent.click(screen.getByText('Review & Submit Order')) })
+
+    await waitFor(() => expect(vi.mocked(submitOrder)).toHaveBeenCalled())
+    expect(vi.mocked(submitOrder).mock.calls[0][0]).toEqual(
+      expect.objectContaining({ fillOrKill: undefined })
+    )
+  })
+})

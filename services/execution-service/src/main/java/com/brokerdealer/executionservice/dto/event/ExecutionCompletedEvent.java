@@ -25,4 +25,5 @@ public class ExecutionCompletedEvent {
     private String marketPriceAtFill;
     private String executionVenue;
     private String executedAt;
+    private String rejectionReason;
 }

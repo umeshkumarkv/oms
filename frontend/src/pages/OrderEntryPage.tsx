@@ -169,6 +169,7 @@ const OrderEntryPage: React.FC = () => {
   const [tif,                setTif]                = useState<TimeInForce>('DAY')
   const [gtdDate,            setGtdDate]            = useState<Date | null>(null)
   const [routingDestination, setRoutingDestination] = useState('')
+  const [fillOrKill,         setFillOrKill]         = useState(false)
 
   const [searchResults, setSearchResults] = useState<InstrumentSearchResult[]>([])
   const [focusedIdx,    setFocusedIdx]    = useState(-1)
@@ -207,6 +208,8 @@ const OrderEntryPage: React.FC = () => {
   const limitRef      = useRef<HTMLButtonElement>(null)
   const dayRef        = useRef<HTMLButtonElement>(null)
   const gtdRef        = useRef<HTMLButtonElement>(null)
+  const fokNoRef       = useRef<HTMLButtonElement>(null)
+  const fokYesRef      = useRef<HTMLButtonElement>(null)
 
   // ── Real-time Bid/Ask (SCRUM-108) ────────────────────────────────────────────
   const { bid: liveBid, ask: liveAsk, ltp: liveLtp, isStale } = useOrderEntryBidAsk(symbol)
@@ -244,6 +247,7 @@ const OrderEntryPage: React.FC = () => {
     setLimitPrice('')
     setTif('DAY')
     setGtdDate(null)
+    setFillOrKill(false)
     setFieldErrors({})
     setSubmitError(null)
     setQuote(null)
@@ -461,6 +465,7 @@ const OrderEntryPage: React.FC = () => {
         tif,
         gtdDate: tif === 'GTD' && gtdDateStr ? gtdDateStr : undefined,
         routingDestination: SOR_VENUES.length === 0 ? DEFAULT_VENUE : routingDestination,
+        fillOrKill: orderType === 'LIMIT' ? fillOrKill : undefined,
       })
       addToast(`Order ${res.orderId} submitted successfully`, TOAST_TYPE.SUCCESS, TOAST_SUCCESS_NAV_MS)
       setTimeout(() => navigate('/orders'), TOAST_SUCCESS_NAV_MS)
@@ -750,9 +755,13 @@ const OrderEntryPage: React.FC = () => {
                 style={s.toggleGroup}
                 role="group"
                 aria-label="Order Type"
-                onKeyDown={(e) => rove(e, [marketRef, limitRef], ['MARKET', 'LIMIT'].indexOf(orderType), (i) => setOrderType((['MARKET', 'LIMIT'] as OrderType[])[i]))}
+                onKeyDown={(e) => rove(e, [marketRef, limitRef], ['MARKET', 'LIMIT'].indexOf(orderType), (i) => {
+                  const next = (['MARKET', 'LIMIT'] as OrderType[])[i]
+                  setOrderType(next)
+                  if (next === 'MARKET') setFillOrKill(false)
+                })}
               >
-                <button ref={marketRef} tabIndex={orderType === 'MARKET' ? 0 : -1} style={s.toggleBtn(orderType === 'MARKET', sideColor)} onClick={() => setOrderType('MARKET')} disabled={isExpired} aria-pressed={orderType === 'MARKET'}>MARKET</button>
+                <button ref={marketRef} tabIndex={orderType === 'MARKET' ? 0 : -1} style={s.toggleBtn(orderType === 'MARKET', sideColor)} onClick={() => { setOrderType('MARKET'); setFillOrKill(false) }} disabled={isExpired} aria-pressed={orderType === 'MARKET'}>MARKET</button>
                 <button ref={limitRef}  tabIndex={orderType === 'LIMIT'  ? 0 : -1} style={s.toggleBtn(orderType === 'LIMIT',  sideColor)} onClick={() => setOrderType('LIMIT')}  disabled={isExpired} aria-pressed={orderType === 'LIMIT'}>LIMIT</button>
               </div>
             </div>
@@ -785,6 +794,37 @@ const OrderEntryPage: React.FC = () => {
                   aria-pressed={tif === 'GTD'}
                 >GTD</button>
               </div>
+            </div>
+          </div>
+
+          {/* Row 4.5 — Fill-or-Kill toggle (enabled only for LIMIT orders) */}
+          <div className="field-group" style={s.fieldGroup}>
+            <label style={s.label}>Fill-or-Kill</label>
+            <div
+              style={s.toggleGroup}
+              role="group"
+              aria-label="Fill-or-Kill"
+              onKeyDown={(e) => {
+                if (orderType !== 'LIMIT') return
+                rove(e, [fokNoRef, fokYesRef], fillOrKill ? 1 : 0, (i) => setFillOrKill(i === 1))
+              }}
+            >
+              <button
+                ref={fokNoRef}
+                tabIndex={!fillOrKill ? 0 : -1}
+                style={s.toggleBtn(!fillOrKill, sideColor)}
+                onClick={() => setFillOrKill(false)}
+                disabled={isExpired || orderType !== 'LIMIT'}
+                aria-pressed={!fillOrKill}
+              >NO</button>
+              <button
+                ref={fokYesRef}
+                tabIndex={fillOrKill ? 0 : -1}
+                style={s.toggleBtn(fillOrKill, sideColor)}
+                onClick={() => setFillOrKill(true)}
+                disabled={isExpired || orderType !== 'LIMIT'}
+                aria-pressed={fillOrKill}
+              >YES</button>
             </div>
           </div>
 

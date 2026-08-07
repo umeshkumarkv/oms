@@ -51,7 +51,8 @@ public class RiskResultConsumer {
         } else if ("PARTIAL".equals(fillType)) {
             orderStateMachineService.transitionOnExecutionPartialFill(orderId);
         } else if ("REJECTED".equals(fillType)) {
-            orderStateMachineService.transitionOnExecutionRejected(orderId);
+            String rejectionReason = (String) payload.get("rejectionReason");
+            orderStateMachineService.transitionOnExecutionRejected(orderId, rejectionReason);
         } else {
             log.warn("Unknown fillType in execution.completed: orderId={} fillType={}", orderId, fillType);
         }

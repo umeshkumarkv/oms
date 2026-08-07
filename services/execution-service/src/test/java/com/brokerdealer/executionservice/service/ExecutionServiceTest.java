@@ -110,6 +110,20 @@ class ExecutionServiceTest {
         verify(fillSimulationService, never()).executeMarketFill(any());
     }
 
+    @Test
+    void shouldRouteFillOrKillOrderToExecuteFillOrKillRegardlessOfOrderType() {
+        OrderExecutionRequest request = buildRequest(OrderType.LIMIT);
+        request.setFillOrKill(true);
+        when(executionRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(pendingRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+
+        executionService.processFill(request);
+
+        verify(fillSimulationService).executeFillOrKill(request);
+        verify(fillSimulationService, never()).initiateLimitFill(any());
+        verify(fillSimulationService, never()).executeMarketFill(any());
+    }
+
     private OrderExecutionRequest buildRequest(OrderType orderType) {
         OrderExecutionRequest req = new OrderExecutionRequest();
         req.setOrderId(ORDER_ID);

@@ -176,6 +176,44 @@ class OrderStateMachineServiceTest {
         verify(redisTemplate).delete("order:state:" + orderId);
     }
 
+    // --- transitionOnExecutionRejected ---
+
+    @Test
+    void shouldTransitionToRejectedAndPopulateRejectionReasonOnExecutionRejection() {
+        Order order = newOrder();
+        order.setStatus(OrderStatus.SENT_TO_EXECUTION);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        List<OrderStatus> capturedStatuses = new ArrayList<>();
+        List<String> capturedReasons = new ArrayList<>();
+        doAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            capturedStatuses.add(o.getStatus());
+            capturedReasons.add(o.getRejectionReason());
+            return o;
+        }).when(orderRepository).save(any(Order.class));
+
+        orderStateMachineService.transitionOnExecutionRejected(orderId, "Fill-or-Kill: unable to fill in full");
+
+        assertThat(capturedStatuses).containsExactly(OrderStatus.REJECTED);
+        assertThat(capturedReasons).containsExactly("Fill-or-Kill: unable to fill in full");
+    }
+
+    @Test
+    void shouldTransitionToRejectedWithNullRejectionReasonWhenNoneProvided() {
+        Order order = newOrder();
+        order.setStatus(OrderStatus.SENT_TO_EXECUTION);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderStateMachineService.transitionOnExecutionRejected(orderId, null);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(OrderStatus.REJECTED);
+        assertThat(captor.getValue().getRejectionReason()).isNull();
+    }
+
     // --- Idempotency guards ---
 
     @Test
