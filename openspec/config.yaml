@@ -1,0 +1,83 @@
+schema: spec-driven
+
+context: |
+  Domain: Broker-Dealer Order Management System (OMS) POC — order lifecycle,
+  risk evaluation, trade execution, market data, client management, audit
+  trail, and notifications for a brokerage/trading business.
+
+  Architecture: Java 21 / Spring Boot 3.2.4 microservices (Spring Cloud
+  2023.0.1) under services/*, one Maven module per service, all inheriting
+  from the root parent pom:
+    - api-gateway            Spring Cloud Gateway MVC + Spring Security, JWT
+                              validation, routes all external traffic
+    - auth-service            authentication/authorization, issues JWTs (jjwt)
+    - order-service           order lifecycle (create/amend/cancel/fill)
+    - client-service          client/account management
+    - marketdata-service      market data ingestion, WebSocket push to clients
+    - risk-service            pre-trade/post-trade risk evaluation
+    - execution-service       order execution, calls marketdata-service
+    - audit-service           audit trail of domain events
+    - notification-service    Kafka-driven notifications, no DB/Redis
+
+  Persistence: PostgreSQL 15, one schema per service (order_schema,
+  risk_schema, etc.) in a shared "brokerdealer" database, versioned with
+  Flyway migrations (V{n}__description.sql per service), accessed via
+  Spring Data JPA.
+
+  Messaging: Apache Kafka (Confluent images) via spring-kafka for
+  cross-service events (order.state.changed, risk.evaluation.requested/result,
+  order.execution.requested, execution.completed), each with a paired
+  .DLT dead-letter topic.
+
+  Cross-cutting: Redis 7 for caching/session state; Resilience4j
+  (circuit breakers) for resilience around external calls; MapStruct for
+  DTO<->entity mapping; Lombok for boilerplate; springdoc-openapi for
+  OpenAPI/Swagger docs on each service; JWT (jjwt) for auth end to end.
+
+  Testing: JUnit + spring-boot-starter-test per service, JaCoCo enforcing an
+  80% line-coverage gate on the BUNDLE element (see each service's pom for
+  package exclusions such as domain/dto/config/generated mappers).
+
+  Frontend (frontend/): React 18 + TypeScript + Vite 5, react-router-dom for
+  routing, axios and @microsoft/fetch-event-source (SSE) for API/streaming
+  calls, react-datepicker + lucide-react for UI. Unit/component tests with
+  Vitest + Testing Library + jsdom; e2e tests with Playwright.
+
+  Infra: Docker Compose wires zookeeper+kafka, redis, postgres, all nine
+  Spring Boot services, and the frontend (served via nginx) together for
+  local/integration runs.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+rules:
+  proposal:
+    - Identify which service(s) under services/* are affected — most
+      changes should be scoped to one service and its own DB schema
+    - Call out any new or changed Kafka topics/event contracts (including
+      whether a .DLT topic is needed) and any new REST endpoints that need
+      api-gateway routing and JWT protection
+  tasks:
+    - Include a Flyway migration task (V{n}__description.sql) whenever the
+      change touches a service's DB schema
+    - Include a task to update springdoc/OpenAPI annotations for any new or
+      changed REST endpoint
+    - Include a task to keep JaCoCo line coverage at/above 80% for touched
+      modules
+    - For frontend-affecting changes, include Vitest unit/component test
+      tasks and, for user-facing flows, a Playwright e2e task
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+operations:
+  apply:
+    guidance:
+      - Prefer Lombok, MapStruct, and Resilience4j patterns already used in
+        sibling services over introducing new libraries for the same concern
+      - Keep new inter-service communication event-driven via Kafka rather
+        than synchronous calls, unless a direct call already exists for that
+        pair of services (e.g. execution-service -> marketdata-service)
+  archive:
+    guidance:
+      - Note which service(s), DB schemas, and Kafka topics were touched so
+        future changes can find related work quickly
