@@ -1,0 +1,46 @@
+schema: spec-driven
+
+project:
+  name: broker-dealer-oms
+  repo: oms
+
+stack:
+  language: Java 21
+  framework: Spring Boot 3
+  build: Maven
+  frontend: React + TypeScript (Vite)
+  messaging: Apache Kafka
+  database: PostgreSQL
+  cache: Redis
+  auth: JWT (HS256, 30-minute expiry, issued by auth-service)
+  api-style: REST + SSE (Server-Sent Events for notifications)
+
+shared:
+  kafka:
+    # All 8 Kafka-enabled services read this same env var — confirmed in every application.yml
+    bootstrap-servers: "${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}"
+  database:
+    type: PostgreSQL
+    default-port: 5432
+    db-name: brokerdealer
+    # Each service uses its own schema within the shared DB — see specs/_global/service-directory.md
+  redis:
+    port: 6379
+    purpose: JWT blocklist (auth-service) + per-service application caches
+
+# Port assignments, schema names, and Kafka topic contracts live in:
+#   specs/_global/service-directory.md
+# Per-service behavior, entities, and business rules live in:
+#   specs/{service}/spec.md
+
+context: |
+  Broker-dealer Order Management System (OMS). Nine Spring Boot microservices
+  behind a single API Gateway. Event-driven order lifecycle via Kafka.
+  Each service owns a dedicated PostgreSQL schema (schema-per-service isolation).
+  JWT issued by auth-service; gateway validates on every request except /auth/login.
+  Frontend is a React SPA (Vite) communicating via /api/v1 base URL proxied through
+  the gateway. Notification delivery uses SSE (Server-Sent Events).
+  Roles: TRADER, OPERATIONS, ADMIN, VIEWER.
+
+  Service directory (ports, schemas, Kafka contract): specs/_global/service-directory.md
+  Per-service baseline specs: specs/{service}/spec.md
