@@ -1,0 +1,12 @@
+date,command,target,attempts,verdict,tests_run,minutes,human_decision
+2026-10-28,/pl-onboard,services/api-gateway,3,PASS,no,,
+2026-10-28,/pl-onboard,services/auth-service,2,PASS,no,,
+2026-10-28,/pl-onboard,services/order-service,3,PASS,no,,
+2026-10-28,/pl-onboard,services/client-service,2,PASS,no,,
+2026-10-28,/pl-onboard,services/marketdata-service,2,PASS,no,,
+2026-10-28,/pl-onboard,services/risk-service,2,PASS,no,,
+2026-10-28,/pl-onboard,services/execution-service,1,PASS,no,,
+2026-10-28,/pl-onboard,services/audit-service,1,PASS,no,,
+2026-10-28,/pl-onboard,services/notification-service,2,PASS,no,,
+2026-10-28,/pl-onboard,frontend,2,PASS,yes (4 failed / 302 passed),,
+2026-10-29,/pl-onboard,CLAUDE.md (root),3,PASS,n/a,,
