@@ -1,0 +1,284 @@
+# Plumbline generic Java/Spring rules: money arithmetic, injection, secrets, SQL, logging, error exposure.
+# Run by .github/workflows/plumbline-checks.yml on the lines a pull request changes (--baseline-commit).
+rules:
+
+  # ───────── C1 Java type rules ─────────
+  - id: C1-money-floating-point
+    message: "Monetary value '$NAME' uses $T. Use BigDecimal."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-either:
+          - pattern: $T $NAME;
+          - pattern: $T $NAME = $V;
+          - pattern: $RET $METHOD(..., $T $NAME, ...) { ... }
+      - metavariable-regex:
+          metavariable: $T
+          regex: ^(double|float|Double|Float)$
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(price|amount|cash|balance|value|cost|notional|fee|pnl|margin|commission|buyingpower|exposure|proceeds|money).*
+    metadata: {category: C1, claude_md: "§10, §13a"}
+
+  - id: C1-bigdecimal-from-double
+    message: "BigDecimal constructed from a double literal loses precision. Use new BigDecimal(\"...\")."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-either:
+          - pattern: new BigDecimal($D)
+          - pattern: new java.math.BigDecimal($D)
+      - metavariable-regex:
+          metavariable: $D
+          regex: ^-?\d+\.\d+[dDfF]?$
+    metadata: {category: C1, claude_md: "§13a"}
+
+  - id: C1-bigdecimal-from-double-var
+    message: "BigDecimal constructed from a double/float variable. Use BigDecimal.valueOf(String) or a String constructor."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: new BigDecimal((double $X))
+      - pattern: new BigDecimal((float $X))
+      - pattern: new BigDecimal((Double $X))
+      - pattern: new BigDecimal(Double.parseDouble(...))
+      - pattern: new BigDecimal(Double.valueOf(...))
+      - pattern: new BigDecimal(Float.parseFloat(...))
+      - pattern: new BigDecimal($X.doubleValue())
+      - pattern: new BigDecimal($X.floatValue())
+      - pattern: new BigDecimal(Math.$F(...))
+    metadata: {category: C1, claude_md: "§13a"}
+
+  - id: C1-bigdecimal-equals
+    message: "BigDecimal.equals() compares scale (1.0 != 1.00). Use compareTo() == 0."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: (BigDecimal $A).equals($B)
+      - pattern: $A.equals((BigDecimal $B))
+      - pattern: java.util.Objects.equals((BigDecimal $A), $B)
+      - pattern: Objects.equals((BigDecimal $A), $B)
+      - patterns:
+          - pattern-either:
+              - pattern: $O.$GET().equals($B)
+              - pattern: java.util.Objects.equals($O.$GET(), $B)
+              - pattern: Objects.equals($O.$GET(), $B)
+          - metavariable-regex:
+              metavariable: $GET
+              regex: (?i)^get\w*(price|amount|cash|balance|notional|threshold|cost|pnl|margin|proceeds|commission|fee|buyingpower)$
+    metadata: {category: C1, claude_md: "§13a"}
+
+  - id: C1-legacy-date-time
+    message: "java.util.Date / Calendar is forbidden. Use Instant or LocalDate."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: import java.util.Date;
+      - pattern: import java.util.Calendar;
+      - pattern: import java.util.GregorianCalendar;
+      - pattern: new java.util.Date(...)
+      - pattern: java.util.Calendar.getInstance(...)
+    metadata: {category: C1, claude_md: "§13a"}
+
+  - id: C4-field-injection
+    message: "Field injection via @Autowired. Use constructor injection with @RequiredArgsConstructor."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: |
+          @Autowired
+          $T $F;
+      - pattern: |
+          @org.springframework.beans.factory.annotation.Autowired
+          $T $F;
+      - pattern: |
+          @Inject
+          $T $F;
+      - pattern: |
+          @javax.inject.Inject
+          $T $F;
+      - pattern: |
+          @jakarta.inject.Inject
+          $T $F;
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  @Autowired
+                  $RET $METHOD(...) { ... }
+              - pattern: |
+                  @org.springframework.beans.factory.annotation.Autowired
+                  $RET $METHOD(...) { ... }
+              - pattern: |
+                  @Inject
+                  $RET $METHOD(...) { ... }
+              - pattern: |
+                  @javax.inject.Inject
+                  $RET $METHOD(...) { ... }
+              - pattern: |
+                  @jakarta.inject.Inject
+                  $RET $METHOD(...) { ... }
+    metadata: {category: C4, claude_md: "§13e"}
+
+  - id: C5-controller-uses-repository
+    message: "Controller $C depends on repository $T. Controllers call services only."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-inside: |
+          @RestController
+          class $C { ... }
+      - pattern-either:
+          - pattern: private final $T $F;
+          - pattern: private $T $F;
+      - metavariable-regex:
+          metavariable: $T
+          regex: ^\w*Repository$
+    metadata: {category: C5, claude_md: "§4"}
+
+  - id: C5-controller-uses-entitymanager
+    message: "Controller $C uses EntityManager/JdbcTemplate directly. Data access belongs in repositories behind services."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-inside: |
+          @RestController
+          class $C { ... }
+      - pattern-either:
+          - pattern: private final EntityManager $F;
+          - pattern: private final JdbcTemplate $F;
+          - pattern: private final NamedParameterJdbcTemplate $F;
+    metadata: {category: C5, claude_md: "§4"}
+
+  # ───────── C6 API standards ─────────
+  - id: C8-log-secret
+    message: "Log statement includes a secret-like value. Log IDs and states only."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-inside: $LOG.$L(...)
+      - metavariable-regex:
+          metavariable: $LOG
+          regex: (?i)^(log|logger)$
+      - metavariable-regex:
+          metavariable: $L
+          regex: ^(trace|debug|info|warn|error)$
+      - pattern-either:
+          - pattern: $X
+          - pattern: $O.$X
+          - pattern: $O.$X()
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i)^(get)?(password|passwd|pwd|secret|clientsecret|token|accesstoken|refreshtoken|jwt|apikey|api_key|credentials?|rawpassword)$
+    metadata: {category: C8, claude_md: "§13h"}
+
+  - id: C8-system-out
+    message: "System.out/err in production code. Use @Slf4j logging."
+    severity: WARNING
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: System.out.$M(...)
+      - pattern: System.err.$M(...)
+    metadata: {category: C8, claude_md: "§13h"}
+
+  # ───────── C9 Exceptions ─────────
+  - id: C9-stacktrace-exposed
+    message: "Stack trace printed or returned. Never expose stack traces; log server-side via @Slf4j."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: $E.printStackTrace()
+      - pattern: $E.getStackTrace()
+      - pattern: ExceptionUtils.getStackTrace($E)
+    metadata: {category: C9, claude_md: "§13i"}
+
+  - id: C11-hardcoded-secret
+    message: "Hard-coded credential in '$NAME'. Read secrets from environment variables."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-either:
+          - pattern: String $NAME = "$V";
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(password|passwd|secret|apikey|api_key|privatekey|jwtsecret|token).*
+      - metavariable-regex:
+          metavariable: $V
+          regex: ^.{6,}$
+    metadata: {category: C11, claude_md: "§10, §14"}
+
+  - id: C11-secret-default-in-placeholder
+    message: "Secret placeholder has a hard-coded default ($P). A missing env var must fail startup, not fall back to a committed secret."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    patterns:
+      - pattern-either:
+          - pattern: '@Value("$P")'
+          - pattern: '@Value(value = "$P")'
+      - metavariable-regex:
+          metavariable: $P
+          regex: (?i)^\$\{[A-Za-z0-9_.-]*(secret|password|passwd|token|api[-_.]?key|private[-_.]?key|credential)[A-Za-z0-9_.-]*:[^}]+\}$
+    metadata: {category: C11, claude_md: "§14"}
+
+  - id: C11-sql-string-concat
+    message: "SQL built by string concatenation (injection risk). Use bind parameters (code-review C11)."
+    severity: ERROR
+    languages: [java]
+    paths: {exclude: ["**/src/test/**"]}
+    pattern-either:
+      - pattern: $EM.createQuery("..." + $X, ...)
+      - pattern: $EM.createQuery("..." + $X)
+      - pattern: $EM.createNativeQuery("..." + $X, ...)
+      - pattern: $EM.createNativeQuery("..." + $X)
+      - pattern: $J.query("..." + $X, ...)
+      - pattern: $J.queryForObject("..." + $X, ...)
+      - pattern: $J.queryForList("..." + $X, ...)
+      - pattern: $J.update("..." + $X, ...)
+      - pattern: $J.execute("..." + $X)
+      - pattern: $S.executeQuery("..." + $X)
+      - pattern: $S.executeUpdate("..." + $X)
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  String $SQL = "..." + $X + ...;
+                  ...
+              - pattern-inside: |
+                  String $SQL = "..." + $X;
+                  ...
+              - pattern-inside: |
+                  $SQL += $X;
+                  ...
+          - pattern-either:
+              - pattern: $J.$Q($SQL, ...)
+              - pattern: $J.$Q($SQL)
+          - metavariable-regex:
+              metavariable: $Q
+              regex: ^(query|queryForObject|queryForList|queryForMap|queryForRowSet|update|execute|batchUpdate|createQuery|createNativeQuery|executeQuery|executeUpdate|prepareStatement)$
+    metadata: {category: C11, claude_md: "C11"}
+
+  - id: C11-yaml-literal-secret
+    message: "Secret value hard-coded in config. Use ${ENV_VAR} placeholders."
+    severity: ERROR
+    languages: [yaml]
+    paths: {include: ["**/src/main/resources/**"]}
+    patterns:
+      - pattern: "$KEY: $VAL"
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: (?i)^(secret|jwt-secret|jwtsecret|password|api-key|apikey)$
+      - metavariable-regex:
+          metavariable: $VAL
+          regex: ^(?!\$\{)(?!\s*$).{4,}
+    metadata: {category: C11, claude_md: "§14"}
