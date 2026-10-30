@@ -2,7 +2,7 @@
 # marketdata-service — reference
 
 <!-- plumbline:begin reference -->
-Last updated: 4369a80 (2026-10-30, /pl-onboard, claude-reference v1)
+Last updated: 4586741 (2026-10-30, /pl-onboard, claude-reference v1)
 
 ## API
 

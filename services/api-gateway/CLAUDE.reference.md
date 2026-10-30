@@ -2,7 +2,7 @@
 # api-gateway — reference
 
 <!-- plumbline:begin reference -->
-Last updated: 4369a80 (2026-10-30, /pl-onboard, claude-reference v1)
+Last updated: 4586741 (2026-10-30, /pl-onboard, claude-reference v1)
 
 ## API
 The gateway defines no REST controllers of its own. All paths are transparent proxy routes. The table below lists every route from `application.yml` plus the SSE path handled by `SseProxyFilter`.
@@ -112,7 +112,7 @@ TODO/FIXME count: **0** — no TODO, FIXME, HACK, or XXX comments found in any s
 
 Other debt:
 
-1. ~~**Dockerfile port mismatch**~~ — Fixed: `EXPOSE` updated to 9090 in Dockerfile (decided 2026-10-30).
+1. **Dockerfile port mismatch** — `EXPOSE 8080` in Dockerfile but service listens on port 9090 (`server.port` in `application.yml`). Commit `4586741` reverted the Dockerfile fix; the mismatch is active. [code: Dockerfile, application.yml]
 2. **No retry or circuit-breaker on Gateway MVC routes** — upstream failures pass through to the client as raw errors; no Resilience4j or retry filter is configured in `application.yml`.
 3. **No rate limiting** — the gateway has no request-rate-limiting filter; all route predicates are path-only.
 4. **No request-ID propagation** — error responses generate a `requestId` UUID locally (`JwtValidationFilter`) but there is no correlation-ID header forwarded to downstream services for distributed tracing.
@@ -122,7 +122,7 @@ Other debt:
 
 ## Open questions
 
-1. ~~**Dockerfile EXPOSE 8080 vs. application port 9090**~~ — Resolved: Dockerfile updated to `EXPOSE 9090` (decided 2026-10-30).
+1. **Dockerfile EXPOSE 8080 vs. application port 9090** — The Dockerfile exposes port 8080 but the service runs on port 9090. Commit `4586741` reverted a prior fix; the mismatch is currently unresolved. Docker port mapping or Kubernetes Service definitions pointing at 8080 will fail to reach the gateway.
 2. **JWT_SECRET sharing convention** — The gateway and auth-service must share the same `JWT_SECRET`. How this is distributed in production (secrets manager, Kubernetes secret, Vault) is not documented in this service.
 3. **Redis blacklist TTL** — The gateway only checks for key existence; the TTL policy for blacklisted tokens is set by auth-service and is unknown from this service's code alone.
 4. **`/api/v1/auth/**` JWT requirement** — Only `/api/v1/auth/login` is explicitly public. The route predicate covers the entire `/api/v1/auth/**` tree, but `JwtValidationFilter` will block non-login auth paths without a token. Whether auth-service has other public endpoints (e.g. `/api/v1/auth/refresh`) is not visible here.
