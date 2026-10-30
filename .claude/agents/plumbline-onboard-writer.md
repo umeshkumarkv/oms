@@ -20,6 +20,18 @@ true of the code today — search for it before you write it.
 - on a retry, the judge's findings: fix every one, or answer it in one line under "Open questions" if the code shows
   the finding is wrong.
 
+## Modes
+- **new** — write both files from the code.
+- **update** (files exist; you get the template check and judge findings) — edit in place: keep every line that is
+  still true, fix exactly what failed, add what the current template requires (its version goes in `Last updated`);
+  do not rewrite, reorder or re-word the rest. This is cheaper and keeps what reviewers already approved.
+
+## Existing docs
+Text outside the markers (the team's own CLAUDE.md, README) is never edited. Read it: every **technical claim** in it
+that the code contradicts goes in your reply as `Docs vs code: <claim> — <what the code does> — <files>`; conventions
+the code does not contradict (money types, logging, naming, tests) become `[decided docs: <file §section>]` rules —
+pointing to the section, not copying it.
+
 ## Rules
 - **Merge, never overwrite.** Write only between `<!-- plumbline:begin unit -->` and `<!-- plumbline:end unit -->`
   (root file: `plumbline:begin solution` / `plumbline:end solution`). Keep everything outside the markers exactly as
@@ -45,9 +57,10 @@ every merge.
    files hard-code absolute paths (log folders, data files) that startup or tests depend on, list them here.
 3. **Architecture & structure** — stack and versions (language, framework, build, database), the layers and patterns
    the code follows (e.g. controller → service → repository, events, DTO mapping), main packages and what lives where.
-4. **Security** — authentication, authorization (roles), where tokens are stored, how identity reaches this unit and
-   where it is verified, and whether the unit is reachable without that check (published ports, k8s Service type) —
-   with the files. A check that can be bypassed is a risk: say so plainly; it also goes in the root's Decisions needed.
+4. **Security** — the three template fields first: `Identity`, `Verified at`, and `Reachable without that check` for
+   **every** environment the repository deploys to (read `docker-compose*.yml`, `k8s/`, Helm: published ports, Service
+   type, ingress). "The gateway is the trust boundary" is not an answer — say where it holds and where it does not.
+   Then roles and token storage, with files. A reachable-without-the-check unit goes in your reply as `Security risk:`.
 5. **Rules** — one line each, tagged with where it comes from: `[code: <file>]` = the code enforces it today;
    `[decided <source>]` = a person decided it (root CLAUDE.md, ADR, README, an approved story). Onboarding writes
    `[decided]` only where a document states the decision; everything else is `[code]`.
@@ -86,10 +99,12 @@ Write it on `.github/plumbline/templates/claude-root.md` (its headings exactly),
   `Confluence parent page`, `Base branch`, `Workflow`; add
   `PR target`, `Branch pattern`, `API URL` and `Frontend URL` if missing (URLs from the config: e.g.
   `http://localhost:<gateway or backend port>`). Values marked `(decided <date>)` are never changed.
-- **Decisions needed** — every secret from the scan you were given (file and key, never a value), every unit's
-  security risk, and every place where the repository's own docs (README, existing CLAUDE.md text, CONTRIBUTING),
+- **Decisions needed** — starts with the `Secrets found` field (file:key from the scan, never a value, or none);
+  then every `Security risk:` and `Docs vs code:` line the unit writers reported, and every place where the repository's own docs (README, existing CLAUDE.md text, CONTRIBUTING),
   the settings and the code disagree about how work is done: base/PR branch, branch naming, ticket key, test command,
   environments. One line each: the two sides with their files. "None" if there are none.
+- **Conventions** — how code is written here: money types, error handling, logging, naming, test requirements — from
+  existing docs (`[decided docs: …]`) or a pattern the code follows consistently (`[code: …]`); never invented.
 - **Rules for every change** — the cross-cutting rules (security, data ownership, testing).
 
 **If writing a file is refused** (Claude Code may stop helpers from writing report-like files), put the complete

@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # {{unit name}}
 
 <!-- plumbline:begin unit -->
-Last updated: {{commit}} ({{date}}, {{/pl-command}}, claude-unit v1)
+Last updated: {{commit}} ({{date}}, {{/pl-command}}, claude-unit v2)
 
 ## Purpose
 {{what this unit does, in 3–5 lines}}
@@ -14,7 +14,10 @@ Last updated: {{commit}} ({{date}}, {{/pl-command}}, claude-unit v1)
 {{stack and versions, layers and patterns, main packages and what lives where}}
 
 ## Security
-{{authentication, roles, where tokens are stored — with the files}}
+- Identity: {{how the user's identity reaches this unit — JWT, gateway headers, session, none}}
+- Verified at: {{the file that verifies it, or "not verified here"}}
+- Reachable without that check: {{per environment the repo deploys to — e.g. "docker-compose: yes, port 8085 published; k8s: no, ClusterIP" — with files}}
+{{roles, token storage and other details, with files}}
 
 ## Rules
 {{one line each, tagged [code: <file>] or [decided <source>]}}
