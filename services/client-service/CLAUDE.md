@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # client-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 Manages broker-dealer client (customer) accounts. Owns client profiles, KYC state, cash balances,
@@ -27,16 +27,11 @@ Port: **8083**. No active Spring profiles; configuration via environment variabl
 - **Virtual threads:** enabled (`spring.threads.virtual.enabled: true`)
 
 ## Security
-No Spring Security. RBAC enforced by `RoleAuthorizationFilter` (`filter/RoleAuthorizationFilter.java`), a `OncePerRequestFilter` reading the `X-User-Role` header forwarded by the API gateway.
-- Missing/blank `X-User-Role` → HTTP 401; unrecognised/insufficient role → HTTP 403.
-- Role permission matrix:
-  - `GET /api/v1/clients/**` — VIEWER, TRADER, OPERATIONS, ADMIN
-  - `GET /api/v1/clients/active` — TRADER, OPERATIONS, ADMIN (VIEWER denied)
-  - `GET /api/v1/clients/{id}/portfolio` — VIEWER, TRADER, OPERATIONS, SYSTEM (**ADMIN denied**, BRD 12.2)
-  - `PATCH /api/v1/clients/{id}/default-route` — ADMIN only
-  - `PATCH /api/v1/clients/{id}/reserved-cash` — exempt from role check (legacy system-to-system, endpoint removed)
-  - `/actuator/**` and `OPTIONS` — excluded from filter
-- Tokens are not parsed by this service; auth is delegated to the gateway.
+- Identity: `X-User-Role` header forwarded by api-gateway; no JWT parsing.
+- Verified at: filter/RoleAuthorizationFilter.java
+- Reachable without that check: docker-compose: yes, port 8083 published (docker-compose.yml); k8s: no, ClusterIP (k8s/services/client-service-service.yaml).
+- No Spring Security; missing/blank role → 401; insufficient role → 403. [code: filter/RoleAuthorizationFilter.java]
+- Role matrix: `GET /clients/**` VIEWER+; `GET /clients/active` TRADER+; `GET /clients/{id}/portfolio` VIEWER/TRADER/OPERATIONS/SYSTEM (ADMIN denied — BRD 12.2); `PATCH /clients/{id}/default-route` ADMIN only. [code: filter/RoleAuthorizationFilter.java]
 
 ## Rules
 - `limit` for `/active` must be 1–50 inclusive; outside values throw `VALIDATION_ERROR` [code: service/ClientService.java]

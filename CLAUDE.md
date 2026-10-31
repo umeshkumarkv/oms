@@ -1,12 +1,12 @@
-<!-- plumbline:template claude-root v2 -->
+<!-- plumbline:template claude-root v3 -->
 # Broker-Dealer OMS
 
 <!-- plumbline:begin solution -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-root v2)
+Last updated: 39916bd (2026-10-31, /pl-onboard, claude-root v3)
 
 ## Solution
 
-POC multi-service order management system covering the full pre-trade-to-post-trade lifecycle: client onboarding, order submission + state machine, pre-trade risk evaluation, simulated fills, market-data WebSocket ticks, audit trail, SSE notifications. All external traffic enters through Spring Cloud Gateway MVC on port 9090 (JWT validation, Redis blacklist, `X-User-Id`/`X-Username`/`X-User-Role` injection). React frontend on port 3000.
+POC order management system: client onboarding, order submission + state machine, pre-trade risk, simulated fills, market-data WebSocket ticks, audit trail, SSE notifications. External traffic enters via Spring Cloud Gateway MVC (port 9090, JWT validation, Redis blacklist, `X-User-Id`/`X-Username`/`X-User-Role` injection). React frontend on port 3000.
 
 ## Units
 
@@ -25,7 +25,7 @@ POC multi-service order management system covering the full pre-trade-to-post-tr
 
 ## How they connect
 
-**Shared infrastructure:** PostgreSQL 15 (`brokerdealer` DB, per-service schemas), Redis 7, Confluent Kafka 7.5.0 (Zookeeper) — all on Docker network `broker-dealer-net`.
+**Shared infrastructure:** PostgreSQL 15 (`brokerdealer` DB, per-service schemas), Redis 7, Kafka 7.5.0 — Docker network `broker-dealer-net`.
 
 **Service-to-service HTTP (bypass gateway):**
 
@@ -47,32 +47,23 @@ POC multi-service order management system covering the full pre-trade-to-post-tr
 | `order.execution.requested` | order-service | execution-service | Route to fill engine |
 | `execution.completed` | execution-service | audit, notification, client | Fill result |
 
-DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.completed.DLT`; 1 s→2 s→4 s back-off, 3 attempts.
+DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.completed.DLT`; 1 s→2 s→4 s, 3 attempts.
 
-**Gateway routing:** all `/api/v1/**` routed to downstream services; `SseProxyFilter` streams `/api/v1/notifications/stream` directly to notification-service:8088.
+**Gateway routing:** `/api/v1/**` → downstream services; `SseProxyFilter` streams `/api/v1/notifications/stream` direct to notification-service:8088.
 
-**Redis usage per service:**
-
-| Service | Keys / purpose |
-|---|---|
-| api-gateway / auth-service | `auth:blacklist:<token>` — gateway reads; auth-service writes on logout |
-| order-service | Dashboard/status-count keys, 15 s TTL |
-| client-service | `client:active-ranked:today:{limit}`, `client:portfolio:{id}`, `client:balance:{id}` — 30 s TTL |
-| marketdata-service | Price, search, movers, indices — 10–60 s TTL |
-| execution-service / risk-service | Execution result cache (30 s TTL); `dup:{clientId}:{symbol}:{side}:{qty}:{limitPrice\|MARKET}` duplicate detection (30 s TTL) |
-| audit-service | Cache manager wired but no `@Cacheable` active (future use) |
+**Redis:** `auth:blacklist:<token>` (api-gateway/auth-service); dashboard keys 15 s (order); portfolio/balance/active-ranked 30 s (client); price/search/indices 10–60 s (market); dup-detect + execution cache 30 s (execution/risk); cache wired, unused (audit).
 
 ## Architecture
 
-**Stack:** Java 21 · Spring Boot 3.2.4 · Spring Cloud 2023.0.1 (gateway) · Maven multi-module (`broker-dealer-parent`) · `mvn clean verify` (CI) / `mvn test` (per service) · PostgreSQL 15 (Flyway, `ddl-auto: validate`) · Kafka 7.5.0 (`Map<String,Object>` consumers) · Redis 7 Alpine · JJWT 0.12.3 (HS256) · Lombok 1.18.30 · MapStruct 1.5.5.Final · Resilience4j 2.2.0 · JaCoCo 0.8.11 · `amazoncorretto:21-alpine` · virtual threads everywhere.
+**Stack:** Java 21 · Spring Boot 3.2.4 · Spring Cloud 2023.0.1 (gateway) · Maven multi-module · PostgreSQL 15 (Flyway) · Kafka 7.5.0 · Redis 7 Alpine · JJWT 0.12.3 (HS256) · Lombok 1.18.30 · MapStruct 1.5.5.Final · Resilience4j 2.2.0 · JaCoCo 0.8.11 · amazoncorretto:21-alpine · virtual threads.
 
 **Cross-cutting:**
 - **Auth:** JWT HS256 at api-gateway only; downstream trusts forwarded headers. notification-service validates JWT directly (SSE bypasses gateway).
 - **Authz:** `RoleAuthorizationFilter` in every service; no Spring Security. Roles: VIEWER/TRADER/OPERATIONS/ADMIN/SYSTEM. BRD 12.2 blocks ADMIN on order-write and market-data-read.
 - **Error envelope:** `{"error":{...},"meta":{...}}` / `{"data":{...},"meta":{...}}` via `GlobalExceptionHandler`.
 - **Money:** `BigDecimal`; serialised as plain strings; never `double`/`float`.
-- **Kafka errors:** 1 s→2 s→4 s back-off, 3 attempts, then `DeadLetterPublishingRecoverer`.
-- **Resilience4j:** CB on all outbound HTTP in order-service, client-service, execution-service (window 10, 50 % threshold, 10 s wait).
+- **Kafka errors:** 1 s→2 s→4 s, 3 attempts, then `DeadLetterPublishingRecoverer`.
+- **Resilience4j:** CB on outbound HTTP in order-service, client-service, execution-service (window 10, 50 %, 10 s wait).
 - **JaCoCo:** 80 % line coverage in audit-service and notification-service.
 
 ## Decisions & trade-offs
@@ -90,6 +81,13 @@ DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.com
 | GTC → GTD — BRD §14 rename via `V4__rename_gtc_to_gtd.sql` | order-service CLAUDE.md |
 | Virtual threads platform-wide — `spring.threads.virtual.enabled: true`; no `ThreadLocal` middleware | `application.yml` |
 
+## Conventions
+
+- Logging: `com.brokerdealer` INFO; `org.springframework.kafka` WARN (downstream services; api-gateway logs `org.springframework.cloud.gateway` at WARN instead). [code: application.yml]
+- Kafka consumers: `Map<String, Object>`, `USE_TYPE_INFO_HEADERS=false`. [code: config/KafkaConfig.java]
+- Flyway schema: one schema per service, `ddl-auto: validate`, `baseline-on-migrate: true`. [code: application.yml]
+- Virtual threads: `spring.threads.virtual.enabled: true` platform-wide; no `ThreadLocal` middleware. [code: application.yml]
+
 ## Plumbline settings
 
 - JIRA project: OMS
@@ -102,15 +100,18 @@ DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.com
 - API URL: http://localhost:9090
 - Frontend URL: http://localhost:3000
 - Frontend build: `./frontend` source context; `docker-compose.yml` supports both local build and pre-built image pull (decided 2026-10-30)
-- JWT_SECRET: local-dev placeholder only; inject via Vault, Kubernetes Secret, or CI secret variable in non-local environments (decided 2026-10-30)
+- JWT_SECRET: local-dev placeholder; inject via Vault, Kubernetes Secret, or CI env var in non-local environments (decided 2026-10-30)
 
 ## Decisions needed
 
-None — all items settled 2026-10-30.
+- Secrets found: `k8s/secret.yaml`: JWT_SECRET, POSTGRES_PASSWORD (base64 dev values); `docker-compose.yml`: JWT_SECRET, POSTGRES_PASSWORD, SPRING_DATASOURCE_PASSWORD — plaintext dev values; rotate before non-local deployment.
+- Reachable without check: backend services publish docker-compose ports (8081–8088, 9090) — direct calls bypass api-gateway; service-to-service HTTP also bypasses it. k8s: backend ClusterIP; frontend NodePort. Apply network controls in production.
+- Docs vs code: order-service `filter/RoleAuthorizationFilter.java` — ADMIN in ORDER_READ_ROLES despite "excluded per BRD 12.2" Javadoc; verify intent.
+- Docs vs code: audit-service `filter/RoleAuthorizationFilter.java` — ADMIN in AUDIT_READ_ROLES despite "excluded per BRD 12.2" Javadoc; verify intent.
 
 ## Rules for every change
 
-- **Security — JWT_SECRET:** Never hardcode; supply via env var; rotate immediately if exposed. [code: api-gateway `JwtValidationFilter.java`, auth-service `JwtService.java`, notification-service `JwtAuthenticationFilter.java`]
+- **Security — JWT_SECRET:** Never hardcode; supply via env var; rotate immediately if exposed.
 - **Security — identity headers:** `X-User-Id`/`X-Username`/`X-User-Role` must originate from api-gateway only; network controls enforce this in production.
 - **Security — no Spring Security bypass:** Do not add `permitAll()` on authenticated paths; `RoleAuthorizationFilter` is the sole RBAC layer per service.
 - **Security — BRD 12.2:** ADMIN must be denied order-write (`POST /api/v1/orders`) and market-data-read (`GET /api/v1/market/**`); check both `RoleAuthorizationFilter` instances when changing role rules.

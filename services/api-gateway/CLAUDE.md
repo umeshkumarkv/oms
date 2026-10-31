@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # api-gateway
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 The api-gateway is the single entry point for all Broker-Dealer OMS traffic on port 9090. It validates JWTs on every inbound request (except `/api/v1/auth/login` and `/actuator/**`), checks revoked tokens against a Redis blacklist, injects identity headers (`X-User-Id`, `X-Username`, `X-User-Role`) for downstream services, and routes to microservices via Spring Cloud Gateway MVC. SSE streaming from notification-service is handled by a dedicated servlet-level proxy filter.
@@ -28,13 +28,12 @@ Layers:
 Packages: `com.brokerdealer.apigateway` (main), `.config` (3 configs), `.filter` (2 filters).
 
 ## Security
-- JWT Bearer HS256 validated by `JwtValidationFilter`; secret from `JWT_SECRET` env var (no default). [code: filter/JwtValidationFilter.java]
-- Redis blacklist key `auth:blacklist:<token>` checked before forwarding. [code: filter/JwtValidationFilter.java]
-- Public paths (no JWT required): `/api/v1/auth/login`, `/actuator/**`. [code: filter/JwtValidationFilter.java, config/SecurityConfig.java]
-- Session: stateless; CSRF disabled. [code: config/SecurityConfig.java]
-- Identity headers `X-User-Id`, `X-Username`, `X-User-Role` injected from JWT claims; raw `Authorization` header not forwarded (SSE proxy re-forwards it). [code: filter/JwtValidationFilter.java]
+- Identity: JWT Bearer HS256; secret from `JWT_SECRET` env var (no default). [code: filter/JwtValidationFilter.java]
+- Verified at: filter/JwtValidationFilter.java — checks signature, expiry, and Redis blacklist (`auth:blacklist:<token>`) before any route is reached.
+- Reachable without that check: docker-compose yes — port 9090 published to host; k8s no — ClusterIP only (k8s/services/api-gateway-service.yaml). Public paths exempt from JWT: `/api/v1/auth/login`, `/actuator/**`. [code: filter/JwtValidationFilter.java, config/SecurityConfig.java]
+- Identity headers `X-User-Id`, `X-Username`, `X-User-Role` injected from JWT claims. [code: filter/JwtValidationFilter.java]
 - Role enforcement is in downstream services; gateway uses `anyRequest().permitAll()` after JWT check. [code: config/SecurityConfig.java]
-- Reachable on port 9090; `/api/v1/auth/login` and `/actuator/**` bypass JWT — intentionally open, no additional network controls in dev.
+- Session: stateless; CSRF disabled. [code: config/SecurityConfig.java]
 
 ## Rules
 - All non-public requests require a valid, non-blacklisted Bearer JWT; gateway returns 401 otherwise. [code: filter/JwtValidationFilter.java]
@@ -59,12 +58,7 @@ Packages: `com.brokerdealer.apigateway` (main), `.config` (3 configs), `.filter`
 - Redis blacklist prefix `auth:blacklist:`: shared convention with auth-service. Source: `JwtValidationFilter.java` constant `BLACKLIST_PREFIX`.
 
 ## Reference
-API — 11 gateway routes + 1 SSE proxy path. See CLAUDE.reference.md API section.
-Data — Redis blacklist key schema only; no owned database. See CLAUDE.reference.md Data section.
-Integrations — 8 downstream HTTP services + Redis. See CLAUDE.reference.md Integrations section.
-Configuration — 6 config keys / env vars. See CLAUDE.reference.md Configuration section.
-Tech debt — TODO/FIXME count and locations. See CLAUDE.reference.md Tech debt section.
-Open questions — Dockerfile port mismatch and other gaps. See CLAUDE.reference.md Open questions section.
+API — 11 routes + 1 SSE proxy; Data — Redis blacklist only; Integrations — 8 downstream services + Redis; Configuration — 6 keys; Tech debt — 0 TODO/FIXME, 7 items; Open questions — 6 items.
 
 Open CLAUDE.reference.md only for the section your task needs.
 <!-- plumbline:end unit -->

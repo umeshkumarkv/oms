@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # execution-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 
@@ -28,11 +28,10 @@ Test recipe: `mvn test` · Java 21 required · **FAILED** — `ExceptionInInitia
 - **Async:** tranche-2 partial fills via `@Async` on virtual-thread executor (`spring.threads.virtual.enabled: true`).
 
 ## Security
-
-- No Spring Security. `RoleAuthorizationFilter` reads `X-User-Role` forwarded by the gateway; no JWT parsing here. [code: `filter/RoleAuthorizationFilter.java`]
-- `/actuator/**` and `OPTIONS` bypass the filter — risk: reachable without auth. [code: `filter/RoleAuthorizationFilter.java`]
-- `GET /api/v1/executions/**` — VIEWER, TRADER, OPERATIONS, ADMIN allowed; all other paths → 403. [code: `filter/RoleAuthorizationFilter.java`]
-- Missing `X-User-Role` → 401 UNAUTHORIZED. [code: `filter/RoleAuthorizationFilter.java`]
+- Identity: `X-User-Role` header from api-gateway; no JWT parsing here.
+- Verified at: filter/RoleAuthorizationFilter.java
+- Reachable without that check: docker-compose: yes, port 8086 published (docker-compose.yml); k8s: no, ClusterIP (k8s/services/execution-service-service.yaml).
+- `GET /api/v1/executions/**` — VIEWER/TRADER/OPERATIONS/ADMIN; missing role → 401; actuator/OPTIONS bypass filter. [code: filter/RoleAuthorizationFilter.java]
 
 ## Rules
 
@@ -58,11 +57,11 @@ Test recipe: `mvn test` · Java 21 required · **FAILED** — `ExceptionInInitia
 
 ## Decisions & trade-offs
 
-- **Mock fill engine:** Deterministic simulation avoids external venue dependency while exercising the full fill lifecycle. [code: `service/FillSimulationService.java` comment; `openapi.yaml`]
-- **Role filter without Spring Security:** Gateway authenticates; downstream uses only forwarded `X-User-Role`. [code: `filter/RoleAuthorizationFilter.java`]
-- **Tranche-2 async delay:** Simulates realistic partial-fill latency via `@Async` + virtual threads. [code: `service/FillSimulationService.java`]
-- **V4 constraint relaxation (SCRUM-99):** `executed_qty > 0` → `>= 0` to allow REJECTED fills with qty=0. [code: `V4__relax_executed_qty_check_for_rejected_fills.sql`]
-- **V3 schema expansion (SCRUM-48):** Added fill_type, fill_value, remaining_quantity, market_price_at_fill, execution_venue, client_id and `pending_order_executions` table. [code: `V3__add_fill_fields_and_pending_table.sql`]
+- Mock fill engine — deterministic simulation avoids external venue dependency. [code: service/FillSimulationService.java]
+- Role filter without Spring Security — gateway authenticates; downstream uses forwarded `X-User-Role`. [code: filter/RoleAuthorizationFilter.java]
+- Tranche-2 async delay — simulates partial-fill latency via `@Async` + virtual threads. [code: service/FillSimulationService.java]
+- V4 constraint relaxation (SCRUM-99) — `executed_qty > 0` → `>= 0` for REJECTED fills. [code: V4__relax_executed_qty_check_for_rejected_fills.sql]
+- V3 schema expansion (SCRUM-48) — added fill fields and `pending_order_executions` table. [code: V3__add_fill_fields_and_pending_table.sql]
 
 ## Reference
 

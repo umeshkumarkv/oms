@@ -1,12 +1,12 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # auth-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 
-auth-service is the authentication and user-management microservice of the Broker-Dealer OMS. It validates credentials against BCrypt-hashed passwords in PostgreSQL, issues HS256 JWTs (30-minute TTL), and blacklists invalidated tokens in Redis. It provides ADMIN-only user lifecycle endpoints (create, list, activate/deactivate). No other service calls auth-service at runtime; the API Gateway validates JWTs autonomously after initial issuance.
+auth-service issues HS256 JWTs (30-minute TTL), validates login credentials against BCrypt hashes in PostgreSQL, and blacklists revoked tokens in Redis. It provides ADMIN-only user lifecycle endpoints. The API Gateway validates JWTs autonomously; no other service calls auth-service at runtime.
 
 ## Build & run
 
@@ -20,21 +20,21 @@ Required env vars: `JWT_SECRET` (no default; absent = startup failure), `SPRING_
 
 ## Architecture & structure
 
-**Stack:** Java 21, Spring Boot 3.2.4, Spring Security, Spring Data JPA/Redis, Flyway, PostgreSQL, Redis, JJWT 0.12.x (HS256), Kafka (wired, unused), Lombok, MapStruct (declared, unused), Resilience4j (wired, unused), springdoc-openapi, Maven.
+**Stack:** Java 21, Spring Boot 3.2.4, Spring Security, Spring Data JPA/Redis, Flyway, PostgreSQL, Redis, JJWT 0.12.x (HS256), Lombok; Kafka/MapStruct/Resilience4j wired but unused, springdoc-openapi, Maven.
 
-**Layers:** `controller/` (REST, envelope responses) → `service/` (`AuthService` login/logout/me; `JwtService` sign/validate/blacklist; `UserService` CRUD) → `repository/` (`UserRepository extends JpaRepository<User, UUID>`) → `domain/` (`User` entity; `UserRole`, `UserStatus` enums) · `dto/` (request/response DTOs; manual mapping in `UserService.toResponse()`) · `config/` (`SecurityConfig`, `RoleHeaderAuthenticationFilter`, `KafkaConfig`, `RedisConfig`) · `exception/` (`GlobalExceptionHandler @RestControllerAdvice`).
+**Layers:** `controller/` → `service/` (`AuthService`, `JwtService`, `UserService`) → `repository/` (`UserRepository extends JpaRepository<User, UUID>`) → `domain/` (`User`, `UserRole`, `UserStatus`) · `dto/` (manual mapping) · `config/` (`SecurityConfig`, `RoleHeaderAuthenticationFilter`) · `exception/` (`GlobalExceptionHandler`).
 
 Root package: `com.brokerdealer.authservice`. Flyway manages `auth_schema` (11 scripts, V1–V2, V4–V12; V3 absent); Hibernate `ddl-auto: validate`.
 
 ## Security
 
-**JWT validation:** Stateless. auth-service validates JWTs in its own service layer (`AuthService`) for `/auth/*`. No `UserDetailsService`. `JWT_SECRET` env var; 30-min expiry; claims: `userId`, `username`, `role`. Blacklisted under `auth:blacklist:<token>` in Redis (TTL = remaining lifetime). [code: service/JwtService.java]
-
-**User-endpoint authorization:** `RoleHeaderAuthenticationFilter` reads the gateway-injected `X-User-Role` header, builds `UsernamePasswordAuthenticationToken(ROLE_<value>)`. URL-level `permitAll()`; `@EnableMethodSecurity` + `@PreAuthorize("hasRole('ADMIN')")` guards `/users/*`. Risk: spoofing possible without network-level isolation. [code: config/RoleHeaderAuthenticationFilter.java]
-
-**Password hashing:** BCrypt strength 10 (`config/SecurityConfig.java`). No session, no cookie.
-
-**Self-deactivation guard:** Admin cannot set own account INACTIVE; `UserService.updateUserStatus` compares `X-User-Id` header with target userId. [code: service/UserService.java]
+- Identity: Inbound requests from api-gateway. `/auth/*` endpoints use JWT Bearer HS256 validated by JwtService. `/users/*` endpoints trust `X-User-Role` header injected by api-gateway.
+- Verified at: `service/JwtService.java` (JWT signature/expiry/blacklist); `config/RoleHeaderAuthenticationFilter.java` (role header)
+- Reachable without that check: docker-compose: yes, port 8081 published to host (`docker-compose.yml`); k8s: no, ClusterIP (`k8s/services/auth-service-service.yaml`). Direct callers can inject arbitrary `X-User-Role` header without gateway.
+- JWT validation: stateless; `JWT_SECRET` env var; 30-min expiry; claims: `userId`, `username`, `role`; blacklisted under `auth:blacklist:<token>` in Redis (TTL = remaining lifetime). [code: service/JwtService.java]
+- User-endpoint authorization: `RoleHeaderAuthenticationFilter` reads gateway-injected `X-User-Role`, builds `UsernamePasswordAuthenticationToken(ROLE_<value>)`; `@PreAuthorize("hasRole('ADMIN')")` guards `/users/*`. [code: config/RoleHeaderAuthenticationFilter.java]
+- Password hashing: BCrypt strength 10; no session, no cookie. [code: config/SecurityConfig.java]
+- Self-deactivation guard: admin cannot set own account INACTIVE; `UserService.updateUserStatus` compares `X-User-Id` header with target userId. [code: service/UserService.java]
 
 ## Rules
 
@@ -60,11 +60,11 @@ Root package: `com.brokerdealer.authservice`. Flyway manages `auth_schema` (11 s
 
 ## Decisions & trade-offs
 
-- **Gateway owns downstream JWT validation; auth-service validates only its own endpoints.** Avoids synchronous auth hop on every downstream request. [code: SecurityConfig.java comment]
-- **`X-User-Role` trusted unconditionally by `RoleHeaderAuthenticationFilter`.** Gateway and network controls are the spoofing defence, not the filter. [code: SecurityConfig.java comment]
-- **No refresh tokens.** 30-minute TTL with blacklist-on-logout; clients re-authenticate after expiry. No source documents the reason.
-- **MapStruct declared but unused.** `pom.xml` includes the dependency; `UserService.toResponse()` maps manually. No source explains the gap.
-- **Virtual threads enabled.** `spring.threads.virtual.enabled: true` in `application.yml`. [decided: application.yml]
+- Gateway owns downstream JWT validation; auth-service validates only its own endpoints — avoids synchronous auth hop on every downstream request. [code: SecurityConfig.java comment]
+- `X-User-Role` trusted unconditionally by `RoleHeaderAuthenticationFilter` — gateway and network controls are the spoofing defence. [code: SecurityConfig.java comment]
+- No refresh tokens — 30-minute TTL with blacklist-on-logout; no documented reason. [code: service/JwtService.java]
+- MapStruct declared but unused — `UserService.toResponse()` maps manually; no documented reason. [code: pom.xml]
+- Virtual threads enabled. [decided: application.yml]
 
 ## Reference
 

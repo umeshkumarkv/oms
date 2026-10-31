@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # order-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 The order-service is the core order lifecycle engine for the Broker-Dealer OMS. It accepts order submissions from traders via REST, runs two-level pre-trade validation (bean + semantic/external), publishes events to Kafka for risk evaluation and execution, and drives all order state transitions through a state machine. It owns the sole authoritative `orders` table in PostgreSQL (`order_schema`) and caches hot reads in Redis.
@@ -30,25 +30,25 @@ Layer pattern: `controller` → `service` → `repository` (JPA + Specifications
 Virtual threads enabled; `JdkClientHttpRequestFactory`. Kafka DLT: exponential backoff 1→2→4 s, 3 attempts.
 
 ## Security
-- No Spring Security. `RoleAuthorizationFilter` reads `X-User-Role` from gateway. [code: filter/RoleAuthorizationFilter.java]
-- `POST /api/v1/orders` TRADER only; `GET /api/v1/orders/**` VIEWER/TRADER/OPERATIONS/ADMIN; `GET /api/v1/dashboard/**` TRADER/OPERATIONS/ADMIN. `/actuator/**` and OPTIONS bypass.
+- Identity: `X-User-Role` and `X-User-Id` injected by api-gateway; no JWT validation here.
+- Verified at: filter/RoleAuthorizationFilter.java
+- Reachable without that check: docker-compose: yes, port 8082 published (docker-compose.yml); k8s: no, ClusterIP (k8s/services/order-service-service.yaml).
+- No Spring Security; `RoleAuthorizationFilter` reads `X-User-Role` from gateway. [code: filter/RoleAuthorizationFilter.java]
 - TRADER data isolation: `getOrderById` returns 403 if `X-User-Id` ≠ order's `clientId`. [code: service/OrderService.java]
-- Outbound: `ClientServiceClient` injects `X-User-Role: SYSTEM`; gateway verifies tokens.
 
 ## Rules
 - LIMIT orders require `limitPrice` > 0; MARKET orders must not supply it. [code: service/OrderService.java]
 - Valid sides: BUY, SELL, SHORT_SELL; types: MARKET, LIMIT; TIF: DAY, GTD (GTC renamed per BRD §14). [decided: V4__rename_gtc_to_gtd.sql]
-- GTD default = today + 180 days; supplied `gtdDate` must be a future weekday non-holiday. [code: service/OrderService.java]
-- Order rejected at submission if market is closed. [code: service/OrderService.java]
-- Client must be ACTIVE, trading-enabled, KYC=VERIFIED and not expired. [code: service/OrderService.java]
+- GTD default = today + 180 days; `gtdDate` must be future weekday non-holiday. [code: service/OrderService.java]
+- Order rejected if market is closed; client must be ACTIVE, trading-enabled, KYC=VERIFIED. [code: service/OrderService.java]
 - Symbol must be tradable and not halted. [code: service/OrderService.java]
-- SELL: `availableToSell = holdings − open SELL commitments`; rejected if insufficient. SHORT_SELL bypasses. [code: service/OrderService.java]
+- SELL: `availableToSell = holdings − open SELL commitments`; SHORT_SELL bypasses. [code: service/OrderService.java]
 - BUY: `availableCash = settledCash − open BUY values`; rejected if insufficient. [code: service/OrderService.java]
 - `limit_price` precision NUMERIC(19,4). Routing defaults to "NYSE". [decided: V3__fix_limitprice_precision.sql]
-- DAY orders expire 16:00 ET Mon–Fri; GTD when `expiryDate == today`; 09:30 ET recovery for stale GTD. [code: service/MarketCloseScheduler.java]
+- DAY orders expire 16:00 ET; GTD expires when `expiryDate == today`; 09:30 ET recovery for stale. [code: service/MarketCloseScheduler.java]
 - `POST /api/v1/orders` TRADER-only (BRD 12.2); ADMIN excluded. [code: filter/RoleAuthorizationFilter.java]
-- Redis cache 15 s TTL for status counts; failures silently swallowed. Page size capped at 200. [code: service/OrderService.java]
-- Kafka DLT: 1→2→4 s, 3 attempts. Resilience4j: sliding window 10, failure 50 %, wait 10 s. [code: config/KafkaConfig.java, application.yml]
+- Redis cache 15 s TTL for status counts; page size capped at 200. [code: service/OrderService.java]
+- Kafka DLT: 1→2→4 s, 3 attempts; Resilience4j: window 10, 50% threshold, 10 s. [code: config/KafkaConfig.java]
 
 ## Must never
 - Skip two-level pre-trade validation (L1 bean + L2 semantic/external) before persisting an order.

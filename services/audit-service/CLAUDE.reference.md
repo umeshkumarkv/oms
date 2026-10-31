@@ -2,7 +2,7 @@
 # audit-service — reference
 
 <!-- plumbline:begin reference -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-reference v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-reference v1)
 
 ## API
 

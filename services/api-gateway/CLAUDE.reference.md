@@ -2,7 +2,7 @@
 # api-gateway — reference
 
 <!-- plumbline:begin reference -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-reference v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-reference v1)
 
 ## API
 The gateway defines no REST controllers of its own. All paths are transparent proxy routes. The table below lists every route from `application.yml` plus the SSE path handled by `SseProxyFilter`.

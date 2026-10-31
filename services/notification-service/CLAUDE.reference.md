@@ -2,7 +2,7 @@
 # notification-service — reference
 
 <!-- plumbline:begin reference -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-reference v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-reference v1)
 
 ## API
 
@@ -19,7 +19,7 @@ Last updated: 4586741 (2026-10-30, /pl-onboard, claude-reference v1)
 | `connected` | Immediately on SSE connection establishment |
 | `ORDER_STATE_CHANGED` | Kafka `order.state.changed` consumed |
 | `EXECUTION_COMPLETED` | Kafka `execution.completed` consumed |
-| `RISK_RESULT` | Kafka `risk.evaluation.result` consumed (REJECTED only) |
+| `RISK_RESULT` | Kafka `risk.evaluation.result` consumed (REJECTED and WARNED; PASSED silently dropped) |
 | (SSE comment `keepalive`) | Heartbeat scheduler, every 20 seconds |
 
 **Actuator endpoints (no auth required):**
@@ -72,7 +72,7 @@ This service has no database or persistence layer. All state is held in-process 
 | `orderId` | `UUID` | Required; event skipped if null |
 | `clientId` | `UUID` | Fallback push target when `userId` is null |
 | `userId` | `UUID` | Primary push target; nullable |
-| `result` | `String` | "PASSED" (silent drop) or "REJECTED" (triggers notification) |
+| `result` | `String` | "PASSED" (silent drop); "REJECTED" or "WARNED" (both trigger notification) |
 | `ruleCode` | `String` | Code of the risk rule that triggered rejection |
 | `reason` | `String` | Human-readable rejection reason |
 | `timestamp` | `Instant` | Evaluation timestamp |

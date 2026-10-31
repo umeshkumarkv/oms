@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # risk-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 
@@ -35,12 +35,11 @@ Required env vars: `SPRING_DATASOURCE_URL` (required), `SPRING_DATASOURCE_USERNA
 - `filter/` — `RoleAuthorizationFilter`: lightweight RBAC; `config/` — `KafkaConfig` (DLT + back-off), `RedisConfig` (30 s TTL)
 
 ## Security
-
-- No Spring Security. `RoleAuthorizationFilter` reads `X-User-Role` forwarded by the API gateway. [code: filter/RoleAuthorizationFilter.java]
-- All `/api/v1/risk/rules/**` require role `ADMIN`; other roles → 403, missing header → 401. [code: filter/RoleAuthorizationFilter.java]
-- `/actuator/**` and HTTP OPTIONS excluded from role checks. [code: filter/RoleAuthorizationFilter.java]
-- User identity via `X-User-Id` / `X-Username` headers; recorded in audit and pending-change records. [code: controller/RiskRuleController.java]
-- JWT libs on classpath but no JWT validation here — gateway is the trust boundary. [code: pom.xml]
+- Identity: `X-User-Role` header from api-gateway; no JWT validation (gateway is trust boundary). [code: pom.xml]
+- Verified at: filter/RoleAuthorizationFilter.java
+- Reachable without that check: docker-compose: yes, port 8085 published (docker-compose.yml); k8s: no, ClusterIP (k8s/services/risk-service-service.yaml).
+- No Spring Security; all `/api/v1/risk/rules/**` require ADMIN role; missing header → 401. [code: filter/RoleAuthorizationFilter.java]
+- User identity via `X-User-Id`/`X-Username` headers; recorded in audit and pending-change records. [code: controller/RiskRuleController.java]
 
 ## Rules
 
@@ -55,26 +54,26 @@ Required env vars: `SPRING_DATASOURCE_URL` (required), `SPRING_DATASOURCE_USERNA
 
 ## Must never
 
-- Do not bypass `PendingChangeService` for rule updates; `RiskRuleService.updateRule()` is unwired from the controller — do not re-expose without restoring maker/checker controls.
-- Do not allow non-ADMIN roles to reach `/api/v1/risk/rules/**`; preserve `RoleAuthorizationFilter.isAllowed()`.
-- Do not DELETE or UPDATE rows in `risk_rule_audit`; it is append-only.
-- Do not call `riskEvaluationService.loadRules()` outside `RiskRuleService` or `PendingChangeService` without a committed DB transaction.
-- Do not deploy on Java 24; Lombok/MapStruct annotation processors fail. Java 21 required.
+- Bypass `PendingChangeService` for rule updates; `RiskRuleService.updateRule()` is unwired intentionally. [code: service/PendingChangeService.java]
+- Allow non-ADMIN roles to reach `/api/v1/risk/rules/**`. [code: filter/RoleAuthorizationFilter.java]
+- DELETE or UPDATE `risk_rule_audit` rows — append-only. [decided: V4__risk_rule_metadata_and_audit.sql]
+- Call `riskEvaluationService.loadRules()` outside a committed DB transaction. [code: service/RiskEvaluationService.java]
+- Deploy on Java 24; Lombok/MapStruct fail. [code: pom.xml]
 
 ## Decisions & trade-offs
 
-- **No Spring Security:** `RoleAuthorizationFilter` reads gateway-forwarded `X-User-Role`. [code: filter/RoleAuthorizationFilter.java]
-- **In-memory rule list with reload:** loaded at startup, reloaded on approved changes. [code: service/RiskEvaluationService.java]
-- **Maker/checker:** rule changes need a second ADMIN; self-approval blocked. [code: service/PendingChangeService.java]
-- **StubRiskRule fallback:** unknown codes PASS rather than block. [code: rule/StubRiskRule.java]
-- **Kafka DLT:** 3 retries (1→2→4 s) then Dead Letter Topic. [code: config/KafkaConfig.java]
-- **Redis 30 s TTL:** default in `RedisCacheConfiguration`; `DuplicateOrderRule` uses 30 s independently. [code: config/RedisConfig.java]
+- No Spring Security — `RoleAuthorizationFilter` reads gateway-forwarded `X-User-Role`. [code: filter/RoleAuthorizationFilter.java]
+- In-memory rule list with reload — loaded at startup, reloaded on approved changes. [code: service/RiskEvaluationService.java]
+- Maker/checker — rule changes need a second ADMIN; self-approval blocked. [code: service/PendingChangeService.java]
+- StubRiskRule fallback — unknown codes PASS rather than block. [code: rule/StubRiskRule.java]
+- Kafka DLT — 3 retries (1→2→4 s) then Dead Letter Topic. [code: config/KafkaConfig.java]
+- Redis 30 s TTL — `DuplicateOrderRule` uses 30 s independently. [code: config/RedisConfig.java]
 
 ## Reference
-
-API — 7 endpoints, 1 controller. Open CLAUDE.reference.md only for the section your task needs.
-Data — 4 tables, 14 Flyway migrations. Open CLAUDE.reference.md only for the section your task needs.
-Integrations — 1 Kafka topic consumed, 1 produced, Redis. Open CLAUDE.reference.md only for the section your task needs.
-Configuration — 6 env vars, Resilience4j, Redis TTL. Open CLAUDE.reference.md only for the section your task needs.
-Tech debt — 0 TODO/FIXME. Open CLAUDE.reference.md only for the section your task needs.
+Open CLAUDE.reference.md only for the section your task needs.
+- API — 7 endpoints, 1 controller.
+- Data — 4 tables, 14 Flyway migrations.
+- Integrations — 1 Kafka topic consumed, 1 produced, Redis.
+- Configuration — 6 env vars, Resilience4j, Redis TTL.
+- Tech debt — 0 TODO/FIXME.
 <!-- plumbline:end unit -->

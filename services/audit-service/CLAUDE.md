@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # audit-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 
@@ -16,8 +16,6 @@ No active-profile switching; config from environment variables (see Configuratio
 
 **Test recipe:** `mvn test` · Java 21 required (`<java.version>21</java.version>` in root pom.xml) · **FAILED** — `ExceptionInInitializerError: TypeTag::UNKNOWN` — Lombok/MapStruct annotation processors incompatible with Java 24; must switch to Java 21 · 2026-10-30
 
-JaCoCo 80% line-coverage gate on every `mvn test`; `AuditServiceApplication`, `KafkaConfig`, `RedisConfig` excluded (`pom.xml` jacoco excludes).
-
 ## Architecture & structure
 
 **Stack:** Java 21 · Spring Boot 3.2.4 · Spring Data JPA (Hibernate, ddl-auto: validate) · Spring Kafka · Spring Data Redis · Flyway · PostgreSQL 15 · Lombok 1.18.30 · MapStruct 1.5.5.Final · Resilience4j 2.2.0 · springdoc-openapi 2.3.0
@@ -27,11 +25,11 @@ JaCoCo 80% line-coverage gate on every `mvn test`; `AuditServiceApplication`, `K
 Database schema: `audit_schema`, Flyway-managed (V1 create, V2 no-op, V3 adds `client_id`). Virtual threads enabled.
 
 ## Security
-
-No Spring Security. `RoleAuthorizationFilter` trusts the gateway-forwarded `X-User-Role` header (JJWT on classpath, unused). [code: filter/RoleAuthorizationFilter.java]
-- Allowed roles: VIEWER, OPERATIONS, ADMIN, TRADER, SYSTEM; missing → 401; unknown → 403; `/actuator/**` and OPTIONS excluded.
-- **Risk:** Javadoc says "ADMIN excluded per BRD 12.2" but `AUDIT_READ_ROLES` includes ADMIN — stale comment, code admits ADMIN. [code: filter/RoleAuthorizationFilter.java]
-- Token storage: none; identity from HTTP header only.
+- Identity: `X-User-Role` header from api-gateway; JJWT on classpath but unused here.
+- Verified at: filter/RoleAuthorizationFilter.java
+- Reachable without that check: docker-compose: yes, port 8087 published (docker-compose.yml); k8s: no, ClusterIP (k8s/services/audit-service-service.yaml).
+- No Spring Security; roles VIEWER/OPERATIONS/ADMIN/TRADER/SYSTEM allowed; missing → 401. [code: filter/RoleAuthorizationFilter.java]
+- Risk: stale Javadoc says "ADMIN excluded per BRD 12.2" but `AUDIT_READ_ROLES` includes ADMIN. [code: filter/RoleAuthorizationFilter.java]
 
 ## Rules
 
@@ -44,21 +42,21 @@ No Spring Security. `RoleAuthorizationFilter` trusts the gateway-forwarded `X-Us
 
 ## Must never
 
-- Do not write to or modify existing `AuditLog` records; the table has no UPDATE path in the codebase.
-- Do not remove or weaken `RoleAuthorizationFilter`; it is the sole authorization control for this service.
-- Do not change the `actor_type` DB constraint without a Flyway migration; Hibernate validate mode will fail startup.
-- Do not add Spring Security without reconciling or removing `RoleAuthorizationFilter`.
-- Do not bypass the `order.state.changed` duplicate-check; doing so produces duplicate audit records.
-- Do not drop below 80% JaCoCo line coverage (excludes: `AuditServiceApplication`, `KafkaConfig`, `RedisConfig`).
+- Modify existing `AuditLog` records — no UPDATE path exists. [code: service/AuditService.java]
+- Remove or weaken `RoleAuthorizationFilter` — sole auth control. [code: filter/RoleAuthorizationFilter.java]
+- Change `actor_type` DB constraint without a Flyway migration — Hibernate validate will fail. [decided: application.yml]
+- Add Spring Security without removing `RoleAuthorizationFilter`. [code: filter/RoleAuthorizationFilter.java]
+- Bypass the duplicate-check in `AuditEventConsumer` — produces duplicate audit records. [code: kafka/consumer/AuditEventConsumer.java]
+- Drop below 80% JaCoCo line coverage (excludes: `AuditServiceApplication`, `KafkaConfig`, `RedisConfig`). [code: pom.xml]
 
 ## Decisions & trade-offs
 
-- **No Spring Security:** plain servlet filter reads gateway-forwarded `X-User-Role`. [code: filter/RoleAuthorizationFilter.java]
-- **Kafka DLT + exponential backoff:** 3 retries then `DeadLetterPublishingRecoverer`. [code: config/KafkaConfig.java]
-- **`Map<String, Object>` Kafka deserialization:** avoids `__TypeId__` coupling across services. [code: kafka/consumer/AuditEventConsumer.java]
-- **Redis wired but unused:** `CacheManager` provisioned (30 s TTL), no `@Cacheable` annotations. [code: config/RedisConfig.java]
-- **Manual DTO mapping:** `AuditService.toResponse()` maps by hand; no MapStruct mapper generated. [code: service/AuditService.java]
-- **Virtual threads:** `spring.threads.virtual.enabled: true`. [code: application.yml]
+- No Spring Security — servlet filter reads gateway-forwarded `X-User-Role`. [code: filter/RoleAuthorizationFilter.java]
+- Kafka DLT + exponential backoff — 3 retries then `DeadLetterPublishingRecoverer`. [code: config/KafkaConfig.java]
+- `Map<String, Object>` Kafka deserialization — avoids `__TypeId__` coupling. [code: kafka/consumer/AuditEventConsumer.java]
+- Redis wired but unused — `CacheManager` provisioned (30 s TTL), no `@Cacheable`. [code: config/RedisConfig.java]
+- Manual DTO mapping — `AuditService.toResponse()` maps by hand; no MapStruct mapper. [code: service/AuditService.java]
+- Virtual threads enabled. [code: application.yml]
 
 ## Reference
 

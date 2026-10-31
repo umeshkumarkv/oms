@@ -1,8 +1,8 @@
-<!-- plumbline:template claude-unit v1 -->
+<!-- plumbline:template claude-unit v2 -->
 # marketdata-service
 
 <!-- plumbline:begin unit -->
-Last updated: 4586741 (2026-10-30, /pl-onboard, claude-unit v1)
+Last updated: 39916bd (2026-10-30, /pl-onboard, claude-unit v2)
 
 ## Purpose
 
@@ -24,46 +24,45 @@ Env vars: `SPRING_DATASOURCE_URL` (required), `SPRING_DATASOURCE_USERNAME` (defa
 
 **Layers:** Controller → Service → Repository (JPA); MapStruct DTOs; `RoleAuthorizationFilter` + `RoleGuard` for authorization.
 
-**Packages:** `controller` (3 controllers: `MarketDataController`, `WatchlistController`, `AdminController`) · `service` (`MarketDataService`, `PriceTickService` @Scheduled 1 s, `TickPersistenceService` @Async, `TickService`, `WatchlistService`, `ScenarioService`, `AdminResetService`) · `websocket` (`MarketDataWebSocketHandler`, `/ws/v1`, 30 s PING) · `domain` (5 entities: `Instrument`, `Tick`, `UserWatchlist`, `MarketHoliday`, `MarketIndex`) · `repository` (JPA repos; `TickRepository` native upsert) · `config` + `filter` + `mapper` (4 MapStruct mappers).
+**Packages:** `controller` (`MarketDataController`, `WatchlistController`, `AdminController`) · `service` (`PriceTickService` @Scheduled 1 s, `TickPersistenceService` @Async, `MarketDataService`, `WatchlistService`, `ScenarioService`, `AdminResetService`) · `websocket` (`MarketDataWebSocketHandler`, `/ws/v1`, 30 s PING) · `domain` (5 entities) · `repository` (`TickRepository` native upsert) · `filter` + `mapper` (4 MapStruct mappers).
 
 **Scheduling:** tick every 1 000 ms; WebSocket ping every 30 000 ms; `@Async` on virtual threads.
 
 ## Security
-
-- **No Spring Security.** Authorization via custom servlet filter and guard.
-- `RoleAuthorizationFilter` reads `X-User-Role` from gateway. `GET /api/v1/market/**` allows VIEWER, TRADER, OPERATIONS; denies ADMIN (BRD 12.2). Missing header = internal call, passed through. [code: `filter/RoleAuthorizationFilter.java`]
-- `AdminController` (`/api/v1/admin/**`) excluded from filter; calls `RoleGuard.requireRole(header, "ADMIN")` directly. [code: `controller/AdminController.java`]
-- Watchlist endpoints require valid UUID in `X-User-Id`; invalid → 401. [code: `service/WatchlistService.java`]
-- **Risk:** `AdminController.reset()` reads role from raw `Authorization` header (not `X-User-Role`) — inconsistent; a caller that can set `Authorization: ADMIN` can trigger a data reset without gateway. [code: `controller/AdminController.java`]
+- Identity: `X-User-Role` from api-gateway; missing = internal call, passed through.
+- Verified at: filter/RoleAuthorizationFilter.java (market/watchlist paths); controller/AdminController.java reads raw `Authorization` header — inconsistent, see risk below.
+- Reachable without that check: docker-compose: yes, port 8084 published (docker-compose.yml); k8s: no, ClusterIP (k8s/services/marketdata-service-service.yaml).
+- No Spring Security; `GET /api/v1/market/**` VIEWER/TRADER/OPERATIONS only — ADMIN denied (BRD 12.2). [code: filter/RoleAuthorizationFilter.java]
+- Risk: `AdminController.reset()` reads from raw `Authorization` header, not `X-User-Role`; direct caller can bypass gateway. [code: controller/AdminController.java]
 
 ## Rules
 
-- Symbols normalised to uppercase. Watchlist capped at 50; search results at 20. [code: `service/MarketDataService.java`, `service/WatchlistService.java`]
-- `tradingHalted = true` instruments skipped in tick loop and blocked from scenario start. [code: `service/PriceTickService.java`]
-- Price bounded [0.01, 99999.9999]; tick upsert idempotent on `(symbol, tick_time)`. [code: `service/PriceTickService.java`, `repository/TickRepository.java`]
-- Scenario start atomic (`putIfAbsent`); one per symbol; `confirmReset` must be `true`. [code: `service/ScenarioService.java`, `service/AdminResetService.java`]
-- Market-hours check skipped when `bypass-market-hours=true` (default `true`). [code: `application.yml`]
-- Redis TTLs: prices/movers/indices 30 s, search 10 s, type-search 60 s. [code: `service/MarketDataService.java`]
+- Symbols to uppercase; watchlist cap 50, search 20. [code: service/MarketDataService.java, service/WatchlistService.java]
+- `tradingHalted = true` instruments skipped in tick loop and blocked from scenario start. [code: service/PriceTickService.java]
+- Price bounded [0.01, 99999.9999]; tick upsert idempotent on `(symbol, tick_time)`. [code: service/PriceTickService.java, repository/TickRepository.java]
+- Scenario start atomic (`putIfAbsent`); one per symbol; `confirmReset` must be `true`. [code: service/ScenarioService.java, service/AdminResetService.java]
+- Market-hours check skipped when `bypass-market-hours=true` (default `true`). [code: application.yml]
+- Redis TTLs: prices/movers/indices 30 s, search 10 s, type-search 60 s. [code: service/MarketDataService.java]
 
 ## Must never
 
-- Remove the ADMIN exclusion from `GET /api/v1/market/**` (BRD 12.2). [code: `filter/RoleAuthorizationFilter.java`]
-- Change `UpsertTick` to a plain INSERT — upsert is load-bearing for the `@Async` retry path.
-- Add Spring Security alongside the custom filter — conflicting access control.
-- Log raw `X-User-Id` or `Authorization` header values.
-- Introduce blocking I/O on the `@Scheduled` tick thread — persistence is `@Async`.
-- Bypass `MAX_WATCHLIST_SIZE = 50`.
+- Remove the ADMIN exclusion from `GET /api/v1/market/**` (BRD 12.2). [code: filter/RoleAuthorizationFilter.java]
+- Change `UpsertTick` to plain INSERT — upsert is required for `@Async` retry idempotency. [code: repository/TickRepository.java]
+- Add Spring Security alongside the custom filter. [code: filter/RoleAuthorizationFilter.java]
+- Log raw `X-User-Id` or `Authorization` header values. [code: filter/RoleAuthorizationFilter.java]
+- Introduce blocking I/O on the `@Scheduled` tick thread. [code: service/TickPersistenceService.java]
+- Bypass `MAX_WATCHLIST_SIZE = 50`. [code: service/WatchlistService.java]
 
 ## Decisions & trade-offs
 
-- **No Spring Security** — custom filter reads gateway-forwarded headers. [code: `filter/RoleAuthorizationFilter.java`]
-- **Virtual threads** — `@Async` tick persistence uses Spring Boot 3.2 virtual-thread executor. [code: `config/SchedulingConfig.java`]
-- **bypass-market-hours defaults `true`** — continuous simulation without NYSE clock alignment. [code: `application.yml`]
-- **Tick upsert not insert** — idempotent; prevents duplicate-key on async retry. [code: `repository/TickRepository.java`]
-- **Tick time anchored to midnight ET** — keeps history valid in bypass mode. [code: `service/TickService.java`]
-- **Scenario state in-memory** — `ConcurrentHashMap`; ephemeral, cleared by admin reset. [code: `service/ScenarioService.java`]
-- **NUMERIC(12,4)→(19,4)** (V12) — prior precision overflowed in extended simulation. [code: `db/migration/V12__fix_ticks_numeric_precision.sql`]
-- **percentChange computed on read** — avoids stale stored values. [code: `db/migration/V16__create_market_indices.sql`]
+- No Spring Security — custom filter reads gateway-forwarded headers. [code: filter/RoleAuthorizationFilter.java]
+- Virtual threads — `@Async` tick persistence uses Spring Boot 3.2 virtual-thread executor. [code: config/SchedulingConfig.java]
+- bypass-market-hours defaults `true` — continuous simulation without NYSE clock alignment. [code: application.yml]
+- Tick upsert not insert — idempotent; prevents duplicate-key on async retry. [code: repository/TickRepository.java]
+- Tick time anchored to midnight ET — keeps history valid in bypass mode. [code: service/TickService.java]
+- Scenario state in-memory — `ConcurrentHashMap`; ephemeral, cleared by admin reset. [code: service/ScenarioService.java]
+- NUMERIC(12,4)→(19,4) (V12) — prior precision overflowed in extended simulation. [code: db/migration/V12__fix_ticks_numeric_precision.sql]
+- percentChange computed on read — avoids stale stored values. [code: db/migration/V16__create_market_indices.sql]
 
 ## Reference
 
