@@ -1,0 +1,128 @@
+---
+description: Plumbline — turn a feature idea into a PRD (and, with your yes, a JIRA epic), checked by an independent judge
+argument-hint: "<feature idea in plain English>"
+---
+
+# /pl-pm
+
+Turn a feature idea into a PRD: problem, solution, success criteria, scope, dependencies, prioritised backlog. A
+**writer** subagent drafts it; an independent **judge** checks it. Up to 3 attempts, then it is handed to the user.
+The epic is created in JIRA only after the user says yes.
+
+Idea: $ARGUMENTS
+
+## How subagents are started
+- **Claude Code:** the Agent tool with `subagent_type: plumbline-pm-writer` or `plumbline-judge` — in the foreground (`run_in_background: false`): wait for each result before the next step.
+- **GitHub Copilot:** VS Code — `#runSubagent` (the `agent/runSubagent` tool); Copilot CLI — the `task` tool; with
+  agent `plumbline-pm-writer` or `plumbline-judge` (`.github/agents/`). If subagents are not available, stop and say so.
+
+Never do the writer's or the judge's work yourself, and never pass the writer's reasoning to the judge. **Shell:** run
+only `git` (from the repository root — never `git -C`, which permission rules do not match), `bash .github/plumbline/check-template.sh` yourself; read and search files with your file tools. Do not research the code yourself — that is the
+writer's and the judge's job; you route, check scope and hand over.
+If a helper replies with `FILE: <path>` and the content instead of writing the file, save that content to the path
+unchanged, then continue — but only for a path you gave that helper; any other path is a FAIL finding, not a write.
+
+## Every run
+- **Judge replies:** only the judge's JSON counts. Not JSON → ask that judge once more, then count the attempt as FAIL
+  ("judge reply unreadable"). Never decide PASS yourself or drop a finding before the next attempt.
+- **Project memory:** no root `CLAUDE.md` → `STOPPED: run /pl-onboard first` (only `/pl-onboard` runs without one).
+  Helpers work from the CLAUDE.md files (kept current by `/pl-doc`) and the JIRA/Confluence
+  material, opening code only for what they change or review; never research the code yourself. List their "Add to
+  CLAUDE.md" / "CLAUDE.md out of date" notes in the hand-over for `/pl-doc`.
+- **Freshness:** for each unit CLAUDE.md a helper gets, run `git log --oneline <its Last updated commit>..HEAD --
+  <unit folder> ':!**/CLAUDE*.md'` (CLAUDE.md's own edits do not make it stale). Commits listed → tell the helpers and the judge "CLAUDE.md may be stale for: <files those commits
+  changed>", and say so in the hand-over.
+- **Templates and lanes:** everything that leaves this machine — JIRA, Confluence, PR descriptions and reviews — and
+  every CLAUDE.md file is written on its template in `.github/plumbline/templates/` (`claude-root.md`,
+  `claude-unit.md`, `claude-reference.md` for those files; the JIRA hand-off table for the rest), and names the
+  template's version. Give each writer the template, the version (`.github/plumbline/VERSION`) and
+  `git rev-parse --short HEAD`; tell the judge the writer's agent name, so it checks that agent's *Your lane*. Before
+  each judge and before posting run `bash .github/plumbline/check-template.sh <template> <draft>` (it also fails text
+  outside the lane): FAIL = that attempt's finding, no judge. No bash → the judge checks it. Set the footer's `judge`.
+- **Limits:** at most 3 attempts per item, one writer and one judge each. More than 6 items → show the list and ask;
+  nobody to answer → do the first 6 and list the rest.
+- **Nobody to answer** (scheduled/headless): where a step says ask, take its safe choice or stop that item — never
+  guess; write nothing outside the repository and `.plumbline-drafts/`; list the unasked questions in the hand-over.
+- **Hand-over:** first line `PASS` · `FAIL after 3 attempts` · `STOPPED: <reason>` · `UNVERIFIED: <what did not
+  run>`; then the details; then each question for the user with the exact text or command it would send or run.
+
+## Drafts
+Drafts go in `.plumbline-drafts/<slug>/` at the repository root (slug = a short kebab-case name for the idea). Before
+the first draft, make sure `.plumbline-drafts/.gitignore` exists with the single line `*` (write it with your write tool; it keeps the folder out of git without touching `.git/`, which Claude Code protects).
+
+## JIRA hand-off
+Roles pass work to each other only through JIRA — tickets, comments and labels — never through files on someone's
+machine, so no agent redoes what an earlier role settled. The PRD and each epic's HLD are Confluence pages (under the
+`Confluence parent page` in the Plumbline settings), linked from the epic; every other hand-off is a ticket or comment.
+The person running a command is that role's SME: their yes at the hand-over is the approval, and JIRA records who.
+
+| Step | Posts | Template | Label added on the SME's yes |
+|---|---|---|---|
+| `/pl-pm` | PRD page; the epic, with summary + PRD link | `prd.md`, `epic.md` | `plumbline-prd-approved` |
+| `/pl-ba` | stories under the epic — business criteria | `story.md` | `plumbline-dor-ready` |
+| `/pl-arch <EPIC>` | HLD page under the PRD; epic comment with its link; decisions → CLAUDE.md docs PR | `hld.md`, `handoff-hld.md`, `pr.md` | `plumbline-hld-final` |
+| `/pl-arch <STORY>` | story comment — the LLD; story points set | `handoff-arch.md` | `plumbline-arch-approved` |
+| `/pl-dev` | PR description; story comment — branch, PR, test result | `pr.md`, `handoff-dev.md` | — (the PR is reviewed next) |
+| `/pl-code-review` | the same text as the PR review and the story comment | `handoff-review.md` | `plumbline-review-passed` |
+| `/pl-qa` | story comment — evidence per criterion | `handoff-qa.md` | `plumbline-qa-passed` |
+| `/pl-doc` | docs PR updating CLAUDE.md + story comment | `pr.md`, `handoff-doc.md` | the architect approves the docs PR |
+| `/pl-devops` | PR description; story comment | `pr.md`, `handoff-devops.md` | — |
+| `/pl-sm` | sprint report; one comment per flagged ticket | `sprint-report.md`, `sm-flag.md` | — |
+
+- **Input:** the ticket (description, labels, links), the latest `[Plumbline /pl-<role>]` comment of each kind (JIRA
+  shows `\[Plumbline …\]`: ignore backslashes), and each PRD or HLD page they link at the version named (a story's HLD
+  is linked from its epic; no version → compare last-modified times).
+- **Gate:** start only when the previous step's label is on the ticket (a story's design also needs
+  `plumbline-hld-final` on its epic). A hand-off edited after it was posted (comment `updated` later than `created`;
+  PRD or HLD page past the pinned version) → `STOPPED: <what> changed after approval — re-run <command>`.
+- **The architect's word is final:** later roles follow the HLD and LLD exactly. A role that cannot → `STOPPED:
+  design gap — /pl-arch <KEY>`; never work around it. Do not redo an earlier role's work.
+- **Output:** post what the table says, on its template, after the SME's yes with the exact text shown first; then
+  add the label.
+- **Status:** with the hand-over the SME approves, move the ticket via JIRA's transitions to the `Workflow` statuses
+  (Plumbline settings): `/pl-dev` → In Progress (epic too), then In Review with the PR; a review or QA FAIL → In
+  Progress; only `/pl-doc` → Done, after merge and `plumbline-qa-passed` (epic with its last story). Never force one.
+- No Confluence tools or no parent page → the PRD goes in the epic description, the HLD in the epic comment. A comment must stay under 30,000
+  characters (JIRA's limit is 32,767): longer → split. No JIRA tools → output as text to paste. Drafts are scratch.
+
+## Metrics
+At the hand-over append to `.plumbline-drafts/metrics.csv` (header, if new:
+`date,command,target,attempts,verdict,tests_run,minutes,human_decision`): date, command, story/branch/PR, attempts,
+verdict, tests ran `yes`/`no`/`n/a`, minutes (`date +%s` at start and at hand-over), and `human_decision` once the user
+answers: `approved`, `edited` or `rejected`. It stays local; `/pl-sm metrics` summarises it.
+**Files:** before the first draft, create `.plumbline-drafts/.gitignore` containing `*` (the folder is never
+committed). Create drafts and metrics with your write tool — never `mkdir`, `echo`, `printf` or redirection.
+
+## Step 1 — Context
+Read the root `CLAUDE.md` (solution, out-of-scope list, rules, Plumbline settings); the writer may read unit CLAUDE.md
+files and code to learn what exists today, but writes business language only. If the idea is empty or too vague to name who has the problem, ask one question.
+
+**Stop and ask the user** if: the idea is entirely in the out-of-scope list; it contradicts a rule in the root CLAUDE.md; or existing epics already cover part of it (if JIRA tools
+are connected, search for them).
+
+## Step 2 — Attempts (1, 2, 3)
+1. **Writer** — start `plumbline-pm-writer` with: the idea, the CLAUDE.md paths, the draft path
+   `.plumbline-drafts/<slug>/prd.md`; on attempts 2–3 also the judge's findings (verbatim JSON).
+2. **Judge** — start `plumbline-judge` with exactly: *Review:* the PRD path and the root CLAUDE.md (writer: `plumbline-pm-writer`); *Checklist:* the
+   **PRD checklist** below, verbatim. PASS → Step 3. FAIL → next attempt with the findings.
+
+After 3 failed attempts: stop, show the last findings and the draft, and hand over to the user.
+
+### PRD checklist
+1. Every section of the template has real content (`None` is fine only for Open questions and Dependencies).
+2. Problem names a specific business role, what they cannot do today, and the business impact.
+3. *Today* says what users can and cannot do now (business terms); Solution describes, in business language, what users will be able to do and see — enough for a BA to write stories.
+4. At least 2 success criteria, each observable by a user or measurable in the business.
+5. Out of scope is explicit and refers to the root CLAUDE.md out-of-scope list where it applies.
+6. No technical design: no APIs, status codes, services or units, data model, classes or points (that is `/pl-arch`).
+7. Dependencies are named, or explicitly "None".
+8. Nothing from the root CLAUDE.md out-of-scope list appears in P1, P2 or P3.
+9. Every backlog item has a size S / M / L, and P1 has no L.
+10. No placeholders (`{…}`, TBD, TODO) left.
+
+## Step 3 — Hand over
+Show the PRD. Then ask before each, in this order (exact content first, then a yes): (1) create the epic in JIRA
+(Plumbline settings: JIRA project) with the title; (2) publish the PRD as a Confluence page `<EPIC> — <title> — PRD`
+under the `Confluence parent page` — the key is in the title from the start, so the page is never renamed; (3) set the
+epic's description on `epic.md` with the page link and its version; (4) add `plumbline-prd-approved`. No Confluence →
+the full PRD goes in the epic description.
