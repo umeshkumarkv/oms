@@ -45,7 +45,7 @@ POC order management system: client onboarding, order submission + state machine
 | `risk.evaluation.requested` | order-service | risk-service | Risk check request |
 | `risk.evaluation.result` | risk-service | order, notification | Risk result (PASSED/REJECTED/WARNED) |
 | `order.execution.requested` | order-service | execution-service | Route to fill engine |
-| `execution.completed` | execution-service | audit, notification, client | Fill result |
+| `execution.completed` | execution-service | order, audit, notification, client | Fill result |
 
 DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.completed.DLT`; 1 s→2 s→4 s, 3 attempts.
 
@@ -64,7 +64,7 @@ DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.com
 - **Money:** `BigDecimal`; serialised as plain strings; never `double`/`float`.
 - **Kafka errors:** 1 s→2 s→4 s, 3 attempts, then `DeadLetterPublishingRecoverer`.
 - **Resilience4j:** CB on outbound HTTP in order-service, client-service, execution-service (window 10, 50 %, 10 s wait).
-- **JaCoCo:** 80 % line coverage in audit-service and notification-service.
+- **JaCoCo:** 80 % line gate (see Rules for every change).
 
 ## Decisions & trade-offs
 
@@ -119,7 +119,7 @@ DLTs: `order.state.changed.DLT`, `risk.evaluation.requested.DLT`, `execution.com
 - **Data — monetary values:** `BigDecimal` only; serialise as plain strings. Never `double`/`float` for money.
 - **Data — cross-service ownership:** Each service owns one schema; cross-service data flows via Kafka or REST only.
 - **Testing — Java 21:** `mvn test` requires Java 21; Lombok/MapStruct are incompatible with Java 24. CI enforces via `actions/setup-java@v4`.
-- **Testing — JaCoCo gate:** 80 % line coverage in audit-service and notification-service; do not shrink exclusion lists without justification.
+- **Testing — JaCoCo gate:** 80 % lines at `mvn verify` in every service but api-gateway and marketdata (root `pom.xml`); never shrink exclusions without a reason.
 - **Kafka — DLT pattern:** Every consumer must use exponential back-off (1 s, 2 s, 4 s, 3 attempts) + `DeadLetterPublishingRecoverer`; do not remove DLT handling.
 - **Kafka — consumer group IDs:** Do not change `groupId` values without coordinating an offset reset.
 - **Virtual threads — ThreadLocal:** Do not introduce `ThreadLocal`-dependent middleware incompatible with virtual-thread pinning.

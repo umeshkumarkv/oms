@@ -43,7 +43,7 @@ Port: **8083**. No active Spring profiles; configuration via environment variabl
 - Holdings upserted (weighted-average price) on BUY; quantity reduced (floor 0) on SELL [code: service/ClientService.java]
 - `Client` entity uses optimistic locking (`@Version`) to prevent concurrent cash mutation races [code: domain/Client.java]
 - Kafka consumer retries with exponential backoff (1 s, 2 s, 4 s — 3 attempts) then publishes to DLT [code: config/KafkaConfig.java]
-- ADMIN role cannot access portfolio endpoints (BRD 12.2) [decided RoleAuthorizationFilter.java comment]
+- ADMIN role cannot access portfolio endpoints (BRD 12.2) [code: filter/RoleAuthorizationFilter.java]
 - All money values serialised as plain-string `BigDecimal` (scale 2 in responses, scale 4 for `avgPrice`) [code: service/ClientService.java, dto/response/]
 
 ## Must never

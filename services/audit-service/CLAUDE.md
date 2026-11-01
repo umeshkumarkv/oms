@@ -44,7 +44,7 @@ Database schema: `audit_schema`, Flyway-managed (V1 create, V2 no-op, V3 adds `c
 
 - Modify existing `AuditLog` records — no UPDATE path exists. [code: service/AuditService.java]
 - Remove or weaken `RoleAuthorizationFilter` — sole auth control. [code: filter/RoleAuthorizationFilter.java]
-- Change `actor_type` DB constraint without a Flyway migration — Hibernate validate will fail. [decided: application.yml]
+- Change `actor_type` DB constraint without a Flyway migration — Hibernate validate will fail. [code: src/main/resources/application.yml]
 - Add Spring Security without removing `RoleAuthorizationFilter`. [code: filter/RoleAuthorizationFilter.java]
 - Bypass the duplicate-check in `AuditEventConsumer` — produces duplicate audit records. [code: kafka/consumer/AuditEventConsumer.java]
 - Drop below 80% JaCoCo line coverage (excludes: `AuditServiceApplication`, `KafkaConfig`, `RedisConfig`). [code: pom.xml]

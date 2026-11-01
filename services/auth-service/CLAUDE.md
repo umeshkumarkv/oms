@@ -47,7 +47,7 @@ Root package: `com.brokerdealer.authservice`. Flyway manages `auth_schema` (11 s
 - Username uniqueness: case-insensitive lookup; DB unique constraint. [code: repository/UserRepository.java, db/migration/V1__schema.sql]
 - All responses include `meta.timestamp` and `meta.requestId`. [code: controller/AuthController.java, controller/UserController.java, exception/GlobalExceptionHandler.java]
 - `JWT_SECRET` has no default; absent = startup failure. [code: service/JwtService.java]
-- Schema changes via Flyway only; `ddl-auto: validate`. [decided: src/main/resources/application.yml]
+- Schema changes via Flyway only; `ddl-auto: validate`. [code: src/main/resources/application.yml]
 
 ## Must never
 
@@ -64,7 +64,7 @@ Root package: `com.brokerdealer.authservice`. Flyway manages `auth_schema` (11 s
 - `X-User-Role` trusted unconditionally by `RoleHeaderAuthenticationFilter` — gateway and network controls are the spoofing defence. [code: SecurityConfig.java comment]
 - No refresh tokens — 30-minute TTL with blacklist-on-logout; no documented reason. [code: service/JwtService.java]
 - MapStruct declared but unused — `UserService.toResponse()` maps manually; no documented reason. [code: pom.xml]
-- Virtual threads enabled. [decided: application.yml]
+- Virtual threads enabled. [code: src/main/resources/application.yml]
 
 ## Reference
 

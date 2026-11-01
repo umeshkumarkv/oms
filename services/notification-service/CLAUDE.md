@@ -49,7 +49,7 @@ Packages: `config` (SecurityConfig, JwtAuthenticationFilter, KafkaConfig), `cont
 ## Must never
 
 - Do not introduce server-side session state; the service is stateless by design. [code: config/SecurityConfig.java]
-- Do not query a database or make outbound HTTP calls. [decided: design — no DB or HTTP deps; stated in Purpose]
+- Do not query a database or make outbound HTTP calls. [code: pom.xml — no JPA, JDBC or HTTP client dependency]
 - Do not expose `JWT_SECRET` in logs, responses, or committed config files. [code: config/JwtAuthenticationFilter.java]
 - Do not remove per-topic consumer group IDs from `@KafkaListener`; the app-level group-id is a fallback only. [code: kafka/consumer/OrderStateConsumer.java]
 - Do not send a notification for a RISK_RESULT event with `result == "PASSED"`. [code: kafka/consumer/RiskResultConsumer.java]

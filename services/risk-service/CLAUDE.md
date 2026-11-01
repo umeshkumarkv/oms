@@ -47,16 +47,16 @@ Required env vars: `SPRING_DATASOURCE_URL` (required), `SPRING_DATASOURCE_USERNA
 - Unknown codes use `StubRiskRule` (always PASS). WARN results collected, not short-circuiting. [code: rule/StubRiskRule.java]
 - Rule changes via maker/checker; PATCH submits pending change; self-approval prohibited. [code: service/PendingChangeService.java]
 - `rejectionReason` required on reject; submit requires at least `enabled` or `thresholdValue`. [code: service/PendingChangeService.java]
-- `risk_rule_audit` append-only — no UPDATE or DELETE. [decided: V4__risk_rule_metadata_and_audit.sql]
+- `risk_rule_audit` append-only — no UPDATE or DELETE. [code: db/migration/V4__risk_rule_metadata_and_audit.sql]
 - Duplicate-order detection: Redis SET NX 30 s; key `dup:{clientId}:{symbol}:{side}:{qty}:{price}`. [code: rule/DuplicateOrderRule.java]
-- WARN rules default `enabled=false`; ADMIN enables explicitly. On approval, in-memory rules reload. [decided: V12__fix_warn_rules_action_and_threshold.sql]
+- WARN rules default `enabled=false`; ADMIN enables explicitly. On approval, in-memory rules reload. [code: db/migration/V12__fix_warn_rules_action_and_threshold.sql]
 - Kafka DLT: 1→2→4 s, 3 attempts. [code: config/KafkaConfig.java]
 
 ## Must never
 
 - Bypass `PendingChangeService` for rule updates; `RiskRuleService.updateRule()` is unwired intentionally. [code: service/PendingChangeService.java]
 - Allow non-ADMIN roles to reach `/api/v1/risk/rules/**`. [code: filter/RoleAuthorizationFilter.java]
-- DELETE or UPDATE `risk_rule_audit` rows — append-only. [decided: V4__risk_rule_metadata_and_audit.sql]
+- DELETE or UPDATE `risk_rule_audit` rows — append-only. [code: db/migration/V4__risk_rule_metadata_and_audit.sql]
 - Call `riskEvaluationService.loadRules()` outside a committed DB transaction. [code: service/RiskEvaluationService.java]
 - Deploy on Java 24; Lombok/MapStruct fail. [code: pom.xml]
 

@@ -25,7 +25,7 @@ Layer pattern: `controller` → `service` → `repository` (JPA + Specifications
 - `client` — 3 circuit-broken HTTP clients: `ClientServiceClient`, `MarketDataServiceClient`, `ExecutionServiceClient`.
 - `repository` — `OrderRepository` (JPA + Specs + 12 custom queries).
 - `domain` — `Order` entity; enums `OrderStatus` (11), `OrderSide`, `OrderType`, `TimeInForce`.
-- `filter` + `exception` — `RoleAuthorizationFilter`, `GlobalExceptionHandler` + 14 exceptions.
+- `filter` + `exception` — `RoleAuthorizationFilter`, `GlobalExceptionHandler` + 16 exceptions.
 
 Virtual threads enabled; `JdkClientHttpRequestFactory`. Kafka DLT: exponential backoff 1→2→4 s, 3 attempts.
 
@@ -38,13 +38,13 @@ Virtual threads enabled; `JdkClientHttpRequestFactory`. Kafka DLT: exponential b
 
 ## Rules
 - LIMIT orders require `limitPrice` > 0; MARKET orders must not supply it. [code: service/OrderService.java]
-- Valid sides: BUY, SELL, SHORT_SELL; types: MARKET, LIMIT; TIF: DAY, GTD (GTC renamed per BRD §14). [decided: V4__rename_gtc_to_gtd.sql]
+- Valid sides: BUY, SELL, SHORT_SELL; types: MARKET, LIMIT; TIF: DAY, GTD (GTC renamed per BRD §14). [code: db/migration/V4__rename_gtc_to_gtd.sql]
 - GTD default = today + 180 days; `gtdDate` must be future weekday non-holiday. [code: service/OrderService.java]
 - Order rejected if market is closed; client must be ACTIVE, trading-enabled, KYC=VERIFIED. [code: service/OrderService.java]
 - Symbol must be tradable and not halted. [code: service/OrderService.java]
 - SELL: `availableToSell = holdings − open SELL commitments`; SHORT_SELL bypasses. [code: service/OrderService.java]
 - BUY: `availableCash = settledCash − open BUY values`; rejected if insufficient. [code: service/OrderService.java]
-- `limit_price` precision NUMERIC(19,4). Routing defaults to "NYSE". [decided: V3__fix_limitprice_precision.sql]
+- `limit_price` precision NUMERIC(19,4). Routing defaults to "NYSE". [code: db/migration/V3__fix_limitprice_precision.sql]
 - DAY orders expire 16:00 ET; GTD expires when `expiryDate == today`; 09:30 ET recovery for stale. [code: service/MarketCloseScheduler.java]
 - `POST /api/v1/orders` TRADER-only (BRD 12.2); ADMIN excluded. [code: filter/RoleAuthorizationFilter.java]
 - Redis cache 15 s TTL for status counts; page size capped at 200. [code: service/OrderService.java]
